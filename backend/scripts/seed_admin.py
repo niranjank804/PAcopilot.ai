@@ -20,7 +20,11 @@ async def seed_admin() -> None:
     # No self-registration can ever succeed on a fresh database: it requires
     # an existing organization code, and approval requires an existing admin
     # - neither exists yet. This creates both, once, so there's a way in.
-    email = os.environ.get("BOOTSTRAP_ADMIN_EMAIL")
+    # .strip().lower() defends against trailing whitespace/newlines from
+    # pasting into a dashboard env var field, and against Google's email
+    # claim being lowercase when the pasted value isn't - either would
+    # silently break the exact-match lookup in google_login otherwise.
+    email = (os.environ.get("BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
 
     if not email:
         print("BOOTSTRAP_ADMIN_EMAIL not set, skipping admin bootstrap.")
