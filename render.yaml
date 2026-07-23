@@ -13,7 +13,8 @@ services:
       pip install -r requirements.txt &&
       PYTHONPATH=. python -m alembic upgrade head &&
       PYTHONPATH=. python scripts/seed_roles.py &&
-      PYTHONPATH=. python scripts/seed_permissions.py
+      PYTHONPATH=. python scripts/seed_permissions.py &&
+      PYTHONPATH=. python scripts/seed_admin.py
     startCommand: >-
       gunicorn src.main:app -k uvicorn.workers.UvicornWorker
       --bind 0.0.0.0:$PORT --workers 2
@@ -55,6 +56,12 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         sync: false
       - key: FRONTEND_URL
+        sync: false
+      # First-run bootstrap only: creates a default organization (code
+      # "default") and a Super Admin account for this email if - and only
+      # if - no user with this email exists yet. Safe to leave set
+      # permanently; every later deploy just skips it.
+      - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
 
   - type: web
