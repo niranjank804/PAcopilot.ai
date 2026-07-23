@@ -315,6 +315,21 @@ class ChangeService:
 
         return await tm1_change_repository.update(db, change)
 
+    async def reject_change(
+        self,
+        db: AsyncSession,
+        change: TM1Change,
+    ) -> TM1Change:
+
+        if change.status != "draft":
+            raise ConflictException(
+                f"Only draft changes can be rejected (status: {change.status})."
+            )
+
+        change.status = "rejected"
+
+        return await tm1_change_repository.update(db, change)
+
     async def rollback_change(
         self,
         db: AsyncSession,

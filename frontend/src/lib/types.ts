@@ -43,7 +43,12 @@ export type ChangeType =
   | "update_process"
   | "delete_process";
 
-export type ChangeStatus = "draft" | "executed" | "failed" | "rolled_back";
+export type ChangeStatus =
+  | "draft"
+  | "executed"
+  | "failed"
+  | "rolled_back"
+  | "rejected";
 
 export interface RelatedObject {
   object_type: string;

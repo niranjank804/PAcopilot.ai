@@ -11,7 +11,8 @@ from ..base import BaseModel
 class TM1Change(BaseModel):
     """A proposed (and possibly executed) change to a TM1 artifact.
 
-    Lifecycle: draft -> executed | failed -> rolled_back.
+    Lifecycle: draft -> executed | failed -> rolled_back, or draft ->
+    rejected (discarded without ever touching the live TM1 server).
     previous_content is the snapshot captured at execute time and is the
     rollback mechanism — TM1 has no object-level sandboxes.
     """

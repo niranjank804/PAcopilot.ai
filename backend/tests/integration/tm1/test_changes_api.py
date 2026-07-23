@@ -150,3 +150,67 @@ async def test_execute_requires_tm1_deploy_permission(
         headers=analyst_headers,
     )
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_reject_draft_change(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    connection_id = await _create_connection(client, headers)
+
+    create_resp = await client.post(
+        f"/tm1/connections/{connection_id}/changes",
+        json={
+            "change_type": "update_rules",
+            "target_name": "Sales",
+            "new_content": {"rules": "['A'] = N: 2;"},
+        },
+        headers=headers,
+    )
+    change_id = create_resp.json()["data"]["id"]
+
+    reject_resp = await client.post(
+        f"/tm1/connections/{connection_id}/changes/{change_id}/reject",
+        headers=headers,
+    )
+    assert reject_resp.status_code == 200
+    assert reject_resp.json()["data"]["status"] == "rejected"
+
+    audit_result = await db_session.execute(
+        select(AuditLog).where(AuditLog.action == "reject_change")
+    )
+    assert len(audit_result.scalars().all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_reject_already_executed_change_fails(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    connection_id = await _create_connection(client, headers)
+
+    create_resp = await client.post(
+        f"/tm1/connections/{connection_id}/changes",
+        json={
+            "change_type": "update_rules",
+            "target_name": "Sales",
+            "new_content": {"rules": "['A'] = N: 2;"},
+        },
+        headers=headers,
+    )
+    change_id = create_resp.json()["data"]["id"]
+
+    execute_resp = await client.post(
+        f"/tm1/connections/{connection_id}/changes/{change_id}/execute",
+        headers=headers,
+    )
+    assert execute_resp.json()["data"]["status"] == "executed"
+
+    reject_resp = await client.post(
+        f"/tm1/connections/{connection_id}/changes/{change_id}/reject",
+        headers=headers,
+    )
+    assert reject_resp.status_code == 409

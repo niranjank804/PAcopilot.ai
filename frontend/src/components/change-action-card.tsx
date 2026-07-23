@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Rocket, RotateCcw } from "lucide-react";
+import { Rocket, RotateCcw, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -47,7 +47,9 @@ export function ChangeActionCard({
   showSummary = true,
 }: ChangeActionCardProps) {
   const queryClient = useQueryClient();
-  const [confirmKind, setConfirmKind] = useState<"execute" | "rollback" | null>(null);
+  const [confirmKind, setConfirmKind] = useState<
+    "execute" | "rollback" | "reject" | null
+  >(null);
 
   const detailQuery = useQuery({
     queryKey: ["tm1-change-detail", connectionId, changeId],
@@ -58,7 +60,7 @@ export function ChangeActionCard({
   });
 
   const actionMutation = useMutation({
-    mutationFn: (kind: "execute" | "rollback") =>
+    mutationFn: (kind: "execute" | "rollback" | "reject") =>
       apiRequest<TM1ChangeSummary>(
         `/tm1/connections/${connectionId}/changes/${changeId}/${kind}`,
         { method: "POST" },
@@ -68,6 +70,8 @@ export function ChangeActionCard({
         toast.error(
           `Change ${kind} finished with verification errors — previous state was restored automatically.`,
         );
+      } else if (kind === "reject") {
+        toast.success("Draft discarded — never applied to the TM1 server.");
       } else {
         toast.success(
           kind === "execute"
@@ -129,6 +133,16 @@ export function ChangeActionCard({
             Execute on server
           </Button>
         ) : null}
+        {change.status === "draft" ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setConfirmKind("reject")}
+          >
+            <X className="mr-2 h-3.5 w-3.5" />
+            Discard
+          </Button>
+        ) : null}
         {change.status === "executed" ? (
           <Button
             size="sm"
@@ -152,12 +166,16 @@ export function ChangeActionCard({
             <AlertDialogTitle>
               {confirmKind === "execute"
                 ? `Execute "${change.target_name}" on the live TM1 server?`
-                : `Roll back "${change.target_name}"?`}
+                : confirmKind === "reject"
+                  ? `Discard draft "${change.target_name}"?`
+                  : `Roll back "${change.target_name}"?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmKind === "execute"
                 ? "The change is applied to the live server, verified, and automatically restored if verification fails. This action is audited."
-                : "The snapshot taken at execution time will be restored on the live server. This action is audited."}
+                : confirmKind === "reject"
+                  ? "The draft is discarded and marked rejected. It was never applied to the live TM1 server, and this cannot be undone."
+                  : "The snapshot taken at execution time will be restored on the live server. This action is audited."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -165,12 +183,15 @@ export function ChangeActionCard({
             <AlertDialogAction
               onClick={() => confirmKind && actionMutation.mutate(confirmKind)}
               disabled={actionMutation.isPending}
+              variant={confirmKind === "reject" ? "destructive" : "default"}
             >
               {actionMutation.isPending
                 ? "Working..."
                 : confirmKind === "execute"
                   ? "Execute"
-                  : "Roll back"}
+                  : confirmKind === "reject"
+                    ? "Discard"
+                    : "Roll back"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

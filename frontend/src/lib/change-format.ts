@@ -8,6 +8,7 @@ export const STATUS_VARIANT: Record<
   executed: "default",
   failed: "destructive",
   rolled_back: "outline",
+  rejected: "outline",
 };
 
 export const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {

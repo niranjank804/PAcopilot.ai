@@ -1403,6 +1403,47 @@ async def execute_change(
 
 
 @router.post(
+    "/connections/{connection_id}/changes/{change_id}/reject",
+    response_model=ApiResponse[ChangeResponse],
+)
+async def reject_change(
+    connection_id: uuid.UUID,
+    change_id: uuid.UUID,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.write")),
+):
+    start = time.monotonic()
+
+    change = await _get_change_checked(
+        db, connection_id, change_id, current_user.organization_id
+    )
+    connection = await tm1_integration_service.get_connection(
+        db, connection_id, current_user.organization_id
+    )
+
+    change = await change_service.reject_change(db, change)
+
+    elapsed_ms = int((time.monotonic() - start) * 1000)
+
+    await _log_tm1_access(
+        db,
+        current_user,
+        http_request,
+        action="reject_change",
+        connection=connection,
+        elapsed_ms=elapsed_ms,
+        extra={
+            "change_id": str(change.id),
+            "change_type": change.change_type,
+            "target": change.target_name,
+        },
+    )
+
+    return ApiResponse(success=True, data=ChangeResponse.model_validate(change))
+
+
+@router.post(
     "/connections/{connection_id}/changes/{change_id}/rollback",
     response_model=ApiResponse[ChangeResponse],
 )
