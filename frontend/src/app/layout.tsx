@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PA-Copilot Console",
-  description: "Enterprise Planning AI console for IBM Planning Analytics/TM1",
+  title: "PA-Copilot — AI Copilot for IBM Planning Analytics",
+  description: "AI engineering copilot for IBM Planning Analytics/TM1",
 };
 
 export default function RootLayout({
