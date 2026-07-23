@@ -1,8 +1,21 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
+    # A trailing newline pasted into a dashboard env var field (confirmed
+    # happening in practice - Render's env var UI doesn't trim it) is
+    # invisible in the UI but breaks anything that uses the value verbatim:
+    # an HTTP Authorization header with an embedded newline fails at the
+    # request-construction level, not as a clean 401. Stripping every
+    # string value before pydantic's own type coercion catches this for
+    # every setting at once, including ones added later.
+    @field_validator("*", mode="before")
+    @classmethod
+    def _strip_string_values(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
     # ------------------------------------------------------------------
     # Application
     # ------------------------------------------------------------------
