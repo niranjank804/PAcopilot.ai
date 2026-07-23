@@ -25,7 +25,6 @@ const requestAccessSchema = z.object({
   username: z.string().min(3, "At least 3 characters"),
   email: z.string().email("Enter a valid email address"),
   password: z.string().min(8, "At least 8 characters"),
-  organization_code: z.string().min(1, "Required"),
 });
 
 type RequestAccessValues = z.infer<typeof requestAccessSchema>;
@@ -63,24 +62,20 @@ export default function RequestAccessPage() {
     <div className="flex flex-1 items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Request access</CardTitle>
-          <CardDescription>
-            Ask your organization admin for your org&apos;s invite code
-            first — you&apos;ll need it below.
-          </CardDescription>
+          <CardTitle className="text-xl">Create account</CardTitle>
+          <CardDescription>Sign up to start using PA-Copilot.</CardDescription>
         </CardHeader>
         <CardContent>
           {submitted ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Your request was submitted. An administrator needs to
-                approve it before you can sign in.
+                Your account is ready — you can sign in now.
               </p>
               <Link
                 href="/login"
                 className="text-sm font-medium text-primary hover:underline"
               >
-                Back to sign in
+                Sign in
               </Link>
             </div>
           ) : (
@@ -137,22 +132,8 @@ export default function RequestAccessPage() {
                   </p>
                 ) : null}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="organization_code">
-                  Organization invite code
-                </Label>
-                <Input
-                  id="organization_code"
-                  {...register("organization_code")}
-                />
-                {errors.organization_code ? (
-                  <p className="text-sm text-destructive">
-                    {errors.organization_code.message}
-                  </p>
-                ) : null}
-              </div>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Submitting..." : "Request access"}
+                {isSubmitting ? "Creating account..." : "Create account"}
               </Button>
               <Link
                 href="/login"

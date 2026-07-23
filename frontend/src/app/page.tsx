@@ -157,7 +157,7 @@ export default function LandingPage() {
               href="/request-access"
               className={cn(buttonVariants({ variant: "default", size: "sm" }))}
             >
-              Request access
+              Sign up
             </Link>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function LandingPage() {
               href="/request-access"
               className={cn(buttonVariants({ variant: "default", size: "lg" }), "px-6")}
             >
-              Request access
+              Sign up
             </Link>
             <Link
               href="/login"
@@ -295,8 +295,7 @@ export default function LandingPage() {
               Ready to try it on your environment?
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Beta access is admin-approved. Request access and an administrator
-              will set you up.
+              Sign up and you&apos;re in — no approval wait during the beta.
             </p>
             <div className="mt-8 flex items-center justify-center gap-3">
               <Link
@@ -306,7 +305,7 @@ export default function LandingPage() {
                   "px-6",
                 )}
               >
-                Request access
+                Sign up
               </Link>
               <Link
                 href="/login"
@@ -327,7 +326,7 @@ export default function LandingPage() {
               Sign in
             </Link>
             <Link href="/request-access" className="hover:text-foreground">
-              Request access
+              Sign up
             </Link>
           </div>
         </div>

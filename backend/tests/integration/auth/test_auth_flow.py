@@ -59,7 +59,7 @@ def fake_email_provider(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_register_creates_a_pending_request(client, db_session):
+async def test_register_creates_an_approved_account(client, db_session):
     org = await create_organization(db_session)
     suffix = uuid.uuid4().hex[:8]
 
@@ -78,11 +78,50 @@ async def test_register_creates_a_pending_request(client, db_session):
     body = register_resp.json()
     assert body["success"] is True
     assert body["data"]["username"] == f"user_{suffix}"
-    assert body["data"]["registration_status"] == "pending"
+    assert body["data"]["registration_status"] == "approved"
 
 
 @pytest.mark.asyncio
-async def test_login_rejected_until_approved_then_succeeds(client, db_session):
+async def test_register_without_organization_code_uses_default_org(
+    client, db_session
+):
+    suffix = uuid.uuid4().hex[:8]
+
+    register_resp = await client.post(
+        "/auth/register",
+        json={
+            "username": f"user_{suffix}",
+            "email": f"user_{suffix}@example.com",
+            "password": DEFAULT_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User",
+        },
+    )
+    assert register_resp.status_code == 201
+    assert register_resp.json()["data"]["registration_status"] == "approved"
+
+    # Registering a second user with no code lands in the same default org
+    # rather than creating a new one each time.
+    suffix2 = uuid.uuid4().hex[:8]
+    second_resp = await client.post(
+        "/auth/register",
+        json={
+            "username": f"user_{suffix2}",
+            "email": f"user_{suffix2}@example.com",
+            "password": DEFAULT_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User",
+        },
+    )
+    assert second_resp.status_code == 201
+
+    first_user = await user_repository.get_by_username(db_session, f"user_{suffix}")
+    second_user = await user_repository.get_by_username(db_session, f"user_{suffix2}")
+    assert first_user.organization_id == second_user.organization_id
+
+
+@pytest.mark.asyncio
+async def test_register_then_login_succeeds_immediately(client, db_session):
     org = await create_organization(db_session)
     suffix = uuid.uuid4().hex[:8]
     username = f"user_{suffix}"
@@ -98,17 +137,6 @@ async def test_login_rejected_until_approved_then_succeeds(client, db_session):
             "organization_code": org.code,
         },
     )
-
-    pending_login = await client.post(
-        "/auth/login",
-        json={"username": username, "password": DEFAULT_PASSWORD},
-    )
-    assert pending_login.status_code == 403
-    assert "pending" in pending_login.json()["error"]["message"].lower()
-
-    user = await user_repository.get_by_username(db_session, username)
-    user.registration_status = "approved"
-    await user_repository.update(db_session, user)
 
     login_resp = await client.post(
         "/auth/login",

@@ -268,8 +268,9 @@ export default function UsersPage() {
         <CardHeader>
           <CardTitle>Pending requests</CardTitle>
           <CardDescription>
-            People who submitted &quot;Request access&quot; and are waiting
-            for a decision.
+            New signups are auto-approved right now, so this is normally
+            empty — it&apos;s only populated by manually setting an account
+            back to pending.
           </CardDescription>
         </CardHeader>
         <CardContent>

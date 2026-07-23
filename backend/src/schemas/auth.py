@@ -9,10 +9,12 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8)
     first_name: str
     last_name: str
-    # A human-typeable invite code (Organization.code), not a raw UUID —
-    # this is a self-service *request*, not an immediately-active account;
-    # see registration_status on the resulting user.
-    organization_code: str
+    # A human-typeable invite code (Organization.code), not a raw UUID.
+    # Optional for now (testing phase, user's explicit choice): omitted,
+    # every signup lands in the single default org and is auto-approved -
+    # see auth_service.register(). Still accepted explicitly for a future
+    # multi-org / admin-approval mode without a schema change.
+    organization_code: str | None = None
 
 
 class LoginRequest(BaseModel):

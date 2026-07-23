@@ -17,9 +17,11 @@ DEFAULT_ORG_NAME = "PA-Copilot"
 
 
 async def seed_admin() -> None:
-    # No self-registration can ever succeed on a fresh database: it requires
-    # an existing organization code, and approval requires an existing admin
-    # - neither exists yet. This creates both, once, so there's a way in.
+    # Self-registration (auth_service.register()) now auto-approves into a
+    # default org on its own, so this is no longer strictly required to get
+    # *a* way in - but it's still the only way to get the specific owner
+    # email into the Super Admin role with a known org, rather than an
+    # arbitrary self-registered account.
     # .strip().lower() defends against trailing whitespace/newlines from
     # pasting into a dashboard env var field, and against Google's email
     # claim being lowercase when the pasted value isn't - either would

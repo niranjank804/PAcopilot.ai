@@ -135,7 +135,7 @@ export default function LoginPage() {
                 href="/request-access"
                 className="font-medium text-primary hover:underline"
               >
-                Request access
+                Sign up
               </Link>
             </p>
           </form>

@@ -13,6 +13,7 @@ from src.core.exceptions import (
     NotFoundException,
     PermissionDeniedException,
 )
+from src.database.models.organization import Organization
 from src.database.models.password_reset_token import PasswordResetToken
 from src.database.models.user import User
 from src.email.registry import get_email_provider
@@ -31,6 +32,11 @@ from src.schemas.auth import (
 from src.services.google_oauth import verify_google_id_token
 from src.services.jwt_service import jwt_service
 from src.services.password_service import password_service
+
+
+# Matches scripts/seed_admin.py's DEFAULT_ORG_CODE - both create the same
+# org on first use, whichever runs first.
+DEFAULT_ORGANIZATION_CODE = "default"
 
 
 def _hash_reset_token(raw_token: str) -> str:
@@ -58,22 +64,57 @@ def _check_can_authenticate(user: User) -> None:
 
 
 class AuthService:
+    async def _resolve_registration_organization(
+        self,
+        db: AsyncSession,
+        organization_code: str | None,
+    ) -> Organization:
+
+        if organization_code is not None:
+            organization = await organization_repository.get_by_code(
+                db,
+                organization_code,
+            )
+
+            if organization is None:
+                raise NotFoundException(
+                    "No organization found with that code. Check it with "
+                    "your administrator."
+                )
+
+            return organization
+
+        # Testing-phase default (user's explicit choice, no invite code
+        # required): every signup with no code lands in one shared org,
+        # created on first use rather than depending on a seed script
+        # having run first.
+        organization = await organization_repository.get_by_code(
+            db,
+            DEFAULT_ORGANIZATION_CODE,
+        )
+
+        if organization is None:
+            organization = await organization_repository.create(
+                db,
+                Organization(
+                    name="PA-Copilot",
+                    code=DEFAULT_ORGANIZATION_CODE,
+                    is_active=True,
+                ),
+            )
+
+        return organization
+
     async def register(
         self,
         db: AsyncSession,
         request: RegisterRequest,
     ) -> UserResponse:
 
-        organization = await organization_repository.get_by_code(
+        organization = await self._resolve_registration_organization(
             db,
             request.organization_code,
         )
-
-        if organization is None:
-            raise NotFoundException(
-                "No organization found with that code. Check it with your "
-                "administrator."
-            )
 
         existing_user = await user_repository.get_by_username(
             db,
@@ -91,10 +132,13 @@ class AuthService:
         if existing_email:
             raise ConflictException("Email already exists")
 
-        # Every self-registration is a REQUEST, not an active account — an
-        # Organization Admin must approve it (see user_service.approve_user)
-        # before it can log in. is_active stays True so it's not confused
-        # with an admin-disabled account; registration_status is the gate.
+        # Testing phase (user's explicit choice, 2026-07-23): every
+        # self-registration is auto-approved, no admin review step. The
+        # approval machinery itself (user_service.approve_user/reject_user)
+        # is untouched — an admin can still manually reject or deactivate
+        # an account after the fact, and "pending" is still a valid status
+        # for that path. This only changes the default a new signup starts
+        # at, so it's a one-line revert if the testing phase ends.
         user = User(
             organization_id=organization.id,
             username=request.username,
@@ -105,7 +149,7 @@ class AuthService:
             first_name=request.first_name,
             last_name=request.last_name,
             is_active=True,
-            registration_status="pending",
+            registration_status="approved",
         )
 
         user = await user_repository.create(db, user)
