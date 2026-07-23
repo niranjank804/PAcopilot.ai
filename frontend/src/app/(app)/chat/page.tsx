@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
   Check,
+  Copy,
   FileText,
   Loader2,
   MessageSquarePlus,
@@ -274,6 +275,7 @@ export default function ChatPage() {
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachmentInput[]>(
     [],
   );
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -322,6 +324,16 @@ export default function ChatPage() {
   const editMessage = (content: string) => {
     setInput(content);
     inputRef.current?.focus();
+  };
+
+  const copyMessage = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex((current) => (current === index ? null : current)), 1500);
+    } catch {
+      toast.error("Couldn't copy — clipboard access was denied.");
+    }
   };
 
   const toggleListening = () => {
@@ -767,14 +779,28 @@ export default function ChatPage() {
                     <Bot className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
                   ) : null}
                   {message.role === "user" && message.content ? (
-                    <button
-                      type="button"
-                      onClick={() => editMessage(message.content)}
-                      className="mt-1 h-fit shrink-0 self-center text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                      aria-label="Edit message"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="mt-1 flex h-fit shrink-0 items-center gap-1 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => copyMessage(message.content, index)}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Copy message"
+                      >
+                        {copiedIndex === index ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => editMessage(message.content)}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Edit message"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ) : null}
                   <div className="max-w-[75%] space-y-1.5">
                     {message.attachmentNames?.length ? (
@@ -833,6 +859,20 @@ export default function ChatPage() {
                       ) : null}
                     </div>
                   </div>
+                  {message.role === "assistant" && message.content ? (
+                    <button
+                      type="button"
+                      onClick={() => copyMessage(message.content, index)}
+                      className="mt-1 h-fit shrink-0 self-center text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                      aria-label="Copy message"
+                    >
+                      {copiedIndex === index ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  ) : null}
                   {message.role === "user" ? (
                     <User className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
                   ) : null}
