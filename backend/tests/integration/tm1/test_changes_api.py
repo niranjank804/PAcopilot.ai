@@ -178,8 +178,14 @@ async def test_reject_draft_change(
     assert reject_resp.status_code == 200
     assert reject_resp.json()["data"]["status"] == "rejected"
 
+    # Scoped to this test's own connection - action alone isn't unique
+    # enough (this suite runs against the shared dev database, which can
+    # have real reject_change rows from manual/live verification).
     audit_result = await db_session.execute(
-        select(AuditLog).where(AuditLog.action == "reject_change")
+        select(AuditLog).where(
+            AuditLog.action == "reject_change",
+            AuditLog.entity_id == connection_id,
+        )
     )
     assert len(audit_result.scalars().all()) == 1
 
