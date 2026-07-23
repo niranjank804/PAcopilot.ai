@@ -315,6 +315,15 @@ export default function ChatPage() {
     inputRef.current?.focus();
   };
 
+  // No backend support for editing/deleting a sent message or truncating a
+  // conversation, so this doesn't try to rewrite history — it just loads the
+  // original text back into the composer for the user to revise and send as
+  // a normal new message, same as any other edit-and-resubmit affordance.
+  const editMessage = (content: string) => {
+    setInput(content);
+    inputRef.current?.focus();
+  };
+
   const toggleListening = () => {
     const recognition = recognitionRef.current;
 
@@ -750,12 +759,22 @@ export default function ChatPage() {
                 <div
                   key={message.id ?? index}
                   className={cn(
-                    "flex gap-3",
+                    "group flex gap-3",
                     message.role === "user" ? "justify-end" : "justify-start",
                   )}
                 >
                   {message.role === "assistant" ? (
                     <Bot className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
+                  ) : null}
+                  {message.role === "user" && message.content ? (
+                    <button
+                      type="button"
+                      onClick={() => editMessage(message.content)}
+                      className="mt-1 h-fit shrink-0 self-center text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                      aria-label="Edit message"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
                   ) : null}
                   <div className="max-w-[75%] space-y-1.5">
                     {message.attachmentNames?.length ? (
