@@ -1,0 +1,74 @@
+databases:
+  - name: pa-copilot-db
+    databaseName: enterprise_ai
+    plan: free
+
+services:
+  - type: web
+    name: pa-copilot-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      python -m alembic upgrade head &&
+      python scripts/seed_permissions.py &&
+      python scripts/seed_roles.py
+    startCommand: >-
+      gunicorn src.main:app -k uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: pa-copilot-db
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: pa-copilot-db
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: pa-copilot-db
+          property: database
+      - key: DATABASE_USER
+        fromDatabase:
+          name: pa-copilot-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: pa-copilot-db
+          property: password
+      - key: SECRET_KEY
+        generateValue: true
+      # Set these manually in the Render dashboard after the first deploy —
+      # never committed to the repo:
+      - key: TM1_CREDENTIALS_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+
+  - type: web
+    name: pa-copilot-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: "npm ci && npm run build"
+    startCommand: "npm run start -- --port $PORT"
+    envVars:
+      # Set to the backend service's actual Render URL after the first
+      # deploy (Render assigns it at service creation — can't be known
+      # until then):
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        sync: false
