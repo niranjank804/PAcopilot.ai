@@ -19,13 +19,6 @@ import type {
   UsageSummary,
 } from "@/lib/types";
 
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
-
 const number = new Intl.NumberFormat("en-US");
 
 const STATE_VARIANT: Record<TM1ConnectionStatus["state"], "default" | "secondary" | "destructive"> = {
@@ -107,7 +100,7 @@ export default function DashboardPage() {
               : usageQuery.isPending
                 ? "Loading..."
                 : usageQuery.data && usageQuery.data.total_requests > 0
-                  ? `${number.format(usageQuery.data.total_tokens)} tokens · ${currency.format(usageQuery.data.total_cost_usd)}`
+                  ? `${number.format(usageQuery.data.total_tokens)} tokens`
                   : "No AI activity in the last 30 days."}
           </CardContent>
         </Card>

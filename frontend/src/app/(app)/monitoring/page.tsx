@@ -22,13 +22,6 @@ import {
 import { ApiError, apiRequest } from "@/lib/api-client";
 import type { TM1ConnectionStatus, ToolUsage, UsageSummary } from "@/lib/types";
 
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
-
 const number = new Intl.NumberFormat("en-US");
 
 const STATE_VARIANT: Record<TM1ConnectionStatus["state"], "default" | "secondary" | "destructive"> = {
@@ -72,8 +65,8 @@ export default function MonitoringPage() {
           <CardTitle>AI Usage by Model</CardTitle>
           <CardDescription>
             {usageQuery.data
-              ? `${number.format(usageQuery.data.total_requests)} requests · ${number.format(usageQuery.data.total_tokens)} tokens · ${currency.format(usageQuery.data.total_cost_usd)} total`
-              : "Token and cost totals per model."}
+              ? `${number.format(usageQuery.data.total_requests)} requests · ${number.format(usageQuery.data.total_tokens)} tokens total`
+              : "Token totals per model."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,7 +87,6 @@ export default function MonitoringPage() {
                   <TableHead>Model</TableHead>
                   <TableHead className="text-right">Requests</TableHead>
                   <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -106,9 +98,6 @@ export default function MonitoringPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       {number.format(row.total_tokens)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {currency.format(row.total_cost_usd)}
                     </TableCell>
                   </TableRow>
                 ))}

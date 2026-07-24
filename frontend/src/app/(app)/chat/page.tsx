@@ -85,13 +85,6 @@ interface ThreadMessage {
   attachmentNames?: string[];
 }
 
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
-
 const number = new Intl.NumberFormat("en-US").format;
 
 function errorMessage(error: unknown): string {
@@ -851,10 +844,7 @@ export default function ChatPage() {
                       ) : null}
                       {message.totalTokens ? (
                         <div className="mt-2 text-xs text-muted-foreground">
-                          {number(message.totalTokens)} tokens ·{" "}
-                          {message.estimatedCostUsd !== undefined
-                            ? currency.format(message.estimatedCostUsd)
-                            : null}
+                          {number(message.totalTokens)} tokens
                         </div>
                       ) : null}
                     </div>
