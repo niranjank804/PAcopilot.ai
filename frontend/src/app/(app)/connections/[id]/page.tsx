@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,12 +8,15 @@ import {
   Calendar,
   GitBranch,
   Layers,
+  Loader2,
+  Network,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -34,6 +37,11 @@ import type { TM1ChangeSummary, TM1Connection } from "@/lib/types";
 
 function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
+}
+
+interface ExtractionSummary {
+  objects_created: number;
+  relationships_created: number;
 }
 
 interface NameListProps {
@@ -127,6 +135,32 @@ export default function ConnectionDetailPage() {
       apiRequest<TM1ChangeSummary[]>(`/tm1/connections/${connectionId}/changes`),
   });
 
+  const queryClient = useQueryClient();
+
+  // The dependency graph is built here and nowhere else: relationship,
+  // impact and "find unused" features all read from it, and they fail with
+  // "not found in the metadata graph" until this has been run at least once
+  // for the connection. Extraction rebuilds the graph from scratch, so it is
+  // safe to re-run whenever the TM1 model has changed.
+  const extractMutation = useMutation({
+    mutationFn: () =>
+      apiRequest<ExtractionSummary>(
+        `/tm1/connections/${connectionId}/metadata/extract`,
+        { method: "POST" },
+      ),
+    onSuccess: (summary) => {
+      toast.success(
+        `Metadata extracted — ${summary.objects_created} objects, ` +
+          `${summary.relationships_created} relationships.`,
+      );
+      // Anything graph-backed is stale now.
+      queryClient.invalidateQueries({ queryKey: ["tm1-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["tm1-dependents"] });
+      queryClient.invalidateQueries({ queryKey: ["tm1-dependencies"] });
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -149,21 +183,48 @@ export default function ConnectionDetailPage() {
           <Skeleton className="h-8 w-64" />
         ) : (
           <>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {connectionQuery.data?.name}
-              </h1>
-              <Badge
-                variant={connectionQuery.data?.is_active ? "default" : "secondary"}
-              >
-                {connectionQuery.data?.is_active ? "active" : "inactive"}
-              </Badge>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-semibold tracking-tight">
+                    {connectionQuery.data?.name}
+                  </h1>
+                  <Badge
+                    variant={
+                      connectionQuery.data?.is_active ? "default" : "secondary"
+                    }
+                  >
+                    {connectionQuery.data?.is_active ? "active" : "inactive"}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {connectionQuery.data?.address}:{connectionQuery.data?.port}
+                  {connectionQuery.data?.ssl ? " · SSL" : ""} ·{" "}
+                  {connectionQuery.data?.username}
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={extractMutation.isPending}
+                  onClick={() => extractMutation.mutate()}
+                >
+                  {extractMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Network className="mr-2 h-4 w-4" />
+                  )}
+                  {extractMutation.isPending
+                    ? "Extracting…"
+                    : "Extract metadata"}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Builds the dependency graph. Run once, then after model
+                  changes.
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {connectionQuery.data?.address}:{connectionQuery.data?.port}
-              {connectionQuery.data?.ssl ? " · SSL" : ""} ·{" "}
-              {connectionQuery.data?.username}
-            </p>
           </>
         )}
       </div>

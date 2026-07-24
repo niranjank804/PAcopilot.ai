@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Boxes,
   Calendar,
@@ -8,6 +8,8 @@ import {
   GitBranch,
   Layers,
   Lightbulb,
+  Loader2,
+  Network,
   Search,
   ShieldAlert,
   Target,
@@ -15,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +60,20 @@ import type {
 
 function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
+}
+
+interface ExtractionSummary {
+  objects_created: number;
+  relationships_created: number;
+}
+
+// The backend raises a plain NotFoundException naming the metadata graph when
+// extraction has never run for a connection. That is a fixable setup step, not
+// a real failure, so it gets its own inline remedy instead of a red error.
+function isGraphMissing(error: unknown): boolean {
+  return (
+    error instanceof ApiError && error.message.includes("metadata graph")
+  );
 }
 
 interface SelectedObject {
@@ -282,6 +299,27 @@ export default function MetadataPage() {
     queryFn: () =>
       apiRequest<TM1ChangeSummary[]>(`/tm1/connections/${activeConnectionId}/changes`),
     enabled: activeConnectionId !== null,
+  });
+
+  const queryClient = useQueryClient();
+
+  // Relationship and graph views read from the dependency graph, which only
+  // exists once extraction has run for the connection. Offer the fix inline
+  // rather than sending the user off to the connection page to find it.
+  const extractMutation = useMutation({
+    mutationFn: () =>
+      apiRequest<ExtractionSummary>(
+        `/tm1/connections/${activeConnectionId}/metadata/extract`,
+        { method: "POST" },
+      ),
+    onSuccess: (summary) => {
+      toast.success(
+        `Metadata extracted — ${summary.objects_created} objects, ` +
+          `${summary.relationships_created} relationships.`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["tm1-relationships"] });
+    },
+    onError: (error) => toast.error(errorMessage(error)),
   });
 
   const objectChanges = selected
@@ -605,6 +643,34 @@ export default function MetadataPage() {
               </TabsContent>
 
               <TabsContent value="relationships">
+                {isGraphMissing(relationshipsQuery.error) ? (
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/50 p-4">
+                    <div>
+                      <p className="text-sm font-medium">
+                        The dependency graph hasn&apos;t been built yet
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Relationships, impact analysis and unused-object
+                        detection all read from it. Building it reads your model
+                        — it never writes to TM1.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={extractMutation.isPending}
+                      onClick={() => extractMutation.mutate()}
+                    >
+                      {extractMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Network className="mr-2 h-4 w-4" />
+                      )}
+                      {extractMutation.isPending
+                        ? "Extracting…"
+                        : "Extract metadata"}
+                    </Button>
+                  </div>
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Card>
                     <CardHeader>
@@ -613,9 +679,16 @@ export default function MetadataPage() {
                     </CardHeader>
                     <CardContent>
                       {relationshipsQuery.isError ? (
-                        <p className="text-sm text-destructive">
-                          Failed to load: {errorMessage(relationshipsQuery.error)}
-                        </p>
+                        isGraphMissing(relationshipsQuery.error) ? (
+                          <p className="text-sm text-muted-foreground">
+                            Not available until metadata is extracted.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-destructive">
+                            Failed to load:{" "}
+                            {errorMessage(relationshipsQuery.error)}
+                          </p>
+                        )
                       ) : relationshipsQuery.isPending ? (
                         <Skeleton className="h-24 w-full" />
                       ) : !relationshipsQuery.data?.outgoing.length ? (
@@ -659,9 +732,16 @@ export default function MetadataPage() {
                     </CardHeader>
                     <CardContent>
                       {relationshipsQuery.isError ? (
-                        <p className="text-sm text-destructive">
-                          Failed to load: {errorMessage(relationshipsQuery.error)}
-                        </p>
+                        isGraphMissing(relationshipsQuery.error) ? (
+                          <p className="text-sm text-muted-foreground">
+                            Not available until metadata is extracted.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-destructive">
+                            Failed to load:{" "}
+                            {errorMessage(relationshipsQuery.error)}
+                          </p>
+                        )
                       ) : relationshipsQuery.isPending ? (
                         <Skeleton className="h-24 w-full" />
                       ) : !relationshipsQuery.data?.incoming.length ? (
