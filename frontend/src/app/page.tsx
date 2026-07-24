@@ -106,9 +106,9 @@ const SECURITY = [
   },
   {
     icon: UserCheck,
-    title: "Admin-approved access",
+    title: "Instant access, revocable anytime",
     description:
-      "New users request access and an administrator approves before they can sign in — access can be revoked just as easily.",
+      "Sign up and start using PA-Copilot right away — an administrator can still deactivate any account at any time.",
   },
   {
     icon: Lock,
@@ -120,7 +120,7 @@ const SECURITY = [
     icon: KeyRound,
     title: "Google Sign-In",
     description:
-      "Sign in with an existing Google account tied to an approved PA-Copilot user — no new password to manage.",
+      "Sign in with your Google account — a PA-Copilot account is created automatically on first sign-in, no separate password to manage.",
   },
 ];
 
