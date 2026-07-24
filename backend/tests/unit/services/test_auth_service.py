@@ -208,14 +208,22 @@ async def test_google_login_issues_tokens_for_existing_active_user(
 
 
 @pytest.mark.asyncio
-async def test_google_login_rejects_email_with_no_account(
+async def test_google_login_auto_creates_account_with_no_existing_user(
     db_session, fake_google_claims
 ):
-    fake_google_claims["email"] = "nobody@example.com"
+    fake_google_claims["email"] = "brandnew@example.com"
     fake_google_claims["email_verified"] = True
+    fake_google_claims["given_name"] = "Brand"
+    fake_google_claims["family_name"] = "New"
 
-    with pytest.raises(AuthenticationException):
-        await auth_service.google_login(db_session, "fake-id-token")
+    result = await auth_service.google_login(db_session, "fake-id-token")
+
+    assert result.access_token
+    user = await user_repository.get_by_email(db_session, "brandnew@example.com")
+    assert user is not None
+    assert user.first_name == "Brand"
+    assert user.last_name == "New"
+    assert user.registration_status == "approved"
 
 
 @pytest.mark.asyncio

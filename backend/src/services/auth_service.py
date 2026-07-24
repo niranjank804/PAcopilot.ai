@@ -105,6 +105,22 @@ class AuthService:
 
         return organization
 
+    async def _unique_username_from_email(
+        self,
+        db: AsyncSession,
+        email: str,
+    ) -> str:
+
+        base_username = email.split("@")[0]
+        username = base_username
+        suffix = 1
+
+        while await user_repository.get_by_username(db, username):
+            username = f"{base_username}{suffix}"
+            suffix += 1
+
+        return username
+
     async def register(
         self,
         db: AsyncSession,
@@ -309,16 +325,37 @@ class AuthService:
 
         user = await user_repository.get_by_email(db, email)
 
-        # Deliberate policy choice: Google sign-in only works for emails
-        # that already have a PA-Copilot account — it never auto-creates
-        # one. Auto-creating would also raise an unanswered question this
-        # app's org-scoped RBAC model doesn't have a default for (which
-        # organization would a brand-new Google user join?).
+        # Testing phase (user's explicit choice, 2026-07-24, superseding the
+        # earlier "never auto-create" policy): a first-time Google sign-in
+        # now provisions an account on the spot, same default-org +
+        # auto-approved treatment as a plain self-registration. The
+        # org-scoped-RBAC question that blocked this before ("which org
+        # would a brand-new Google user join?") is answered the same way
+        # register() answers it — the shared default org.
         if user is None:
-            raise AuthenticationException(
-                "No PA-Copilot account found for this email. Contact your "
-                "administrator."
+            organization = await self._resolve_registration_organization(
+                db, None
             )
+
+            username = await self._unique_username_from_email(db, email)
+
+            user = User(
+                organization_id=organization.id,
+                username=username,
+                email=email,
+                # Never used to log in - this account only ever
+                # authenticates via Google. A real hash still has to exist
+                # because password_hash is NOT NULL.
+                password_hash=password_service.hash_password(
+                    secrets.token_urlsafe(32)
+                ),
+                first_name=claims.get("given_name") or "Google",
+                last_name=claims.get("family_name") or "User",
+                is_active=True,
+                registration_status="approved",
+            )
+
+            user = await user_repository.create(db, user)
 
         _check_can_authenticate(user)
 

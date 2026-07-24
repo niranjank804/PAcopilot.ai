@@ -380,16 +380,69 @@ async def test_google_login_issues_tokens_for_existing_account(
 
 
 @pytest.mark.asyncio
-async def test_google_login_rejects_email_without_an_account(
+async def test_google_login_auto_creates_account_for_new_email(
     client, db_session, monkeypatch
 ):
+    suffix = uuid.uuid4().hex[:8]
+    email = f"newgoogleuser_{suffix}@example.com"
+
     monkeypatch.setattr(
         auth_service_module,
         "verify_google_id_token",
-        lambda token: {"email": "nobody@example.com", "email_verified": True},
+        lambda token: {
+            "email": email,
+            "email_verified": True,
+            "given_name": "New",
+            "family_name": "Googler",
+        },
     )
 
     resp = await client.post("/auth/google", json={"id_token": "fake-token"})
 
-    assert resp.status_code == 401
-    assert resp.json()["error"]["code"] == "AUTHENTICATION_ERROR"
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert "access_token" in body
+
+    me_resp = await client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert me_resp.status_code == 200
+    me_data = me_resp.json()["data"]
+    assert me_data["email"] == email
+    assert me_data["first_name"] == "New"
+    assert me_data["last_name"] == "Googler"
+
+
+@pytest.mark.asyncio
+async def test_google_login_reuses_account_on_second_login(
+    client, db_session, monkeypatch
+):
+    suffix = uuid.uuid4().hex[:8]
+    email = f"repeatgoogleuser_{suffix}@example.com"
+
+    monkeypatch.setattr(
+        auth_service_module,
+        "verify_google_id_token",
+        lambda token: {"email": email, "email_verified": True},
+    )
+
+    first_resp = await client.post("/auth/google", json={"id_token": "fake-token"})
+    second_resp = await client.post("/auth/google", json={"id_token": "fake-token"})
+
+    assert first_resp.status_code == 200
+    assert second_resp.status_code == 200
+
+    first_me = await client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {first_resp.json()['data']['access_token']}"
+        },
+    )
+    second_me = await client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {second_resp.json()['data']['access_token']}"
+        },
+    )
+    assert first_me.json()["data"]["id"] == second_me.json()["data"]["id"]

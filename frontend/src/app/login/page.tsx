@@ -166,9 +166,6 @@ export default function LoginPage() {
                   )}
                 </div>
               </GoogleOAuthProvider>
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                Only works for emails that already have a PA-Copilot account.
-              </p>
             </>
           ) : null}
         </CardContent>
