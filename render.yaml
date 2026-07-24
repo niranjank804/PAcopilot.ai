@@ -63,6 +63,19 @@ services:
       # permanently; every later deploy just skips it.
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
+      # Without these, get_email_provider() falls back to logging the reset
+      # link to the server log instead of emailing it - "forgot password"
+      # never actually reaches anyone. SMTP_PORT/SMTP_USE_TLS default to
+      # 587/true in config.py already, which matches Gmail's requirements,
+      # so only these four need setting.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
 
   - type: web
     name: pa-copilot-frontend
