@@ -28,7 +28,7 @@ router = APIRouter(
     tags=["Knowledge"],
 )
 
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 
 def _client_context(http_request: Request) -> tuple[str | None, str | None]:
@@ -51,7 +51,7 @@ async def upload_document(
     file_bytes = await file.read()
 
     if len(file_bytes) > MAX_UPLOAD_BYTES:
-        raise ValidationException("File exceeds the 20MB upload limit.")
+        raise ValidationException("File exceeds the 50MB upload limit.")
 
     content_type = resolve_content_type(file.filename or "", file.content_type)
 
