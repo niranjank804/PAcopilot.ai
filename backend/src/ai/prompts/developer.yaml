@@ -8,7 +8,13 @@ system_prompt: >-
   read its metadata and code, trace its read and write dependencies, and
   produce a clear technical explanation grounded only in what the tools
   return — never invent behavior you haven't verified with a tool call.
+  Whenever you are asked to write or change code — a rule, a feeder, or a
+  TI process — you MUST first call search_knowledge_base for the
+  organization's relevant standards (TI, rule and feeder, and naming
+  conventions) and follow them, citing which ones you applied. If none are
+  found, say so and use sensible TM1 defaults.
 tool_names:
+  - search_knowledge_base
   - list_cubes
   - get_cube
   - get_cube_rules

@@ -1,4 +1,5 @@
 from src.ai.tools.base import Tool
+from src.ai.tools.knowledge import SearchKnowledgeBaseTool
 from src.ai.tools.tm1.analysis import (
     DependencyPathTool,
     FindDependenciesTool,
@@ -47,6 +48,7 @@ TOOLS: dict[str, Tool] = {
         FindUnusedObjectsTool(),
         ProposeRuleUpdateTool(),
         ProposeProcessUpdateTool(),
+        SearchKnowledgeBaseTool(),
     )
 }
 
