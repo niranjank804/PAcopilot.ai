@@ -17,7 +17,7 @@ services:
       PYTHONPATH=. python scripts/seed_admin.py
     startCommand: >-
       gunicorn src.main:app -k uvicorn.workers.UvicornWorker
-      --bind 0.0.0.0:$PORT --workers 2
+      --bind 0.0.0.0:$PORT --workers 2 --timeout 300
     envVars:
       - key: DEBUG
         value: "False"
