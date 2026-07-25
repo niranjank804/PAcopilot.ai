@@ -32,6 +32,65 @@ _PROCESS_CODE_FIELDS = {
 }
 
 
+def _apply_datasource(process: Process, content: dict) -> None:
+    datasource_type = content.get("datasource_type")
+    if not datasource_type:
+        return
+
+    process.datasource_type = datasource_type
+
+    if datasource_type == "ASCII":
+        name = content.get("datasource_name") or ""
+        process.datasource_data_source_name_for_server = name
+        process.datasource_data_source_name_for_client = name
+        process.datasource_ascii_delimiter_type = "Character"
+        process.datasource_ascii_delimiter_char = content.get("ascii_delimiter") or ","
+        header = content.get("ascii_header_records")
+        process.datasource_ascii_header_records = (
+            int(header) if header is not None else 0
+        )
+
+
+def _apply_variables(process: Process, content: dict) -> None:
+    if "variables" not in content:
+        return
+
+    # Replace rather than append: a re-proposed draft defines the full set.
+    # TM1py exposes no clear-all, so the backing lists are reset directly.
+    process._variables = []
+    process._variables_ui_data = []
+
+    for variable in content["variables"]:
+        var_type = "Numeric" if str(variable.get("type")) == "Numeric" else "String"
+        process.add_variable(str(variable["name"]), var_type)
+
+
+def _apply_parameters(process: Process, content: dict) -> None:
+    if "parameters" not in content:
+        return
+
+    process._parameters = []
+
+    for parameter in content["parameters"]:
+        param_type = "Numeric" if str(parameter.get("type")) == "Numeric" else "String"
+        raw = parameter.get("value")
+
+        if param_type == "Numeric":
+            try:
+                value: str | float = float(raw) if raw not in (None, "") else 0
+            except (TypeError, ValueError):
+                value = 0
+        else:
+            value = str(raw) if raw is not None else ""
+
+        process.add_parameter(
+            str(parameter["name"]),
+            str(parameter.get("prompt") or parameter["name"]),
+            value,
+            parameter_type=param_type,
+        )
+
+
 def _build_process(name: str, content: dict, base: dict | None = None) -> Process:
     if base:
         process = Process.from_dict(base)
@@ -45,6 +104,10 @@ def _build_process(name: str, content: dict, base: dict | None = None) -> Proces
 
     if "has_security_access" in content:
         process.has_security_access = bool(content["has_security_access"])
+
+    _apply_datasource(process, content)
+    _apply_variables(process, content)
+    _apply_parameters(process, content)
 
     return process
 

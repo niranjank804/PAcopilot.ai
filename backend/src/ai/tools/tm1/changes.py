@@ -134,6 +134,66 @@ class ProposeProcessUpdateTool(Tool):
             "metadata": {"type": "string", "description": "Metadata code."},
             "data": {"type": "string", "description": "Data code."},
             "epilog": {"type": "string", "description": "Epilog code."},
+            "datasource_type": {
+                "type": "string",
+                "enum": ["None", "ASCII"],
+                "description": (
+                    "Datasource. Use 'None' for a self-contained process. "
+                    "Use 'ASCII' for a delimited-file loader — required for "
+                    "source column variables (v1, v2, ...) to compile."
+                ),
+            },
+            "datasource_name": {
+                "type": "string",
+                "description": (
+                    "For ASCII: the data file path on the TM1 server "
+                    "(the administrator can confirm or change it at deploy)."
+                ),
+            },
+            "ascii_delimiter": {
+                "type": "string",
+                "description": "For ASCII: the column delimiter. Default ','.",
+            },
+            "ascii_header_records": {
+                "type": "integer",
+                "description": "For ASCII: header rows to skip. Default 0.",
+            },
+            "variables": {
+                "type": "array",
+                "description": (
+                    "Datasource source columns, in order. Declare these so "
+                    "references like v1, v2 compile against an ASCII/view "
+                    "datasource."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "type": {"type": "string", "enum": ["String", "Numeric"]},
+                    },
+                    "required": ["name", "type"],
+                },
+            },
+            "parameters": {
+                "type": "array",
+                "description": (
+                    "Process parameters (e.g. pSourceFile). Declare these so "
+                    "the process compiles when the code references them."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "type": {"type": "string", "enum": ["String", "Numeric"]},
+                        "value": {
+                            "type": "string",
+                            "description": "Default value (numbers as text).",
+                        },
+                        "prompt": {"type": "string"},
+                    },
+                    "required": ["name", "type"],
+                },
+            },
         },
         "required": ["connection_id", "process_name", "create_new"],
     }
@@ -154,11 +214,25 @@ class ProposeProcessUpdateTool(Tool):
                 "You do not have permission to draft TM1 changes."
             )
 
-        new_content = {
+        new_content: dict = {
             key: str(kwargs[key])
             for key in ("prolog", "metadata", "data", "epilog")
             if key in kwargs
         }
+
+        # Datasource / variable / parameter definitions travel as-is (lists
+        # and scalars); _build_process applies them to the TM1py Process so
+        # source columns and parameters resolve at compile time.
+        for key in (
+            "datasource_type",
+            "datasource_name",
+            "ascii_delimiter",
+            "ascii_header_records",
+            "variables",
+            "parameters",
+        ):
+            if kwargs.get(key) is not None:
+                new_content[key] = kwargs[key]
 
         return await _create_draft(
             db,
