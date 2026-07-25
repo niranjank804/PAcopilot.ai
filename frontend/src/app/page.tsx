@@ -1,6 +1,7 @@
 import {
   AudioLines,
   FileText,
+  Fingerprint,
   GitBranch,
   Image as ImageIcon,
   KeyRound,
@@ -28,6 +29,12 @@ const FEATURES = [
     title: "TI Script Assistant",
     description:
       "Generate, refactor, and debug TurboIntegrator processes with AI that understands your cube model.",
+  },
+  {
+    icon: Fingerprint,
+    title: "House-Style Code Generation",
+    description:
+      "Generated TI processes, rules, and feeders follow your org's own coding standards from the Knowledge Base — not generic TM1 templates.",
   },
   {
     icon: Sigma,
