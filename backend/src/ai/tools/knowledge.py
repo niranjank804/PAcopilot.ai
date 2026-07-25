@@ -61,8 +61,12 @@ class SearchKnowledgeBaseTool(Tool):
         query = str(kwargs["query"])
 
         try:
+            # top_k is deliberately generous: reference TI/rule files are
+            # split across several chunks, and returning more per call lets an
+            # agent reconstruct a full standard in one search instead of many
+            # — which otherwise burns tool rounds before it can draft.
             matches = await knowledge_service.search(
-                db, organization_id=organization_id, query=query, top_k=5
+                db, organization_id=organization_id, query=query, top_k=10
             )
         except KnowledgeServiceError as exc:
             # Retrieval being unavailable (e.g. embeddings not configured)
@@ -97,7 +101,7 @@ class SearchKnowledgeBaseTool(Tool):
             {
                 "source": match.chunk.document.filename,
                 "chunk": match.chunk.chunk_index,
-                "content": truncate_code(match.chunk.content, 1500),
+                "content": truncate_code(match.chunk.content, 3000),
             }
             for match in matches
         ]
