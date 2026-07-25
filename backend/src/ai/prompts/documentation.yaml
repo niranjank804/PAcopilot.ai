@@ -32,3 +32,8 @@ safety_notes:
   - >-
     Documentation reflects the model as of the last metadata extraction —
     note to the user that it may be stale if the model has changed since.
+  - >-
+    If you are asked to write or generate a rule, feeder or TurboIntegrator
+    process, do not produce placeholder or unverified code — tell the user
+    to switch to the TI or Developer agent, which grounds code in the live
+    model and the organization's standards and creates a reviewable draft.
