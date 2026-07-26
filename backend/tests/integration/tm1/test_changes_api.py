@@ -191,6 +191,135 @@ async def test_reject_draft_change(
 
 
 @pytest.mark.asyncio
+async def test_cross_org_change_get_is_404(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+    headers_a = auth_headers(admin_a)
+    headers_b = auth_headers(admin_b)
+
+    connection_id_a = await _create_connection(client, headers_a)
+    connection_id_b = await _create_connection(client, headers_b)
+
+    create_resp = await client.post(
+        f"/tm1/connections/{connection_id_a}/changes",
+        json={
+            "change_type": "update_rules",
+            "target_name": "Sales",
+            "new_content": {"rules": "['A'] = N: 2;"},
+        },
+        headers=headers_a,
+    )
+    change_id = create_resp.json()["data"]["id"]
+
+    # Org B tries the change id against its OWN connection - proves a
+    # user can't reach another org's change even by pairing it with a
+    # connection they legitimately own.
+    get_resp = await client.get(
+        f"/tm1/connections/{connection_id_b}/changes/{change_id}",
+        headers=headers_b,
+    )
+    assert get_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_org_change_execute_is_404(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+    headers_a = auth_headers(admin_a)
+    headers_b = auth_headers(admin_b)
+
+    connection_id_a = await _create_connection(client, headers_a)
+    connection_id_b = await _create_connection(client, headers_b)
+
+    create_resp = await client.post(
+        f"/tm1/connections/{connection_id_a}/changes",
+        json={
+            "change_type": "update_rules",
+            "target_name": "Sales",
+            "new_content": {"rules": "['A'] = N: 2;"},
+        },
+        headers=headers_a,
+    )
+    change_id = create_resp.json()["data"]["id"]
+
+    execute_resp = await client.post(
+        f"/tm1/connections/{connection_id_b}/changes/{change_id}/execute",
+        headers=headers_b,
+    )
+    assert execute_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_org_change_reject_is_404(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+    headers_a = auth_headers(admin_a)
+    headers_b = auth_headers(admin_b)
+
+    connection_id_a = await _create_connection(client, headers_a)
+    connection_id_b = await _create_connection(client, headers_b)
+
+    create_resp = await client.post(
+        f"/tm1/connections/{connection_id_a}/changes",
+        json={
+            "change_type": "update_rules",
+            "target_name": "Sales",
+            "new_content": {"rules": "['A'] = N: 2;"},
+        },
+        headers=headers_a,
+    )
+    change_id = create_resp.json()["data"]["id"]
+
+    reject_resp = await client.post(
+        f"/tm1/connections/{connection_id_b}/changes/{change_id}/reject",
+        headers=headers_b,
+    )
+    assert reject_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_org_change_rollback_is_404(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+    headers_a = auth_headers(admin_a)
+    headers_b = auth_headers(admin_b)
+
+    connection_id_a = await _create_connection(client, headers_a)
+    connection_id_b = await _create_connection(client, headers_b)
+
+    create_resp = await client.post(
+        f"/tm1/connections/{connection_id_a}/changes",
+        json={
+            "change_type": "update_rules",
+            "target_name": "Sales",
+            "new_content": {"rules": "['A'] = N: 2;"},
+        },
+        headers=headers_a,
+    )
+    change_id = create_resp.json()["data"]["id"]
+
+    execute_resp = await client.post(
+        f"/tm1/connections/{connection_id_a}/changes/{change_id}/execute",
+        headers=headers_a,
+    )
+    assert execute_resp.json()["data"]["status"] == "executed"
+
+    rollback_resp = await client.post(
+        f"/tm1/connections/{connection_id_b}/changes/{change_id}/rollback",
+        headers=headers_b,
+    )
+    assert rollback_resp.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_reject_already_executed_change_fails(
     client, db_session, tm1_credentials_key, fake_tm1_client
 ):

@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     TM1_CIRCUIT_BREAKER_THRESHOLD: int = 5
     TM1_CIRCUIT_BREAKER_COOLDOWN_SECONDS: float = 30.0
 
+    # ------------------------------------------------------------------
+    # Tenancy
+    # ------------------------------------------------------------------
+    # Session-level org-scoping backstop (src/database/tenancy.py) behind
+    # the existing service-layer ownership checks. Off by default so this
+    # can roll out gradually: the listener stays registered either way, it
+    # just no-ops when this is False. See docs/AUDIT.md for the rollout plan.
+    TENANCY_ENFORCEMENT_ENABLED: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

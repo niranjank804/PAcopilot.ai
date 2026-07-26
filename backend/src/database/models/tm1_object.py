@@ -6,9 +6,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class TM1Object(BaseModel):
+class TM1Object(BaseModel, OrganizationScoped):
     __tablename__ = "tm1_objects"
     __table_args__ = (
         UniqueConstraint(

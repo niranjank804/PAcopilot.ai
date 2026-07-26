@@ -6,9 +6,10 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class TM1Change(BaseModel):
+class TM1Change(BaseModel, OrganizationScoped):
     """A proposed (and possibly executed) change to a TM1 artifact.
 
     Lifecycle: draft -> executed | failed -> rolled_back, or draft ->

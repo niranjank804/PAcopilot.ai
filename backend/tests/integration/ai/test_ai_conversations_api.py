@@ -197,6 +197,28 @@ async def test_conversation_endpoints_reject_another_users_conversation(
 
 
 @pytest.mark.asyncio
+async def test_cross_org_conversation_access_is_404(
+    client, db_session, fake_provider,
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+
+    resp = await client.post(
+        "/ai/chat",
+        json={"message": "hello"},
+        headers=auth_headers(admin_a),
+    )
+    conversation_id = resp.json()["data"]["conversation_id"]
+
+    messages_resp = await client.get(
+        f"/ai/conversations/{conversation_id}/messages",
+        headers=auth_headers(admin_b),
+    )
+
+    assert messages_resp.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_agents_endpoint_includes_tool_names_and_safety_notes(
     client, db_session,
 ):

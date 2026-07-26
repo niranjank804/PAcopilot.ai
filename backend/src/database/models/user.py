@@ -5,9 +5,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class User(BaseModel):
+class User(BaseModel, OrganizationScoped):
     __tablename__ = "users"
 
     organization_id: Mapped[uuid.UUID] = mapped_column(

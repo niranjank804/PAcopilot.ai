@@ -5,11 +5,18 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class AuditLog(BaseModel):
+class AuditLog(BaseModel, OrganizationScoped):
     __tablename__ = "audit_logs"
 
+    # organization_id is nullable only because it's SET NULL when the
+    # owning org is hard-deleted (see the FK below) - not a "global" row
+    # like Role's. No live session can legitimately belong to a deleted
+    # org, so unlike Role this deliberately does NOT set
+    # __tenant_nullable__ = True: NULL-org audit rows should never surface
+    # from a live request's session.
     organization_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey(

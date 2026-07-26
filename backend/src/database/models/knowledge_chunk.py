@@ -5,9 +5,10 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class KnowledgeChunk(BaseModel):
+class KnowledgeChunk(BaseModel, OrganizationScoped):
     __tablename__ = "knowledge_chunks"
 
     document_id: Mapped[uuid.UUID] = mapped_column(

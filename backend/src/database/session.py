@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.core.config import settings
+from src.database.tenancy import register_tenant_listener
 
 
 DATABASE_URL = settings.DATABASE_URL
@@ -21,6 +22,8 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+register_tenant_listener()
 
 
 async def get_db():

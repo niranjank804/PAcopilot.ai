@@ -6,9 +6,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class TM1Relationship(BaseModel):
+class TM1Relationship(BaseModel, OrganizationScoped):
     __tablename__ = "tm1_relationships"
 
     connection_id: Mapped[uuid.UUID] = mapped_column(

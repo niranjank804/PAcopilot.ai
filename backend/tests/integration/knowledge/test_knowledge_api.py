@@ -150,6 +150,36 @@ async def test_search_endpoint_returns_matches(client, db_session, fake_embeddin
 
 
 @pytest.mark.asyncio
+async def test_cross_org_search_does_not_return_other_orgs_chunks(
+    client, db_session, fake_embeddings
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+
+    await client.post(
+        "/knowledge/documents",
+        files={
+            "file": (
+                "org_a_notes.txt",
+                b"Org A's private knowledge base content",
+                "text/plain",
+            )
+        },
+        headers=auth_headers(admin_a),
+    )
+
+    resp = await client.post(
+        "/knowledge/search",
+        json={"query": "private knowledge", "top_k": 5},
+        headers=auth_headers(admin_b),
+    )
+
+    assert resp.status_code == 200
+    results = resp.json()["data"]
+    assert all(r["filename"] != "org_a_notes.txt" for r in results)
+
+
+@pytest.mark.asyncio
 async def test_search_returns_clean_error_when_embedding_provider_fails(
     client, db_session, monkeypatch,
 ):
@@ -205,6 +235,36 @@ async def test_ask_endpoint_returns_answer_with_citations(
     assert body["content"] == "grounded answer"
     assert len(body["citations"]) == 1
     assert body["citations"][0]["filename"] == "notes.txt"
+
+
+@pytest.mark.asyncio
+async def test_cross_org_ask_does_not_ground_in_other_orgs_documents(
+    client, db_session, fake_embeddings, fake_chat_provider
+):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+
+    await client.post(
+        "/knowledge/documents",
+        files={
+            "file": (
+                "org_a_notes.txt",
+                b"Org A's private knowledge base content",
+                "text/plain",
+            )
+        },
+        headers=auth_headers(admin_a),
+    )
+
+    resp = await client.post(
+        "/knowledge/ask",
+        json={"query": "what's in the notes?"},
+        headers=auth_headers(admin_b),
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["citations"] == []
 
 
 @pytest.mark.asyncio

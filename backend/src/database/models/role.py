@@ -10,9 +10,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class Role(BaseModel):
+class Role(BaseModel, OrganizationScoped):
     __tablename__ = "roles"
     __table_args__ = (
         UniqueConstraint(
@@ -21,6 +22,12 @@ class Role(BaseModel):
             name="uq_role_org_name",
         ),
     )
+
+    # NULL organization_id = a global/system role, shared across every
+    # organization (e.g. the seeded Super Admin/Analyst/Viewer roles) - the
+    # tenancy filter must keep these visible from any org's session, not
+    # just the row's own org.
+    __tenant_nullable__ = True
 
     organization_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

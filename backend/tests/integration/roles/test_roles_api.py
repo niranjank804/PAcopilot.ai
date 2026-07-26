@@ -44,6 +44,28 @@ async def test_cross_org_role_access_is_404(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_cross_org_role_listing_excludes_other_orgs_roles(client, db_session):
+    org_a, admin_a = await create_org_admin(db_session)
+    org_b, admin_b = await create_org_admin(db_session)
+
+    await client.post(
+        "/roles",
+        json={"name": "Org A Only Role"},
+        headers=auth_headers(admin_a),
+    )
+
+    list_resp = await client.get("/roles", headers=auth_headers(admin_b))
+    assert list_resp.status_code == 200
+    names = {r["name"] for r in list_resp.json()["data"]}
+
+    assert "Org A Only Role" not in names
+    # Global/system roles (organization_id IS NULL) must stay visible to
+    # every organization, not just the one currently querying.
+    assert "Viewer" in names
+    assert "Organization Admin" in names
+
+
+@pytest.mark.asyncio
 async def test_unauthenticated_request_is_401(client):
     resp = await client.get("/roles")
     assert resp.status_code == 401

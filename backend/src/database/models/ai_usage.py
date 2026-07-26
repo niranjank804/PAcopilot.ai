@@ -5,9 +5,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import BaseModel
+from ..tenancy import OrganizationScoped
 
 
-class AIUsage(BaseModel):
+class AIUsage(BaseModel, OrganizationScoped):
     __tablename__ = "ai_usage"
 
     conversation_id: Mapped[uuid.UUID] = mapped_column(
