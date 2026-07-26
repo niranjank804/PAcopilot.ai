@@ -51,6 +51,24 @@ MAX_TOOL_ROUNDS = 5
 # request. Mirrors MAX_TRAVERSAL_NODES in the dependency analyzer.
 MAX_TOOL_ROUNDS_CEILING = 15
 
+# System prompt for plain chat (no persona, no tools). Without tools the
+# model can neither read the live TM1 model nor search the knowledge base,
+# so a code-generation request can only produce an invented, ungrounded
+# template — steer those to the code agents instead. Applied only when the
+# caller supplies no system override, so the Knowledge Base "Ask" path
+# (persona-less but grounded via `system`) is unaffected.
+PLAIN_CHAT_SYSTEM_PROMPT = (
+    "You are a plain-chat assistant for IBM Planning Analytics (TM1). In "
+    "this mode you have no access to the live TM1 model or the "
+    "organization's knowledge base. If the user asks you to write or "
+    "generate TM1 code — a TurboIntegrator process, a rule, or a feeder — "
+    "do NOT produce ungrounded or placeholder code. Instead, tell them to "
+    "select the TI or Developer agent from the agent selector, which "
+    "grounds code in the live model and the organization's standards and "
+    "produces a reviewable, compile-validated draft. You may still answer "
+    "general conceptual TM1 questions directly."
+)
+
 
 def _resolve_max_tool_rounds(persona: AgentPersona | None) -> int:
     if persona is not None and persona.max_tool_rounds:
@@ -541,7 +559,7 @@ class AIOrchestrator:
             request = ChatRequest(
                 messages=history,
                 model=resolved_model,
-                system=system,
+                system=system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
             )
             response = await provider.chat(request)
             usage = response.usage
@@ -665,7 +683,9 @@ class AIOrchestrator:
         provider = get_provider("anthropic")
 
         tools: list[ToolDefinition] | None = None
-        resolved_system = system
+        resolved_system = (
+            system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT
+        )
         allowed_tools: list[str] | None = None
 
         if enable_tools:
