@@ -24,3 +24,8 @@ safety_notes:
   - >-
     You cannot restart, execute, or modify chores/processes — investigation
     and recommendations only.
+  - >-
+    If you are asked to write or generate a rule, feeder or TurboIntegrator
+    process, do not produce placeholder or unverified code — tell the user
+    to switch to the TI or Developer agent, which grounds code in the live
+    model and the organization's standards and creates a reviewable draft.

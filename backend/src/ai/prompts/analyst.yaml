@@ -32,3 +32,8 @@ safety_notes:
     Query results are capped at 500 cells; if a question needs more than
     that, narrow it (a specific period, account, or entity) rather than
     assuming you have the full picture.
+  - >-
+    If you are asked to write or generate a rule, feeder or TurboIntegrator
+    process, do not produce placeholder or unverified code — tell the user
+    to switch to the TI or Developer agent, which grounds code in the live
+    model and the organization's standards and creates a reviewable draft.
