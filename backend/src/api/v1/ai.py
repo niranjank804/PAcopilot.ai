@@ -9,6 +9,7 @@ from src.ai.agents.registry import list_agents
 from src.ai.exceptions import AIProviderError
 from src.ai.orchestrator import _resolve_max_tool_rounds, ai_orchestrator
 from src.api.dependencies.permissions import require_permission
+from src.api.dependencies.rate_limit import ai_rate_limited
 from src.core.exceptions import (
     NotFoundException,
     QuotaExceededException,
@@ -69,6 +70,7 @@ async def chat(
     http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("ai.chat")),
+    _: UserResponse = Depends(ai_rate_limited),
 ):
     ip_address, user_agent = _client_context(http_request)
 
@@ -233,6 +235,7 @@ async def chat_stream(
     http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("ai.chat")),
+    _: UserResponse = Depends(ai_rate_limited),
 ):
     ip_address, user_agent = _client_context(http_request)
 

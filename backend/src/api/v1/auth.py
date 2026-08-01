@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.auth import get_current_active_user
+from src.api.dependencies.rate_limit import auth_throttle
 from src.database.session import get_db
 from src.schemas.auth import (
     ForgotPasswordRequest,
@@ -30,6 +31,7 @@ router = APIRouter(
 async def register(
     request: RegisterRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(auth_throttle("register", "AUTH_REGISTER_PER_WINDOW")),
 ):
     user = await auth_service.register(
         db,
@@ -46,6 +48,7 @@ async def register(
 async def login(
     request: LoginRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(auth_throttle("login", "AUTH_LOGIN_ATTEMPTS_PER_WINDOW")),
 ):
     token = await auth_service.login(
         db,
@@ -62,6 +65,7 @@ async def login(
 async def refresh(
     request: RefreshRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(auth_throttle("refresh", "AUTH_REFRESH_PER_WINDOW")),
 ):
     token = await auth_service.refresh(
         db,
@@ -78,6 +82,7 @@ async def refresh(
 async def google_login(
     request: GoogleLoginRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(auth_throttle("google_login", "AUTH_LOGIN_ATTEMPTS_PER_WINDOW")),
 ):
     token = await auth_service.google_login(db, request.id_token)
 
@@ -91,6 +96,7 @@ async def google_login(
 async def forgot_password(
     request: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(auth_throttle("forgot_password", "AUTH_PASSWORD_RESET_PER_WINDOW")),
 ):
     await auth_service.request_password_reset(db, request.email)
 
@@ -106,8 +112,40 @@ async def forgot_password(
 async def reset_password(
     request: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(auth_throttle("reset_password", "AUTH_PASSWORD_RESET_PER_WINDOW")),
 ):
     await auth_service.reset_password(db, request.token, request.new_password)
+
+    return ApiResponse(success=True, data=None)
+
+
+@router.post(
+    "/logout",
+    response_model=ApiResponse[None],
+)
+async def logout(
+    request: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_active_user),
+):
+    """End this session by revoking its refresh token."""
+
+    await auth_service.logout(db, current_user.id, request.refresh_token)
+
+    return ApiResponse(success=True, data=None)
+
+
+@router.post(
+    "/logout-all",
+    response_model=ApiResponse[None],
+)
+async def logout_all(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_active_user),
+):
+    """End every session for this user, on every device."""
+
+    await auth_service.logout_all(db, current_user.id)
 
     return ApiResponse(success=True, data=None)
 
