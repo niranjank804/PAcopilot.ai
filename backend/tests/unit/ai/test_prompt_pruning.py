@@ -50,11 +50,13 @@ async def test_breaker_open_connections_are_pruned_from_tool_prompt(
     breaker.state = CircuitState.OPEN
 
     try:
-        prompt = await ai_orchestrator._build_tool_system_prompt(
+        # Connection state is volatile (a breaker can open at any time),
+        # so it lives in the uncached half of the system prompt.
+        _stable, volatile = await ai_orchestrator._build_tool_system_prompt(
             db_session, org.id, None, None
         )
 
-        assert str(healthy.id) in prompt
-        assert str(dead.id) not in prompt
+        assert str(healthy.id) in volatile
+        assert str(dead.id) not in volatile
     finally:
         remove_circuit_breaker(dead.id)

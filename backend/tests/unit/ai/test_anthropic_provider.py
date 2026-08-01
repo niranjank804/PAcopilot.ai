@@ -109,7 +109,12 @@ async def test_chat_builds_image_and_text_content_blocks_for_attachments():
         "type": "image",
         "source": {"type": "base64", "media_type": "image/png", "data": "ZmFrZQ=="},
     }
-    assert blocks[1] == {"type": "text", "text": "What's in this image?"}
+    # The trailing block also carries the conversation cache breakpoint.
+    assert blocks[1] == {
+        "type": "text",
+        "text": "What's in this image?",
+        "cache_control": {"type": "ephemeral"},
+    }
 
 
 @pytest.mark.asyncio

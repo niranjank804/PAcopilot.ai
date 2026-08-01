@@ -54,6 +54,11 @@ class AIToolExecutionRepository:
                 func.count(AIToolExecution.id).filter(
                     AIToolExecution.status == "error"
                 ),
+                # Expected negatives ("no such process") are counted apart
+                # from failures so error_count stays a health signal.
+                func.count(AIToolExecution.id).filter(
+                    AIToolExecution.status == "not_found"
+                ),
                 func.coalesce(func.avg(AIToolExecution.duration_ms), 0),
             )
             .where(
@@ -69,6 +74,7 @@ class AIToolExecutionRepository:
                 "total_calls": total_calls,
                 "success_count": success_count,
                 "error_count": error_count,
+                "not_found_count": not_found_count,
                 "avg_duration_ms": float(avg_duration_ms),
             }
             for (
@@ -76,6 +82,7 @@ class AIToolExecutionRepository:
                 total_calls,
                 success_count,
                 error_count,
+                not_found_count,
                 avg_duration_ms,
             ) in result.all()
         ]
