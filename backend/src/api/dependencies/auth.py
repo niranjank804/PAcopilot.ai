@@ -10,6 +10,7 @@ from src.database.session import get_db
 from src.schemas.auth import UserResponse
 from src.services.auth_service import auth_service
 from src.services.jwt_service import jwt_service
+from src.services.token_revocation_service import token_revocation_service
 
 security = HTTPBearer()
 
@@ -38,10 +39,22 @@ async def get_current_user(
     # user).
     db.info.pop("organization_id", None)
 
+    # Revocation is checked here rather than at the edge because a JWT is
+    # otherwise self-validating: without this, "log out" only clears the
+    # browser and the token stays usable until it expires.
+    if await token_revocation_service.is_revoked(db, payload):
+        raise AuthenticationException("Invalid or expired token")
+
     current_user = await auth_service.get_current_user(
         db,
         user_id,
     )
+
+    if token_revocation_service.issued_before_cutoff(
+        payload, current_user.tokens_valid_from
+    ):
+        # Password changed, reset completed, or logged out everywhere.
+        raise AuthenticationException("Session ended. Sign in again.")
 
     # Stamps the session with the caller's org for tenancy.py's
     # session-level filter. Must happen here, not inside get_db() - the

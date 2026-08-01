@@ -446,3 +446,169 @@ async def test_google_login_reuses_account_on_second_login(
         },
     )
     assert first_me.json()["data"]["id"] == second_me.json()["data"]["id"]
+
+
+# ---------------------------------------------------------------------------
+# A new signup must be able to use the product it just signed up for.
+# Registration used to create an approved, active account with no role, so
+# every page failed with "Missing permission: ...".
+# ---------------------------------------------------------------------------
+
+
+async def _seed_analyst_role(db_session):
+    """Idempotent: the dev database may already carry the seeded rows."""
+
+    from src.database.models.permission import Permission
+    from src.database.models.role import Role
+    from src.database.models.role_permission import RolePermission
+    from src.repositories.permission_repository import permission_repository
+    from src.repositories.role_permission_repository import (
+        role_permission_repository,
+    )
+    from src.repositories.role_repository import role_repository
+
+    role = await role_repository.get_system_role(db_session, "Analyst")
+
+    if role is None:
+        role = Role(
+            organization_id=None,
+            name="Analyst",
+            description="Can view and analyze data.",
+            is_system=True,
+        )
+        db_session.add(role)
+        await db_session.flush()
+
+    for code in ("ai.chat", "knowledge.read", "monitoring.view"):
+        permission = await permission_repository.get_by_code(db_session, code)
+
+        if permission is None:
+            permission = Permission(code=code, description=code)
+            db_session.add(permission)
+            await db_session.flush()
+
+        link = await role_permission_repository.get_by_role_and_permission(
+            db_session, role.id, permission.id
+        )
+
+        if link is None:
+            db_session.add(
+                RolePermission(role_id=role.id, permission_id=permission.id)
+            )
+
+    await db_session.flush()
+
+    return role
+
+
+@pytest.mark.asyncio
+async def test_registration_grants_the_default_role(client, db_session):
+    await _seed_analyst_role(db_session)
+
+    response = await client.post(
+        "/auth/register",
+        json={
+            "username": "newstarter",
+            "email": "newstarter@example.com",
+            "password": "Str0ngPassw0rd!",
+            "first_name": "New",
+            "last_name": "Starter",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+
+    from src.repositories.auth_repository import auth_repository
+    from src.repositories.user_repository import user_repository
+
+    user = await user_repository.get_by_username(db_session, "newstarter")
+
+    assert user is not None
+    # The two permissions whose absence produced the reported errors.
+    assert await auth_repository.user_has_permission(
+        db_session, user.id, "ai.chat"
+    )
+    assert await auth_repository.user_has_permission(
+        db_session, user.id, "knowledge.read"
+    )
+
+
+@pytest.mark.asyncio
+async def test_default_role_does_not_grant_write_or_admin(client, db_session):
+    await _seed_analyst_role(db_session)
+
+    await client.post(
+        "/auth/register",
+        json={
+            "username": "limited",
+            "email": "limited@example.com",
+            "password": "Str0ngPassw0rd!",
+            "first_name": "Limited",
+            "last_name": "User",
+        },
+    )
+
+    from src.repositories.auth_repository import auth_repository
+    from src.repositories.user_repository import user_repository
+
+    user = await user_repository.get_by_username(db_session, "limited")
+
+    for code in ("users.write", "tm1.deploy", "knowledge.write"):
+        assert not await auth_repository.user_has_permission(
+            db_session, user.id, code
+        ), code
+
+
+@pytest.mark.asyncio
+async def test_registration_still_succeeds_when_the_role_is_missing(
+    client, monkeypatch
+):
+    # Seed scripts not run, or DEFAULT_SIGNUP_ROLE misconfigured. Creating
+    # the account must not fail just because the grant cannot be made.
+    from src.core.config import settings
+
+    monkeypatch.setattr(settings, "DEFAULT_SIGNUP_ROLE", "No Such Role")
+
+    response = await client.post(
+        "/auth/register",
+        json={
+            "username": "noroles",
+            "email": "noroles@example.com",
+            "password": "Str0ngPassw0rd!",
+            "first_name": "No",
+            "last_name": "Roles",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_default_role_can_be_disabled(client, db_session, monkeypatch):
+    from src.core.config import settings
+
+    monkeypatch.setattr(settings, "DEFAULT_SIGNUP_ROLE", "")
+
+    await _seed_analyst_role(db_session)
+
+    response = await client.post(
+        "/auth/register",
+        json={
+            "username": "unprivileged",
+            "email": "unprivileged@example.com",
+            "password": "Str0ngPassw0rd!",
+            "first_name": "Un",
+            "last_name": "Privileged",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+
+    from src.repositories.auth_repository import auth_repository
+    from src.repositories.user_repository import user_repository
+
+    user = await user_repository.get_by_username(db_session, "unprivileged")
+
+    assert not await auth_repository.user_has_permission(
+        db_session, user.id, "ai.chat"
+    )

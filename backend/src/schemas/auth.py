@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -56,6 +57,14 @@ class UserResponse(BaseModel):
     is_active: bool
     organization_id: UUID
     registration_status: str
+
+    # Needed by the auth dependency to reject tokens predating a bulk
+    # revocation. Excluded from serialization: it is effectively a
+    # last-password-change timestamp and clients have no use for it.
+    tokens_valid_from: datetime = Field(
+        default_factory=lambda: datetime.fromtimestamp(0, tz=timezone.utc),
+        exclude=True,
+    )
 
 
 class ApproveUserRequest(BaseModel):

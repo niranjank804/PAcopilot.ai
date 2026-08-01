@@ -16,8 +16,11 @@ from src.core.exceptions import (
 from src.database.models.organization import Organization
 from src.database.models.password_reset_token import PasswordResetToken
 from src.database.models.user import User
+from src.database.models.user_role import UserRole
 from src.email.registry import get_email_provider
 from src.repositories.organization_repository import organization_repository
+from src.repositories.role_repository import role_repository
+from src.repositories.user_role_repository import user_role_repository
 from src.repositories.password_reset_token_repository import (
     password_reset_token_repository,
 )
@@ -32,6 +35,7 @@ from src.schemas.auth import (
 from src.services.google_oauth import verify_google_id_token
 from src.services.jwt_service import jwt_service
 from src.services.password_service import password_service
+from src.services.token_revocation_service import token_revocation_service
 
 
 # Matches scripts/seed_admin.py's DEFAULT_ORG_CODE - both create the same
@@ -64,6 +68,43 @@ def _check_can_authenticate(user: User) -> None:
 
 
 class AuthService:
+    async def _grant_default_role(
+        self,
+        db: AsyncSession,
+        user: User,
+    ) -> None:
+        """Give a newly self-registered account a usable starting role.
+
+        Registration previously created an approved, active user with no
+        role at all. That user could log in, see the full navigation, and
+        then hit "Missing permission: ai.chat" on every page — the product
+        looked broken when the account was simply unprovisioned.
+
+        Failure here is deliberately non-fatal: a missing role (seed
+        scripts not run) must not turn a successful signup into a 500. The
+        account is still created, and an administrator can assign a role
+        through the Users page.
+        """
+
+        role_name = settings.DEFAULT_SIGNUP_ROLE.strip()
+
+        if not role_name:
+            return
+
+        role = await role_repository.get_system_role(db, role_name)
+
+        if role is None:
+            return
+
+        existing = await user_role_repository.get_by_user_and_role(
+            db, user.id, role.id
+        )
+
+        if existing is None:
+            await user_role_repository.create(
+                db, UserRole(user_id=user.id, role_id=role.id)
+            )
+
     async def _resolve_registration_organization(
         self,
         db: AsyncSession,
@@ -170,6 +211,8 @@ class AuthService:
 
         user = await user_repository.create(db, user)
 
+        await self._grant_default_role(db, user)
+
         return UserResponse.model_validate(user)
 
     async def login(
@@ -230,6 +273,41 @@ class AuthService:
             raise AuthenticationException("Invalid or expired refresh token")
 
         _check_can_authenticate(user)
+
+        # Reuse detection. Rotation retires each refresh token as it is
+        # spent, so a *second* presentation means either a replay or a
+        # stolen copy in use alongside the real client. There is no way to
+        # tell which, so the safe reading is compromise: end every session.
+        if await token_revocation_service.is_revoked(db, payload):
+            await token_revocation_service.revoke_all_for_user(db, user.id)
+
+            # Committed before raising. The request handler rolls back on
+            # exception, which would otherwise discard the very revocation
+            # this branch exists to perform — the attacker's replay would
+            # be rejected while every live session stayed open.
+            await db.commit()
+
+            raise AuthenticationException(
+                "This session has been ended for security reasons. "
+                "Please sign in again."
+            )
+
+        if token_revocation_service.issued_before_cutoff(
+            payload, user.tokens_valid_from
+        ):
+            raise AuthenticationException("Session ended. Sign in again.")
+
+        # Rotate: spend the presented token and issue a replacement.
+        # Without this one refresh token stays valid for its whole 7-day
+        # life however often it is used, and a copy is indistinguishable
+        # from the original.
+        await token_revocation_service.revoke(
+            db,
+            jti=payload.get("jti", ""),
+            user_id=user.id,
+            expires_at=jwt_service.expiry_of(payload),
+            reason="rotated",
+        )
 
         access_token = jwt_service.create_access_token(str(user.id))
         refresh_token = jwt_service.create_refresh_token(str(user.id))
@@ -314,6 +392,11 @@ class AuthService:
         await user_repository.update(db, user)
         await password_reset_token_repository.mark_used(db, reset_token, now)
 
+        # A reset is a recovery action: whoever knew the old password may
+        # still be holding live tokens. Ending every session is the point of
+        # resetting, not a side effect of it.
+        await token_revocation_service.revoke_all_for_user(db, user.id)
+
     async def google_login(
         self,
         db: AsyncSession,
@@ -357,6 +440,8 @@ class AuthService:
 
             user = await user_repository.create(db, user)
 
+            await self._grant_default_role(db, user)
+
         _check_can_authenticate(user)
 
         access_token = jwt_service.create_access_token(str(user.id))
@@ -366,6 +451,53 @@ class AuthService:
             access_token=access_token,
             refresh_token=refresh_token,
         )
+
+    async def logout(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        refresh_token: str | None,
+    ) -> None:
+        """End this session by revoking its refresh token.
+
+        The access token is short-lived and expires on its own; the refresh
+        token is what could mint new ones for the next seven days. A missing
+        or unparseable token is not an error — logging out must always
+        appear to succeed.
+        """
+
+        if not refresh_token:
+            return
+
+        try:
+            payload = jwt_service.decode_token(refresh_token)
+        except JWTError:
+            return
+
+        if payload.get("type") != "refresh":
+            return
+
+        # Revoking someone else's token by presenting it here is not a
+        # capability this endpoint should offer.
+        if payload.get("sub") != str(user_id):
+            return
+
+        await token_revocation_service.revoke(
+            db,
+            jti=payload.get("jti", ""),
+            user_id=user_id,
+            expires_at=jwt_service.expiry_of(payload),
+            reason="logout",
+        )
+
+    async def logout_all(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+    ) -> None:
+        """End every session for this user, on every device."""
+
+        await token_revocation_service.revoke_all_for_user(db, user_id)
 
     async def get_current_user(
         self,
