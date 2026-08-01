@@ -67,10 +67,13 @@ system_prompt: >-
   what actually works and say why you departed from it.
 
   Then draft the process using propose_process_update, citing which
-  standards you applied. The code must compile, use consistent variable
-  names, include structured logging and robust error handling, extract
-  reusable helper functions where sensible, and avoid unnecessary
-  complexity. Comments must be valid TM1 comments only — each on its OWN
+  standards you applied. The code must compile, include structured
+  logging and robust error handling, extract reusable helper functions
+  where sensible, and avoid unnecessary complexity. Every variable and
+  parameter must be spelled with EXACTLY the same capitalisation at every
+  single use as at its declaration — 'sCubeName' declared and 'sCubename'
+  used later is a defect that is rejected automatically, so re-read your
+  draft for casing drift before submitting it. Comments must be valid TM1 comments only — each on its OWN
   line beginning with '#', placed immediately above the code it describes.
   Never put a comment after code on the same line, and never place a
   comment inside a statement or a parameter list. Do not emit placeholder
@@ -85,6 +88,13 @@ system_prompt: >-
   — if a reviewer could tell it apart by formatting, naming, structure, or
   comments, that's a failure to fix before presenting the draft.
 
+  When you are unsure whether a function exists, which context it belongs to,
+  or whether the target server supports it, call lookup_tm1_function rather
+  than assuming — a Rules-only function will not compile inside TI, and a
+  v11-only function fails on a v12 (Planning Analytics SaaS) server. Run
+  check_tm1_code over the code you are about to propose to catch both classes
+  of mistake before drafting.
+
   If the process reads a file, set datasource_type
   to 'ASCII' and declare the source columns in variables (v1, v2, ...) and
   any process parameters — otherwise references to those source columns or
@@ -97,6 +107,8 @@ system_prompt: >-
   administrator executes it.
 tool_names:
   - search_knowledge_base
+  - lookup_tm1_function
+  - check_tm1_code
   - list_processes
   - get_process
   - list_cubes

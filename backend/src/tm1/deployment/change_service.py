@@ -1,3 +1,5 @@
+import hashlib
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -12,6 +14,7 @@ from src.core.exceptions import (
 from src.database.models.tm1_change import TM1Change
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
+from src.tm1.deployment import ti_analysis
 from src.tm1.exceptions import TM1NotFoundError
 from src.tm1.metadata import dependency_analyzer
 from src.tm1.service import tm1_integration_service
@@ -91,6 +94,33 @@ def _apply_parameters(process: Process, content: dict) -> None:
         )
 
 
+def _fingerprint(
+    change_type: str,
+    target_name: str,
+    new_content: dict | None,
+) -> str:
+    """Stable hash of everything that makes a proposal what it is.
+
+    Two proposals with the same fingerprint are the same draft, however
+    many times the caller asked for it — a double-clicked button, a
+    retried HTTP request, or an agent re-running a tool after a stream
+    reconnect.
+    """
+
+    payload = json.dumps(
+        {
+            "change_type": change_type,
+            "target_name": target_name,
+            "new_content": new_content,
+        },
+        sort_keys=True,
+        default=str,
+        separators=(",", ":"),
+    )
+
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _build_process(name: str, content: dict, base: dict | None = None) -> Process:
     if base:
         process = Process.from_dict(base)
@@ -154,6 +184,30 @@ class ChangeService:
         if change_type not in VALID_CHANGE_TYPES:
             raise ValidationException(f"Unknown change_type '{change_type}'.")
 
+        # Resolved before any TM1 round trip so a repeated proposal costs
+        # nothing. Scoped to this author: superseding a colleague's open
+        # draft out from under them would be a surprise, so a second
+        # person proposing against the same target gets their own draft.
+        fingerprint = _fingerprint(change_type, target_name, new_content)
+
+        open_drafts = await tm1_change_repository.list_open_drafts(
+            db,
+            connection_id=connection_id,
+            organization_id=organization_id,
+            created_by=created_by,
+            change_type=change_type,
+            target_name=target_name,
+        )
+
+        for draft in open_drafts:
+            if (
+                _fingerprint(
+                    draft.change_type, draft.target_name, draft.new_content
+                )
+                == fingerprint
+            ):
+                return draft
+
         connection = await tm1_integration_service.get_connection(
             db, connection_id, organization_id
         )
@@ -196,10 +250,21 @@ class ChangeService:
                 )
 
             candidate = _build_process(target_name, new_content, base)
+
+            # Static analysis first: it catches defects the compiler
+            # tolerates (inconsistent variable casing) or reports at the
+            # use site rather than the missing declaration. The server's
+            # own datasource is passed through so an update that doesn't
+            # touch the datasource is still analysed against the right one
+            # — a cube-view process has generated source variables that no
+            # draft can declare.
             errors = await process_service.compile_process_dryrun(
                 client, connection.id, candidate
             )
-            validation_errors = errors or []
+            validation_errors = ti_analysis.analyze(
+                new_content,
+                datasource_type=(base or {}).get("DataSourceType"),
+            ) + (errors or [])
             object_type = "process"
 
         else:  # delete_process
@@ -214,6 +279,19 @@ class ChangeService:
             db, connection.id, organization_id, object_type, target_name
         )
 
+        # An agent that calls propose_process_update several times in one
+        # turn produces several proposals against the same target. Each one
+        # replaces the last, so the turn ends with exactly one executable
+        # draft rather than N competing ones.
+        #
+        # Split in two because the constraints pull opposite ways:
+        # uq_tm1_changes_open_draft needs the old row out of 'draft' before
+        # the insert, while superseded_by's foreign key needs the new row to
+        # exist before it can be pointed at. Status first, pointer after.
+        for draft in open_drafts:
+            draft.status = "superseded"
+            await tm1_change_repository.update(db, draft)
+
         change = TM1Change(
             connection_id=connection.id,
             organization_id=organization_id,
@@ -226,7 +304,13 @@ class ChangeService:
             status="draft",
         )
 
-        return await tm1_change_repository.create(db, change)
+        created = await tm1_change_repository.create(db, change)
+
+        for draft in open_drafts:
+            draft.superseded_by = created.id
+            await tm1_change_repository.update(db, draft)
+
+        return created
 
     async def get_change_preview(
         self,

@@ -13,7 +13,9 @@ class TM1Change(BaseModel, OrganizationScoped):
     """A proposed (and possibly executed) change to a TM1 artifact.
 
     Lifecycle: draft -> executed | failed -> rolled_back, or draft ->
-    rejected (discarded without ever touching the live TM1 server).
+    rejected (discarded without ever touching the live TM1 server), or
+    draft -> superseded (the author re-proposed the same target with
+    different content; `superseded_by` points at the replacement).
     previous_content is the snapshot captured at execute time and is the
     rollback mechanism — TM1 has no object-level sandboxes.
     """
@@ -79,6 +81,12 @@ class TM1Change(BaseModel, OrganizationScoped):
 
     error_message: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
+    )
+
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tm1_changes.id", ondelete="SET NULL"),
         nullable=True,
     )
 
