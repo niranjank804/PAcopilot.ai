@@ -1,0 +1,35 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+exclude = ["alembic/versions", ".venv"]
+
+[tool.ruff.lint]
+# CI blocks on this set only. "F" is pyflakes — undefined names, unused
+# imports, unused variables: things that are wrong regardless of taste.
+# Style rules are reported by the advisory job instead, so a formatting
+# opinion can never block a security fix from merging.
+select = ["F", "E9"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/alembic/*", "*/__pycache__/*", "*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+# Advisory only today. The codebase predates type checking, so enabling
+# strict mode as a merge gate would block every PR until a large
+# retrofit lands. Ratchet these up as modules are annotated.
+check_untyped_defs = false

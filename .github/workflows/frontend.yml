@@ -1,0 +1,67 @@
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+    paths: ['frontend/**', '.github/workflows/frontend.yml']
+  pull_request:
+    paths: ['frontend/**', '.github/workflows/frontend.yml']
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  verify:
+    name: Typecheck, lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `ci` not `install`: fails on a lockfile that disagrees with
+      # package.json rather than quietly resolving something else.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and component tests
+        run: npm run test
+
+      - name: Coverage
+        run: npm run coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 90
+
+      - name: Production build
+        # A build that only succeeds with real values isn't verifying the
+        # build — these are placeholders, and no real secret belongs here.
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+        run: npm run build
+
+      # Playwright is not installed yet. A workflow step for an absent
+      # tool is a red pipeline that teaches people to ignore red
+      # pipelines, so end-to-end stays out until the tooling lands.
