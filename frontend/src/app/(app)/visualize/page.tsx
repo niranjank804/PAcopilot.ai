@@ -52,6 +52,12 @@ const MAX_CHART_BARS = 30;
 
 type ChartKind = "bar" | "line" | "area";
 
+const CHART_KIND_LABEL: Record<ChartKind, string> = {
+  bar: "Bar",
+  line: "Line",
+  area: "Area",
+};
+
 const CHART_HEIGHTS = {
   small: 240,
   medium: 320,
@@ -59,6 +65,12 @@ const CHART_HEIGHTS = {
 } as const;
 
 type ChartHeightKey = keyof typeof CHART_HEIGHTS;
+
+const CHART_HEIGHT_LABEL: Record<ChartHeightKey, string> = {
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+};
 
 const DEFAULT_CHART_COLOR = "#1877f2";
 
@@ -126,7 +138,15 @@ export default function VisualizePage() {
               onValueChange={(value) => setConnectionId(value ?? "")}
             >
               <SelectTrigger className="w-56" aria-label="Connection">
-                <SelectValue placeholder="Select connection" />
+                {/* Base UI renders the raw value unless given a function
+                    child — without this the trigger shows the connection's
+                    UUID instead of its name. */}
+                <SelectValue placeholder="Select connection">
+                  {(value: string) =>
+                    connectionsQuery.data?.find((c) => c.id === value)?.name ??
+                    "Select connection"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {connectionsQuery.data?.map((c) => (
@@ -185,7 +205,9 @@ export default function VisualizePage() {
                           onValueChange={(v) => setChartKind((v as ChartKind) ?? "bar")}
                         >
                           <SelectTrigger id="chart-kind" className="w-32" aria-label="Chart type">
-                            <SelectValue />
+                            <SelectValue>
+                              {(value: ChartKind) => CHART_KIND_LABEL[value]}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="bar">Bar</SelectItem>
@@ -205,7 +227,11 @@ export default function VisualizePage() {
                           }
                         >
                           <SelectTrigger id="chart-size" className="w-28" aria-label="Chart size">
-                            <SelectValue />
+                            <SelectValue>
+                              {(value: ChartHeightKey) =>
+                                CHART_HEIGHT_LABEL[value]
+                              }
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="small">Small</SelectItem>

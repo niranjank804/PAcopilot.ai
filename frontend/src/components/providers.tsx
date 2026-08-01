@@ -14,12 +14,17 @@ export function Providers({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             // Never re-ask a question the API answered definitively: an
-            // ApiError means the backend responded (and TM1 calls are already
-            // retried 4x server-side — client retries just multiply the wait,
-            // leaving pages on skeletons for ~30s). Only retry once for
-            // transport-level failures (fetch threw, no response at all).
+            // ApiError with a real HTTP status means the backend responded
+            // (and TM1 calls are already retried 4x server-side — client
+            // retries just multiply the wait, leaving pages on skeletons for
+            // ~30s). Only retry once for transport-level failures, which
+            // apiRequest surfaces as NETWORK_ERROR/TIMEOUT rather than
+            // letting the raw DOMException escape.
             retry: (failureCount, error) =>
-              !(error instanceof ApiError) && failureCount < 1,
+              failureCount < 1 &&
+              (!(error instanceof ApiError) ||
+                error.code === "NETWORK_ERROR" ||
+                error.code === "TIMEOUT"),
             staleTime: 30_000,
             // The API is same-host; the default "online" networkMode pauses
             // queries whenever the browser *thinks* it's offline (embedded
@@ -41,7 +46,14 @@ export function Providers({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      // Without this every token transitions on a theme switch, so the
+      // whole page visibly sweeps through an intermediate colour.
+      disableTransitionOnChange
+    >
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           {children}

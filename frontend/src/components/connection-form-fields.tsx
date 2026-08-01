@@ -19,6 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const AUTH_TYPE_LABEL: Record<string, string> = {
+  native: "Native (on-prem / self-hosted TM1)",
+  v12_saas: "Planning Analytics as a Service (IBM Cloud API key)",
+};
+
 export interface ConnectionFormValues {
   name: string;
   authentication_type: "native" | "v12_saas";
@@ -77,7 +82,11 @@ export function ConnectionFormFields<T extends FieldValues>({
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger id="authentication_type" className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(value: string) =>
+                    AUTH_TYPE_LABEL[value] ?? "Select authentication type"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="native">

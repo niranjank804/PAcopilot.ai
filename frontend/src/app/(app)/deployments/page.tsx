@@ -483,7 +483,11 @@ export default function DeploymentsPage() {
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger id="change_type" className="w-full">
-                      <SelectValue />
+                      <SelectValue>
+                        {(value: keyof typeof CHANGE_TYPE_LABEL) =>
+                          CHANGE_TYPE_LABEL[value]
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="update_rules">Update rules</SelectItem>

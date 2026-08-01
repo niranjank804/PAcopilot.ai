@@ -9,6 +9,7 @@ export const STATUS_VARIANT: Record<
   failed: "destructive",
   rolled_back: "outline",
   rejected: "outline",
+  superseded: "outline",
 };
 
 export const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {

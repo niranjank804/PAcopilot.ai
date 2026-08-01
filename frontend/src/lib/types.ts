@@ -48,7 +48,8 @@ export type ChangeStatus =
   | "executed"
   | "failed"
   | "rolled_back"
-  | "rejected";
+  | "rejected"
+  | "superseded";
 
 export interface RelatedObject {
   object_type: string;
@@ -163,6 +164,10 @@ export interface UsageSummary {
   total_requests: number;
   total_tokens: number;
   total_cost_usd: number;
+  /** Fraction of prompt tokens served from cache, 0-1. */
+  cache_hit_rate: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
   by_model: ModelUsage[];
 }
 
@@ -171,6 +176,7 @@ export interface ToolUsage {
   total_calls: number;
   success_count: number;
   error_count: number;
+  not_found_count: number;
   avg_duration_ms: number;
 }
 
@@ -282,6 +288,7 @@ export interface TM1ChangeSummary {
   validation_errors: ProcessSyntaxError[] | null;
   impact: (RelatedObject | { note: string })[] | null;
   error_message: string | null;
+  superseded_by: string | null;
   created_by: string;
   executed_by: string | null;
   created_at: string;

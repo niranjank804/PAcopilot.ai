@@ -152,6 +152,9 @@ export default function LandingPage() {
             <a href="#security" className="hover:text-foreground">
               Security
             </a>
+            <Link href="/pricing" className="hover:text-foreground">
+              Pricing
+            </Link>
           </nav>
           <div className="flex items-center gap-2">
             <Link
