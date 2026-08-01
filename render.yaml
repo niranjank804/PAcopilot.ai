@@ -18,9 +18,21 @@ services:
     startCommand: >-
       gunicorn src.main:app -k uvicorn.workers.UvicornWorker
       --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+    # Fails the deploy if the new build cannot reach its database, instead
+    # of promoting it and serving errors. Saturation deliberately does not
+    # fail this probe — see src/api/v1/health.py.
+    healthCheckPath: /health/ready
     envVars:
       - key: DEBUG
         value: "False"
+      # Sized per *worker*: --workers 2 means two processes, each with its
+      # own pool, so the real connection count against Postgres is twice
+      # these numbers (2 x (10 + 10) = 40). Raise only alongside the
+      # database plan's own connection limit.
+      - key: DATABASE_POOL_SIZE
+        value: "10"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "10"
       - key: DATABASE_HOST
         fromDatabase:
           name: pa-copilot-db
