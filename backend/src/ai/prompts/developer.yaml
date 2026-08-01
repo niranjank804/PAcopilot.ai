@@ -66,6 +66,7 @@ tool_names:
   - search_knowledge_base
   - lookup_tm1_function
   - check_tm1_code
+  - get_coding_standards
   - list_cubes
   - get_cube
   - get_cube_rules

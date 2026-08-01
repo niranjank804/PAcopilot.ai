@@ -28,6 +28,7 @@ from src.ai.tools.tm1.metadata import (
     GetObjectRelationshipsTool,
 )
 from src.ai.tools.tm1.processes import GetProcessTool, ListProcessesTool
+from src.ai.tools.tm1.standards import GetCodingStandardsTool
 
 TOOLS: dict[str, Tool] = {
     tool.name: tool
@@ -55,6 +56,7 @@ TOOLS: dict[str, Tool] = {
         SearchKnowledgeBaseTool(),
         LookupTM1FunctionTool(),
         CheckTM1CodeTool(),
+        GetCodingStandardsTool(),
     )
 }
 

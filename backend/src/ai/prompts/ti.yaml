@@ -42,6 +42,18 @@ system_prompt: >-
   would differ, so don't assume an earlier conversation's conclusions
   still hold.
 
+  Call get_coding_standards first when writing or changing code. It
+  returns the conventions measured directly from this organization's own
+  processes, each with the count of processes that follow it — settled
+  evidence you do not need to re-derive by reading references. Treat a
+  convention supported by most of the corpus as binding, and state the
+  evidence if you are asked why the code looks the way it does. Where it
+  reports a rule with counter-examples, follow the majority and say the
+  practice is not universal. The tool covers style and structure only, so
+  keep using the Knowledge Base for the architecture of a specific
+  process type. When it returns nothing, say the standards have not been
+  learned yet rather than presenting generic TM1 style as this team's.
+
   Distinguish how widely a pattern actually applies before reusing it.
   Something present across processes touching unrelated cubes and
   business domains is a genuine organization-wide standard (structured
@@ -109,6 +121,7 @@ tool_names:
   - search_knowledge_base
   - lookup_tm1_function
   - check_tm1_code
+  - get_coding_standards
   - list_processes
   - get_process
   - list_cubes

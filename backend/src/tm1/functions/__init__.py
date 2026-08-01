@@ -98,6 +98,23 @@ _DESCRIPTION_CORRECTIONS = {
     ),
 }
 
+# Functions absent from the scraped source but valid and in real-world use.
+# Without these, validation reports working production code as an error,
+# which trains developers to ignore the validator.
+_MISSING_FUNCTIONS = (
+    {
+        "name": "ReturnViewHandle",
+        "description": (
+            "Specifies the cube view returned to the client by a drill-through "
+            "process. Used as the final statement of a drill assignment rule's "
+            "target process."
+        ),
+        "contexts": ["TurboIntegrator"],
+        "versions": ["v11", "v12"],
+        "url": "",
+    },
+)
+
 
 @lru_cache(maxsize=1)
 def _library() -> dict[str, TM1Function]:
@@ -116,7 +133,7 @@ def _library() -> dict[str, TM1Function]:
             versions=entry.get("versions", []),
             url=entry.get("url", ""),
         )
-        for entry in payload["functions"]
+        for entry in (*payload["functions"], *_MISSING_FUNCTIONS)
         for key in (entry["name"].upper(),)
     }
 
