@@ -1,0 +1,85 @@
+name: paw_fixed_width_load
+description: >-
+  Loading a fixed-width file in PAW Modeler. The expected answer recommends
+  a CharacterDelimited datasource and extracts columns with SUBST(), rather
+  than reaching for PositionDelimited as one would in Architect.
+
+# NOTE ON PROVENANCE
+# ------------------
+# The PAW-vs-Architect datasource claim below is the product owner's domain
+# assertion, not something this repository can verify. The function-level
+# checks ARE verifiable — they run against src/tm1/functions, which knows
+# every documented TM1 function and the contexts it is valid in.
+#
+# If the datasource claim is ever found to be wrong, this case enshrines a
+# wrong answer, exactly as the upstream function library did with
+# HierarchyAttrPutN. Confirm against IBM's own PAW documentation before
+# treating a pass here as evidence of correctness.
+
+prompt: >-
+  I need to load a fixed-width file in Planning Analytics Workspace (PAW).
+  Generate a TI process for it.
+
+agent: ti
+
+# Every function used must resolve on BOTH, so the deterministic checks run
+# once per version. A case that only holds on one is a different case.
+supported_versions:
+  - v11
+  - v12
+
+tags:
+  - datasource
+  - paw-compatibility
+  - fixed-width
+  - regression
+
+# Overrides the defaults in evals/case.py. Naming a function that does not
+# exist is a statement of fact that is wrong; omitting a recommended term
+# is a weaker signal and may just be phrasing.
+severity:
+  functions_are_real: critical
+  qualified: critical
+  absent: high
+  present: medium
+
+# Deterministic checks. No LLM judge involved.
+checks:
+  functions_are_real:
+    context: TI
+
+  present:
+    - CharacterDelimited
+    - SUBST
+    - Architect
+
+  absent:
+    # Asserting the two environments are equivalent is the specific wrong
+    # claim this case exists to catch.
+    - behave identically
+    - behaves identically
+    - work the same way
+    - no difference between
+
+  qualified:
+    # PositionDelimited SHOULD be named — a good answer explains what not to
+    # use and why. It fails only when recommended with no caveat attached.
+    - term: PositionDelimited
+      qualifiers:
+        - architect
+        - not supported
+        - unsupported
+        - not available
+        - avoid
+        - instead
+        - cannot
+        - rather than
+        - unlike
+
+# Open question, needs a human or a judge — kept out of the deterministic
+# run so the suite stays cheap and repeatable.
+manual_review:
+  - Does it explain WHY the approach differs between PAW and Architect,
+    rather than only stating that it does?
+  - Are the SUBST() start positions and lengths derived from a column
+    layout the user supplies, rather than invented?

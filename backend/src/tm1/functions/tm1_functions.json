@@ -1,0 +1,5911 @@
+{
+ "source": "Cubewise TM1 Functions Library",
+ "function_count": 483,
+ "functions": [
+  {
+   "name": "ABS",
+   "description": "Converts a number into an absolute value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-abs/"
+  },
+  {
+   "name": "ACOS",
+   "description": "Returns the angle, in radians, whose cosine is x.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-acos/"
+  },
+  {
+   "name": "AddClient",
+   "description": "Create a new client on the server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-addclient/"
+  },
+  {
+   "name": "AddCubeDependency",
+   "description": "Establish cube dependency manually.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-addcubedependency/"
+  },
+  {
+   "name": "AddGroup",
+   "description": "Create a new group on the server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-addgroup/"
+  },
+  {
+   "name": "AddInfoCubeRestriction",
+   "description": "Filters InfoCube data as it is pulled into TM1. Use this function to restrict the values that are imported for a specified characteristic.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-AddInfoCubeRestriction/"
+  },
+  {
+   "name": "ASCIIDelete",
+   "description": "Deletes an ASCII file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-asciidelete/"
+  },
+  {
+   "name": "ASCIIOutput",
+   "description": "Exports to an ASCII file. The fields exported must be in string format. To convert a number to string, use NumberToString or STR.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-asciioutput/"
+  },
+  {
+   "name": "AsciiOutputOpen",
+   "description": "Appends or overwrites content in a specified existing file that you would use in conjunction with functions that write to a file like AsciiOutput and TextOutput.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-asciioutputopen"
+  },
+  {
+   "name": "ASIN",
+   "description": "Returns the angle, in radians, whose sine is x.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-asin/"
+  },
+  {
+   "name": "AssignClientPassword",
+   "description": "Change the password for a user.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-assignclientpassword/"
+  },
+  {
+   "name": "AssignClientToGroup",
+   "description": "Assigns an existing client on a server to an existing user group.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-assignclienttogroup/"
+  },
+  {
+   "name": "AssociateCAMIDToGroup",
+   "description": "Creates an association between a TM1 user group and a CAMID (Cognos Access Manager ID) that can be viewed in }ClientCAMAssociatedGroups control cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-associatecamidtogroup/"
+  },
+  {
+   "name": "ATAN",
+   "description": "Returns the angle, in radians, whose tangent is x.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-atan/"
+  },
+  {
+   "name": "AttrDelete",
+   "description": "Deletes an attribute for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-attrdelete/"
+  },
+  {
+   "name": "AttrInsert",
+   "description": "Creates a new attribute for a dimenion.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-attrinsert/"
+  },
+  {
+   "name": "AttrN",
+   "description": "Returns the numeric attribute for a specified element of a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-attrn/"
+  },
+  {
+   "name": "AttrNL",
+   "description": "Returns a numeric attribute for an element in a dimension, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-attrnl/"
+  },
+  {
+   "name": "AttrPutN",
+   "description": "Uploads a value to a numeric attribute for an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-attrputn/"
+  },
+  {
+   "name": "AttrPutS",
+   "description": "Uploads a string into an attribute to an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-attrputs/"
+  },
+  {
+   "name": "AttrS",
+   "description": "Returns the string attribute for a specified element of a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-attrs/"
+  },
+  {
+   "name": "AttrSL",
+   "description": "Returns a string attribute for an element, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-attrsl/"
+  },
+  {
+   "name": "BatchUpdateFinish",
+   "description": "Ends the batch process that was started by BatchUpdateStart.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-batchupdatefinish/"
+  },
+  {
+   "name": "BatchUpdateFinishWait",
+   "description": "Ends the batch process until a lock become available that was started by BatchUpdateStart.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-batchupdatefinishwait/"
+  },
+  {
+   "name": "BatchUpdateStart",
+   "description": "Enables batch updates so changes can be committed together when BatchUpdateFinish or BatchUpdateFinishWait is called.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-batchupdatestart/"
+  },
+  {
+   "name": "Break",
+   "description": "A statement that exits from a while loop and continues with the next statement.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-break"
+  },
+  {
+   "name": "CancelJobs",
+   "description": "Cancels asynchronous processes that were launched by the RunProcess function.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-canceljobs"
+  },
+  {
+   "name": "CapIt",
+   "description": "Capitalize the first letter of every word in a string.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-capit/"
+  },
+  {
+   "name": "CellGetN",
+   "description": "Retrieves a numeric value from a cube cell.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellgetn/"
+  },
+  {
+   "name": "CellGetS",
+   "description": "Retrieves a string value from a cube cell.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellgets/"
+  },
+  {
+   "name": "CellIncrementN",
+   "description": "Increases a numeric value by a value.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellincrementn/"
+  },
+  {
+   "name": "CellIsUpdateable",
+   "description": "Checks whether a cube cell can be written to. If the cell can be written to, the function returns 1, otherwise a 0 is returned.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellisupdateable/"
+  },
+  {
+   "name": "CellPutN",
+   "description": "Writes a numeric value to a cube cell.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellputn/"
+  },
+  {
+   "name": "CellPutProportionalSpread",
+   "description": "Proportionally spreads a value to the children of a consolidation.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellputproportionalspread/"
+  },
+  {
+   "name": "CellPutS",
+   "description": "Writes a string value to a cube cell.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellputs/"
+  },
+  {
+   "name": "CellSecurityCubeCreate",
+   "description": "Creates cell security for a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellsecuritycubecreate/"
+  },
+  {
+   "name": "CellSecurityCubeDestroy",
+   "description": "Deletes cube’s cell security.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cellsecuritycubedestroy/"
+  },
+  {
+   "name": "CellValueN",
+   "description": "Returns the numeric value of the specified element in a specified cube.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-CellValueN/"
+  },
+  {
+   "name": "CellValueS",
+   "description": "Returns a string attribute for a specified cube.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-cellvalues/"
+  },
+  {
+   "name": "CHAR",
+   "description": "Converts the ASCII numeric code into the character.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-char/"
+  },
+  {
+   "name": "ChoreAttrDelete",
+   "description": "Deletes an attribute for Chores.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrdelete/"
+  },
+  {
+   "name": "ChoreAttrInsert",
+   "description": "Creates an attribute for Chores.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrinsert/"
+  },
+  {
+   "name": "ChoreAttrN",
+   "description": "Retrieves a numeric attribute for a Chore.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrn/"
+  },
+  {
+   "name": "ChoreAttrNL",
+   "description": "Retrieves a numeric attribute for a Chore, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrnl/"
+  },
+  {
+   "name": "ChoreAttrPutN",
+   "description": "Uploads data to a numeric attribute for a Chore.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrputn/"
+  },
+  {
+   "name": "ChoreAttrPutS",
+   "description": "Uploads data to a string attribute for a Chore.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrputs/"
+  },
+  {
+   "name": "ChoreAttrS",
+   "description": "Retrieves data from a string attribute for a chore.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrs/"
+  },
+  {
+   "name": "ChoreAttrSL",
+   "description": "Retrieves data from a string attribute for a chore, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreattrsl/"
+  },
+  {
+   "name": "ChoreError",
+   "description": "Terminates the chore and flag with an error status.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-choreerror/"
+  },
+  {
+   "name": "ChoreQuit",
+   "description": "Terminates a chore and flag with an error status.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-chorequit/"
+  },
+  {
+   "name": "ChoreRollback",
+   "description": "Terminates a chore and begins a rollback.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-chorerollback/"
+  },
+  {
+   "name": "CODE",
+   "description": "Converts the character to the ASCII numeric code.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-code/"
+  },
+  {
+   "name": "CODEW",
+   "description": "Returns the UTF-8 numeric code for a specified character within a string.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-codew"
+  },
+  {
+   "name": "ConsolidateChildren",
+   "description": "Forces consolidate value to be calculated by summing immediate children.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-consolidatechildren/"
+  },
+  {
+   "name": "ConsolidatedAvg",
+   "description": "Returns the average value in a consolidation.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-consolidatedavg/"
+  },
+  {
+   "name": "ConsolidatedCount",
+   "description": "Returns the number of values in a consolidation",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-consolidatedcount/"
+  },
+  {
+   "name": "ConsolidatedCountUnique",
+   "description": "Counts the unique elements of the consolidated cell in one dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-consolidatedcountunique/"
+  },
+  {
+   "name": "ConsolidatedMax",
+   "description": "Returns the maximum value in a consolidation.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-consolidatedmax/"
+  },
+  {
+   "name": "ConsolidatedMin",
+   "description": "Returns the minimum value in a consolidation.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-consolidatedmin/"
+  },
+  {
+   "name": "CONTINUE",
+   "description": "Allows a subsequent rule within the same intersection to be executed.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-continue/"
+  },
+  {
+   "name": "COS",
+   "description": "Returns the cosine of an angle expressed in radians.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-cos/"
+  },
+  {
+   "name": "CreateHierarchyByAttribute",
+   "description": "Creates a hierarchy composed of three levels. The lowest level is the N element, the first parent is a given attribute, and the top level is given by a parameter. The new hierarchy will have the same name as the given attribute.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-createhierarchybyattribute/"
+  },
+  {
+   "name": "CubeAttrDelete",
+   "description": "Deletes a cube’s attribute.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeattrdelete/"
+  },
+  {
+   "name": "CubeAttrInsert",
+   "description": "Creates a new attribute for Cubes.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeattrinsert/"
+  },
+  {
+   "name": "CubeAttrN",
+   "description": "Returns a numeric attribute for a specified cube.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-cubeattrn/"
+  },
+  {
+   "name": "CubeAttrNL",
+   "description": "Retrieves data from a numeric attribute for a cube, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeattrnl/"
+  },
+  {
+   "name": "CubeAttrPutN",
+   "description": "Uploads data to a numeric attribute for a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeattrputn/"
+  },
+  {
+   "name": "CubeAttrPutS",
+   "description": "Uploads data to a string attribute for a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeattrputs/"
+  },
+  {
+   "name": "CubeAttrS",
+   "description": "Returns a string attribute for a specified cube.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-cubeattrs/"
+  },
+  {
+   "name": "CubeAttrSL",
+   "description": "Retrieves data from a string attribute for a Cube, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeattrsl/"
+  },
+  {
+   "name": "CubeClearData",
+   "description": "CubeClearData clears the entire data for a Cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubecleardata/"
+  },
+  {
+   "name": "CubeCreate",
+   "description": "Creates a cube using the list of specified dimensions.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubecreate/"
+  },
+  {
+   "name": "CubeDataReservationAcquire",
+   "description": "Acquires data reservation for a cube, user and intersection.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedatareservationacquire/"
+  },
+  {
+   "name": "CubeDataReservationGet",
+   "description": "Finds the data reservations for a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedatareservationget/"
+  },
+  {
+   "name": "CubeDataReservationGetConflicts",
+   "description": "Gets data reservation set for a cube that conflicts with a user, address and tuple.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedatareservationgetconflicts/"
+  },
+  {
+   "name": "CubeDataReservationRelease",
+   "description": "Releases the data reservation for a cube, user and address.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedatareservationrelease/"
+  },
+  {
+   "name": "CubeDataReservationReleaseAll",
+   "description": "Releases all the data reservation specified.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedatareservationreleaseall/"
+  },
+  {
+   "name": "CubeDestroy",
+   "description": "Deletes a Cube from the TM1 Server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedestroy/"
+  },
+  {
+   "name": "CubeDimensionCountGet",
+   "description": "Returns the number of dimensions in a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedimensioncountget/"
+  },
+  {
+   "name": "CubeDRAcquire",
+   "description": "Acquires data reservation for a user in a cube according to an element list. This function applies to dimensions with one or more hierarchies, while CubeDataReservationAcquire is used for dimensions with a single hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedracquire/"
+  },
+  {
+   "name": "CubeDRGet",
+   "description": "Finds existing reservations on a specific cube for all or one user. This function applies to dimensions with one or more hierarchies, while CubeDataReservationGet is used for dimensions with a single hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedrget/"
+  },
+  {
+   "name": "CubeDRGetConflicts",
+   "description": "Gets the current data reservation conflicts of the cube. This function applies to dimensions with one or more hierarchies, while CubeDataReservationGetConflicts is used for dimensions with a single hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedrgetconflicts/"
+  },
+  {
+   "name": "CubeDRRelease",
+   "description": "Releases the data reservation specified in the element list. This function applies to dimensions with one or more hierarchies, while CubeDataReservationRelease is used for dimensions with a single hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedrrelease/"
+  },
+  {
+   "name": "CubeDRReleaseAll",
+   "description": "Releases all the data reservation specified in the element list. This function applies to dimensions with one or more hierarchies, while CubeDataReservationReleaseAll is used for dimensions with a single hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubedrreleaseall/"
+  },
+  {
+   "name": "CubeExists",
+   "description": "Used check if a cube exists on the TM1 Server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeexists/"
+  },
+  {
+   "name": "CubeGetLogChanges",
+   "description": "Determines whether logging property of a cube is turned on or not.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubegetlogchanges/"
+  },
+  {
+   "name": "CubeProcessFeeders",
+   "description": "Re-processes feeders in the rule for a specified cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeprocessfeeders/"
+  },
+  {
+   "name": "CubeRuleAppend",
+   "description": "Appends a single line of text to a rule.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cuberuleappend/"
+  },
+  {
+   "name": "CubeRuleDestroy",
+   "description": "Deletes the rule from a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cuberuledestroy/"
+  },
+  {
+   "name": "CubeSaveData",
+   "description": "Serialises a cube to disk.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubesavedata/"
+  },
+  {
+   "name": "CubeSetConnParams",
+   "description": "Sets the connection parameters and encrypt the password for a virtual cube stored in }CubeProperties control cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubesetconnparams/"
+  },
+  {
+   "name": "CubeSetLogChanges",
+   "description": "Sets the logging property for a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubesetlogchanges/"
+  },
+  {
+   "name": "CubeTimeLastUpdated",
+   "description": "Returns a serial value which refers to the last time the cube was updated.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubetimelastupdated/"
+  },
+  {
+   "name": "CubeUnload",
+   "description": "Unloads a cube and its view from the memory.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-cubeunload/"
+  },
+  {
+   "name": "DataMinorErrorCount",
+   "description": "Counts minor errors that occur in Data tab.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dataminorerrorcount/"
+  },
+  {
+   "name": "DatasourceASCIIDecimalSeparator",
+   "description": "Sets the decimal separator for a text file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourceasciidecimalseparator/"
+  },
+  {
+   "name": "DatasourceASCIIDelimiter",
+   "description": "Sets the delimiter for a text file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourceasciidelimiter/"
+  },
+  {
+   "name": "DatasourceASCIIHeaderRecords",
+   "description": "Sets the header records for a text file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourceasciiheaderrecords/"
+  },
+  {
+   "name": "DatasourceASCIIQuoteCharacter",
+   "description": "Sets the quote character for a text file",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourceasciiquotecharacter/"
+  },
+  {
+   "name": "DatasourceASCIIThousandSeparator",
+   "description": "Sets the thousand separator for a text file",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourceasciithousandseparator/"
+  },
+  {
+   "name": "DatasourceCubeview",
+   "description": "Sets the cube view in the data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourcecubeview/"
+  },
+  {
+   "name": "DatasourceDimensionSubset",
+   "description": "Sets the dimension subset in the data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourcedimensionsubset/"
+  },
+  {
+   "name": "DatasourceNameForClient",
+   "description": "Sets the name of the data source from the client’s perspective when creating or editing the process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DatasourceNameForClient/"
+  },
+  {
+   "name": "DatasourceNameForServer",
+   "description": "Sets the name for the data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourcenameforserver/"
+  },
+  {
+   "name": "DatasourceODBOCatalog",
+   "description": "This TurboIntegrator local variable sets the name of the database collection that contains the cubes, dimensions or other objects to which you want to connect. For Microsoft Analysis Services, this is the name of the database.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOCatalog/"
+  },
+  {
+   "name": "DatasourceODBOConnectionString",
+   "description": "This TurboIntegrator local variable sets any additional connection parameters that may be required to connect to the OLAP server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOConnectionString/"
+  },
+  {
+   "name": "DatasourceODBOCubeName",
+   "description": "This TurboIntegrator local variable sets the name of the cube from the OLAP server that you want to use as a data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOCubeName/"
+  },
+  {
+   "name": "DatasourceODBOHierarchyName",
+   "description": "This TurboIntegrator local variable sets the name of the hierarchy for the specific dimension you are using as a data source. You use this variable for other OLAP products, such as SAP BW, where a hierarchy is a separate object.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOHierarchyName/"
+  },
+  {
+   "name": "DatasourceODBOLocation",
+   "description": "This TurboIntegrator local variable sets the name of the location (system) where the OLAP server is running.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOLocation/"
+  },
+  {
+   "name": "DatasourceODBOProvider",
+   "description": "This TurboIntegrator local variable sets the name of the ODBO provider that you want to use as a data source. This is the full name that is assigned by the ODBO provider manufacturer to identify their multidimensional database server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOProvider/"
+  },
+  {
+   "name": "DatasourceODBOSAPClientID",
+   "description": "This TurboIntegrator local variable sets the client number that corresponds to the UI version on the SAP server to which you want to connect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOSAPClientID/"
+  },
+  {
+   "name": "DatasourceODBOSAPClientLanguage",
+   "description": "This TurboIntegrator local variable sets the language specification for the language of the SAP system to which you want to connect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceODBOSAPClientLanguage/"
+  },
+  {
+   "name": "DatasourcePassword",
+   "description": "Sets the password used for the data source",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourcepassword/"
+  },
+  {
+   "name": "DatasourceQuery",
+   "description": "Sets query for the data source",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourcequery/"
+  },
+  {
+   "name": "DatasourceSAPUsingRoleAuths",
+   "description": "The DatasourceSAPUsingRoleAuths local variable instructs the TurboIntegrator process to ignore security information when processing an SAP datasource. This variable must be placed in the Prolog.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceSAPUsingRoleAuths/"
+  },
+  {
+   "name": "DatasourceSAPUsingTexts",
+   "description": "The DatasourceSAPUsingTexts local variable instructs the TurboIntegrator process to ignore characteristic descriptions when processing an SAP datasource, resulting in a decreased memory consumption and increased performance.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DataSourceSAPUsingTexts/"
+  },
+  {
+   "name": "DatasourceType",
+   "description": "Sets the type used for the data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourcetype/"
+  },
+  {
+   "name": "DatasourceUsername",
+   "description": "Sets the name used to connect to the data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-datasourceusername/"
+  },
+  {
+   "name": "DATE",
+   "description": "Returns the date in a string yy-dd-mm format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-date/"
+  },
+  {
+   "name": "DATES",
+   "description": "Returns the date in a string yy-dd-mm or yyyy-dd-mm format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-dates/"
+  },
+  {
+   "name": "DAY",
+   "description": "Returns the day from a date in a numeric format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-day/"
+  },
+  {
+   "name": "DAYNO",
+   "description": "Returns the serial number from a date in a numeric format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-dayno/"
+  },
+  {
+   "name": "DB",
+   "description": "Retrieve a value from a cube cell.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-db/"
+  },
+  {
+   "name": "DBR",
+   "description": "Retrieve and write back a value or text to a cube’s cell. DBR is less efficient over a WAN than DBRW. DBR will be processed before a DBRW.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbr/"
+  },
+  {
+   "name": "DBRA",
+   "description": "Retrieve and write back a value or text to a dimension’s attribute.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbra/"
+  },
+  {
+   "name": "DBRW",
+   "description": "Provides read and write back capability to Excel from a Cube.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbrw/"
+  },
+  {
+   "name": "DBS",
+   "description": "Send a value to a cube’s cell. This function cannot send a string to a cube. To send strings, use the DBSS function.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbs/"
+  },
+  {
+   "name": "DBSA",
+   "description": "Send a value to a dimension attribute. The value sent can be either a string or numeric value, based on the attribute type.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbsa/"
+  },
+  {
+   "name": "DBSS",
+   "description": "Send text to a cube’s cell.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbss/"
+  },
+  {
+   "name": "DBSW",
+   "description": "Send a numeric value to a cube’s cell. DBSW is more efficient over a WAN than DBS.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dbsw/"
+  },
+  {
+   "name": "DELET",
+   "description": "Deletes a specified number of characters from a specified position within a string.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-delet/"
+  },
+  {
+   "name": "DeleteAllPersistentFeeders",
+   "description": "Deletes all persistent feeders on the TM1 Server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-deleteallpersistentfeeders/"
+  },
+  {
+   "name": "DeleteClient",
+   "description": "Deletes an existing client from the server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-deleteclient/"
+  },
+  {
+   "name": "DeleteGroup",
+   "description": "Deletes a group from the server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-deletegroup/"
+  },
+  {
+   "name": "DFRST",
+   "description": "Returns the first element in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dfrst/"
+  },
+  {
+   "name": "DimensionAttrDelete",
+   "description": "Deletes an attribute for a Dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DimensionAttrDelete/"
+  },
+  {
+   "name": "DimensionAttrInsert",
+   "description": "Creates an attribute for a Dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DimensionAttrInsert/"
+  },
+  {
+   "name": "DimensionAttrN",
+   "description": "Returns a numeric attribute for a specified dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-dimensionattrn/"
+  },
+  {
+   "name": "DimensionAttrNL",
+   "description": "Returns and numeric attribute field, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DimensionATTRNL/"
+  },
+  {
+   "name": "DimensionAttrPutN",
+   "description": "Uploads data to a numeric attribute for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionattrputn/"
+  },
+  {
+   "name": "DimensionAttrPutS",
+   "description": "Uploads data to a string attribute for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionattrputs/"
+  },
+  {
+   "name": "DimensionAttrS",
+   "description": "Returns a string attribute for a specified dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-DimensionATTRS/"
+  },
+  {
+   "name": "DimensionAttrSL",
+   "description": "Returns and string attribute field, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DimensionATTRSL/"
+  },
+  {
+   "name": "DimensionCreate",
+   "description": "Creates a new dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensioncreate/"
+  },
+  {
+   "name": "DimensionDeleteAllElements",
+   "description": "Deletes all elements in a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-DimensionDeleteAllElements/"
+  },
+  {
+   "name": "DimensionDeleteElements",
+   "description": "Deletes elements in a dimension based on a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensiondeleteelements/"
+  },
+  {
+   "name": "DimensionDestroy",
+   "description": "Deletes a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensiondestroy/"
+  },
+  {
+   "name": "DimensionElementComponentAdd",
+   "description": "Adds an element to a consolidated element in a rollup according to a specific weight. This action occurs after a commitment in the process (e.g. at the end of execution).",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementcomponentadd/"
+  },
+  {
+   "name": "DimensionElementComponentAddDirect",
+   "description": "Adds an element to a consolidated element in a rollup according to a specific weight in a dimension. This function is actioned immediately.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementcomponentadddirect/"
+  },
+  {
+   "name": "DimensionElementComponentDelete",
+   "description": "Deletes an element from a consolidated element in a rollup. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use DimensionElementComponentDeleteDirect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementcomponentdelete/"
+  },
+  {
+   "name": "DimensionElementComponentDeleteDirect",
+   "description": "Deletes an element from a consolidated element. This function is actioned immediately. To action this function until the process makes a commitment (e.g. at the end of executing the metadata tab), use DimensionElementComponentDelete.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementcomponentdeletedirect/"
+  },
+  {
+   "name": "DimensionElementDelete",
+   "description": "Deletes an element in a dimension. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use DimensionElementDeleteDirect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementdelete/"
+  },
+  {
+   "name": "DimensionElementDeleteDirect",
+   "description": "Deletes an element directly in a dimension. This function is actioned immediately. To action this function until the process makes a commitment (e.g. at the end of executing the metadata tab), use DimensionElementDelete.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementdeletedirect/"
+  },
+  {
+   "name": "DimensionElementExists",
+   "description": "Checks whether a specific element exists in a dimension. If the element exists, the result is 1 and if it does not exist, the result is 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementexists/"
+  },
+  {
+   "name": "DimensionElementInsert",
+   "description": "Adds an element in a dimension. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use DimensionElementInsertDirect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementinsert/"
+  },
+  {
+   "name": "DimensionElementInsertDirect",
+   "description": "Adds an element in a dimension by directly editing a dimension. This function is actioned immediately. To action this function until the process makes a commitment (e.g. at the end of executing the metadata tab), use DimensionElementInsert.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementinsertdirect/"
+  },
+  {
+   "name": "DimensionElementPrincipalName",
+   "description": "Returns the principal name of an element or element alias.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionelementprincipalname/"
+  },
+  {
+   "name": "DimensionExists",
+   "description": "Checks whether a dimension exists. If the dimension exists, the result is 1 and if it does not exist the result is 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionexists/"
+  },
+  {
+   "name": "DimensionHierarchyCreate",
+   "description": "Creates a hierarchy in a dimension. No elements will be inserted in the hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionhierarchycreate/"
+  },
+  {
+   "name": "DimensionSortOrder",
+   "description": "Sorts the elements and components of consolidations within a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionsortorder/"
+  },
+  {
+   "name": "DimensionTimeLastUpdated",
+   "description": "Returns a serial value indicating date and time when a dimension was last updated. Use TIMST to convert the value to a date/time format.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensiontimelastupdated/"
+  },
+  {
+   "name": "DimensionTopElementInsert",
+   "description": "Creates a root element in a dimension. This can only be created if the dimension does not have a standalone root element. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab).",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensiontopelementinsert/"
+  },
+  {
+   "name": "DimensionTopElementInsertDirect",
+   "description": "Creates a root element in a dimension by directly editing a dimension. This can only be created if the dimension does not have a standalone root element. This function is actioned immediately.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensiontopelementinsertdirect/"
+  },
+  {
+   "name": "DimensionUpdateDirect",
+   "description": "Rewrites a dimension that has been edited with Dimension*Direct function(s) (e.g. DimensionElementInsertDirect) to reduce the memory utilised to edit the dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-dimensionupdatedirect/"
+  },
+  {
+   "name": "DIMIX",
+   "description": "Returns an element’s index number in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dimix/"
+  },
+  {
+   "name": "DIMNM",
+   "description": "Returns an element’s primary name based on an index in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dimnm/"
+  },
+  {
+   "name": "DIMSIZ",
+   "description": "Returns the number of elements in a dimension.",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dimsiz/"
+  },
+  {
+   "name": "DisableBulkLoadMode",
+   "description": "Disables bulk load processing on the TM1 Server. To enable bulk load processing, use EnableBulkLoadMode.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-disablebulkloadmode/"
+  },
+  {
+   "name": "DisableMTQViewConstruct",
+   "description": "Disables multi-threaded query processing in a process which uses a cube view as the datasource. This function will override the value MTQQuery=F set in the tms1.cfg file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-disablemtqviewconstruct/"
+  },
+  {
+   "name": "DNEXT",
+   "description": "Returns the next element based on the index in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dnext/"
+  },
+  {
+   "name": "DNLEV",
+   "description": "Returns the number of levels in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dnlev/"
+  },
+  {
+   "name": "DTYPE",
+   "description": "Returns the element type in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-dtype/"
+  },
+  {
+   "name": "ELCOMP",
+   "description": "Returns the name of a child element from a consolidated element based on the position",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elcomp/"
+  },
+  {
+   "name": "ELCOMPN",
+   "description": "Returns the number of components under an element",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elcompn/"
+  },
+  {
+   "name": "ElementAttrDelete",
+   "description": "Deletes attribute for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementattrdelete/"
+  },
+  {
+   "name": "ElementAttrInsert",
+   "description": "Create an attribute for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementattrinsert/"
+  },
+  {
+   "name": "ElementAttrN",
+   "description": "Returns the numeric attribute value of the specified element of a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementattrn/"
+  },
+  {
+   "name": "ElementAttrNL",
+   "description": "Retrieves a numeric attribute for an element, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementattrnl/"
+  },
+  {
+   "name": "ElementAttrPutN",
+   "description": "Uploads data to a numeric attribute for an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementattrputn/"
+  },
+  {
+   "name": "ElementAttrPutS",
+   "description": "Uploads data from a string attribute for an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementattrputs/"
+  },
+  {
+   "name": "ElementAttrS",
+   "description": "Returns the string attribute value of the specified element of a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementattrs/"
+  },
+  {
+   "name": "ElementAttrSL",
+   "description": "Returns a string attribute for an element, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementattrsl/"
+  },
+  {
+   "name": "ElementComponent",
+   "description": "Returns the name of child of a consolidated element.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementcomponent/"
+  },
+  {
+   "name": "ElementComponentCount",
+   "description": "Returns the number of components of the consolidation.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementcomponentcount/"
+  },
+  {
+   "name": "ElementCount",
+   "description": "Returns the number of components of the consolidated element.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementcount/"
+  },
+  {
+   "name": "ElementFirst",
+   "description": "Returns the first element of a specified dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementfirst/"
+  },
+  {
+   "name": "ElementIndex",
+   "description": "Returns the index number of an element within a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementindex/"
+  },
+  {
+   "name": "ElementIsAncestor",
+   "description": "Determines if the element is an ancestor of another element or not. Function returns 1 if the element is ancestor of another element.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementisancestor/"
+  },
+  {
+   "name": "ElementIsComponent",
+   "description": "Determines if the element is child of a consolidation or not. Function returns 1 if the element is child of consolidation.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementiscomponent/"
+  },
+  {
+   "name": "ElementIsParent",
+   "description": "Determines if an element is parent of another element or not.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementisparent/"
+  },
+  {
+   "name": "ElementLevel",
+   "description": "Returns the level of an element within a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementlevel/"
+  },
+  {
+   "name": "ElementName",
+   "description": "Returns the element of a dimension based on the index argument.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementname/"
+  },
+  {
+   "name": "ElementNext",
+   "description": "Returns the element that follows the specified element of a dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementnext/"
+  },
+  {
+   "name": "ElementParent",
+   "description": "Returns the parent of an element in the dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementparent/"
+  },
+  {
+   "name": "ElementParentCount",
+   "description": "Returns the number of parents of an element in the dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementparentcount/"
+  },
+  {
+   "name": "ElementSecurityGet",
+   "description": "Retrieves the security level assigned to a specified group for a dimension element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementsecurityget/"
+  },
+  {
+   "name": "ElementSecurityPut",
+   "description": "Assigns a security level to a specified group for an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-elementsecurityput/"
+  },
+  {
+   "name": "ElementType",
+   "description": "Returns element type information of an element in the dimension.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementtype/"
+  },
+  {
+   "name": "ElementWeight",
+   "description": "Returns the weight of a child element in a consolidation element.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elementweight/"
+  },
+  {
+   "name": "ELISANC",
+   "description": "Determines if an element is ancestor of another element or not.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-elisanc/"
+  },
+  {
+   "name": "ELISCOMP",
+   "description": "Determine whether an element is a component of a parent element in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-eliscomp/"
+  },
+  {
+   "name": "ELISPAR",
+   "description": "Determine whether an element is a parent of a child in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elispar/"
+  },
+  {
+   "name": "ELLEV",
+   "description": "Returns the level of an element within a dimension.",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-ellev/"
+  },
+  {
+   "name": "ELPAR",
+   "description": "Returns the parent of an element in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elpar/"
+  },
+  {
+   "name": "ELPARN",
+   "description": "Returns the number of parents for an element",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elparn/"
+  },
+  {
+   "name": "ELSLEN",
+   "description": "Returns the number of characters in the element in a dimension",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elslen/"
+  },
+  {
+   "name": "ELWEIGHT",
+   "description": "Returns the element’s weight to a consolidated element in a dimension",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-elweight/"
+  },
+  {
+   "name": "EnableBulkLoadMode",
+   "description": "Enables bulk load processing to improve process efficiency. Call EnableBulkLoadMode in the Prolog or Epilog. This function is enabled in in one process and remains enabled until disabled with DisableBulkLoadMode or until a chore completes.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-enablebulkloadmode/"
+  },
+  {
+   "name": "EnableMTQViewConstruct",
+   "description": "Enables multi-threaded query processing in a process which uses a cube view as the datasource. This function will override the value MTQQuery=F set in the tms1.cfg file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-enablemtqviewconstruct/"
+  },
+  {
+   "name": "EvalJavaN",
+   "description": "A rules function that executes a Java TI process that returns a number.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-evaljavan/"
+  },
+  {
+   "name": "EvalJavaS",
+   "description": "A rules function that executes a Java TI process that returns a string.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-evaljavas/"
+  },
+  {
+   "name": "ExecuteCommand",
+   "description": "Executes a command line.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-executecommand/"
+  },
+  {
+   "name": "ExecuteHttpRequest",
+   "description": "Executes an HTTP request to a server over the web, enabling the retrieval of web pages, data and other resources. For instance, retrieving a list of TM1 cubes or the local weather.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-executehttprequest"
+  },
+  {
+   "name": "ExecuteJavaN",
+   "description": "Executes a Java TurboIntegrator process that returns a number.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-ExecuteJavaN/"
+  },
+  {
+   "name": "ExecuteJavaS",
+   "description": "Executes a Java TurboIntegrator process that returns a string.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-ExecuteJavaS/"
+  },
+  {
+   "name": "ExecuteProcess",
+   "description": "Executes a process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-executeprocess/"
+  },
+  {
+   "name": "EXP",
+   "description": "Returns the natural anti-log of a number.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-exp/"
+  },
+  {
+   "name": "Expand",
+   "description": "Expands variable names, enclosed in % signs.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-expand/"
+  },
+  {
+   "name": "FEEDERS",
+   "description": "Flag rule cells and force TM1 engine to calculate.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-feeders/"
+  },
+  {
+   "name": "FEEDSTRINGS",
+   "description": "Enables feeding of string cells.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-feedstrings/"
+  },
+  {
+   "name": "FileExists",
+   "description": "Searches if a file exists in a folder. If the file exists, then 1 is returned, otherwise 0 is returned.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-fileexists/"
+  },
+  {
+   "name": "FILL",
+   "description": "Repeats a string to the specified number of lengths",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-fill/"
+  },
+  {
+   "name": "ForceSkipCheck",
+   "description": "Forces the view query to process only values in the cube, instead of going through every possible cell. Use in the Prolog tab.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-forceskipcheck/"
+  },
+  {
+   "name": "FormatDate",
+   "description": "Formats a date value",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-formatdate/"
+  },
+  {
+   "name": "FV",
+   "description": "Returns the future value of an annuity at the time of the last payment.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-fv/"
+  },
+  {
+   "name": "GetJobStatus",
+   "description": "Returns the status of a process, such as whether it existed normally, had minor errors or is still in progress.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-getjobstatus"
+  },
+  {
+   "name": "GetProcessErrorFileDirectory",
+   "description": "Returns the full path name, with trailing slash, of the directory where error files are written.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-getprocesserrorfiledirectory/"
+  },
+  {
+   "name": "GetProcessErrorFilename",
+   "description": "Returns the name of the error log file associated with the process. If the process has not yet generated an error log file, the function returns an empty (null) string.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-getprocesserrorfilename/"
+  },
+  {
+   "name": "GetProcessName",
+   "description": "Returns the name of the process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-getprocessname/"
+  },
+  {
+   "name": "GetUseActiveSandboxProperty",
+   "description": "Returns a value that identifies if the process has read/write access to the base or active sandbox for the user.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-getuseactivesandboxproperty/"
+  },
+  {
+   "name": "Hierarchy",
+   "description": "Returns the name of the hierarchy if there is only one hierarchy at the dimension otherwise it returns empty string.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-hierarchy/"
+  },
+  {
+   "name": "HierarchyAttrN",
+   "description": "Returns a numeric attribute for a dimensions' hierarchy",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyATTRN/"
+  },
+  {
+   "name": "HierarchyAttrNL",
+   "description": "Returns a numeric attribute for a dimensions' hierarchy, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyAttrNL/"
+  },
+  {
+   "name": "HierarchyAttrPutN",
+   "description": "uploads data to a string attribute for a dimensions' hierarchy",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyAttrPutN/"
+  },
+  {
+   "name": "HierarchyAttrPutS",
+   "description": "uploads data to a numeric attribute for a dimensions' hierarchy",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyAttrPutS/"
+  },
+  {
+   "name": "HierarchyAttrS",
+   "description": "Returns a string attribute for a dimensions' hierarchy",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyATTRS/"
+  },
+  {
+   "name": "HierarchyAttrSL",
+   "description": "Returns a string attribute for a dimensions' hierarchy, given a locale",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyAttrSL/"
+  },
+  {
+   "name": "HierarchyContainsAllLeaves",
+   "description": "If a hierarchy contains all leaf elements in the dimension. If all are leaf elements the function returns 1 (True) and if missing one or more leaf elements it returns 0 (false).",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchycontainsallleaves/"
+  },
+  {
+   "name": "HierarchyCount",
+   "description": "Returns the number of hierarchies in the supplied dimension.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-hierarchycount/"
+  },
+  {
+   "name": "HierarchyCreate",
+   "description": "Creates a new hierarchy in a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchycreate/"
+  },
+  {
+   "name": "HierarchyDeleteAllElements",
+   "description": "Deletes all elements in a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchydeleteallelements/"
+  },
+  {
+   "name": "HierarchyDeleteElements",
+   "description": "Deletes an element from a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchydeleteelements/"
+  },
+  {
+   "name": "HierarchyDestroy",
+   "description": "Deletes a hierarchy from a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchydestroy/"
+  },
+  {
+   "name": "HierarchyElementComponentAdd",
+   "description": "Adds an element to a consolidated element in a hierarchy, rolling up according to the weight defined. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab).",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementcomponentadd/"
+  },
+  {
+   "name": "HierarchyElementComponentAddDirect",
+   "description": "Adds an element to a consolidated element in a hierarchy, rolling up according to the weight defined. This function is actioned immediately.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementcomponentadddirect/"
+  },
+  {
+   "name": "HierarchyElementComponentDelete",
+   "description": "Deletes a component (child) from a consolidated element in a hierarchy. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use HierarchyElementComponentDeleteDirect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementcomponentdelete/"
+  },
+  {
+   "name": "HierarchyElementComponentDeleteDirect",
+   "description": "Deletes a component (child) from a consolidated element in a specific hierarchy in a dimension. This function is actioned immediately.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementcomponentdeletedirect/"
+  },
+  {
+   "name": "HierarchyElementDelete",
+   "description": "Deletes a member element of a specific hierarchy. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use HierarchyElementDeleteDirect..",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementdelete/"
+  },
+  {
+   "name": "HierarchyElementDeleteDirect",
+   "description": "Deletes a member element of a specific hierarchy in a dimension. This function is actioned immediately. To action this function until the process makes a commitment (e.g. at the end of executing the metadata tab), use HierarchyElementDelete.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementdeletedirect/"
+  },
+  {
+   "name": "HierarchyElementExists",
+   "description": "Checks whether an element exists in a dimension. If the element exists, the result is 1. If it does not exist, the result is 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementexists/"
+  },
+  {
+   "name": "HierarchyElementInsert",
+   "description": "Adds an element to a hierarchy. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use HierarchyElementInsertDirect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementinsert/"
+  },
+  {
+   "name": "HierarchyElementInsertDirect",
+   "description": "Adds an element to a specific hierarchy. This function is actioned immediately. To action this function until the process makes a commitment (e.g. at the end of executing the metadata tab), use HierarchyElementInsert.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementinsertdirect/"
+  },
+  {
+   "name": "HierarchyElementPrincipalName",
+   "description": "Returns the principal name of an element given an alias or the element name itself.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementprincipalname/"
+  },
+  {
+   "name": "HierarchyElementSecurityGet",
+   "description": "Returns the level of security privilege designated to a group for an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementsecurityget/"
+  },
+  {
+   "name": "HierarchyElementSecurityPut",
+   "description": "Sets security access for a group to an element.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyelementsecurityput/"
+  },
+  {
+   "name": "HierarchyExists",
+   "description": "Checks whether a specific hierarchy exists in a dimension. If the hierarchy exists, the result is 1 and if it does not exist the result is 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyexists/"
+  },
+  {
+   "name": "HierarchyHasOrphanedLeaves",
+   "description": "Returns 1 if a hierarchy in a dimension has an orphaned element or returns 0 if there is no orphaned element in that hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchyhasorphanedleaves/"
+  },
+  {
+   "name": "HierarchyIndex",
+   "description": "Function returns a 1-based index if the hierarchy is in the supplied dimension, 0 otherwise.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-hierarchyindex/"
+  },
+  {
+   "name": "HierarchyN",
+   "description": "Returns the name of the hierarchy at a specified position.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-hierarchyn/"
+  },
+  {
+   "name": "HierarchySortOrder",
+   "description": "Sets the order in which elements in a dimension are organized and displayed.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysortorder/"
+  },
+  {
+   "name": "HierarchySubsetAliasGet",
+   "description": "Retrieves the alias used for a subset in a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetaliasget/"
+  },
+  {
+   "name": "HierarchySubsetAliasSet",
+   "description": "Sets an alias for a subset for a hierarchy. Returns 1 if successful or 0 if not.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetaliasset/"
+  },
+  {
+   "name": "HierarchySubsetAttrDelete",
+   "description": "Deletes a subset attribute from a hierarchy in a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetattrdelete/"
+  },
+  {
+   "name": "HierarchySubsetAttrInsert",
+   "description": "Adds a new attribute for subsets.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetattrinsert/"
+  },
+  {
+   "name": "HierarchySubsetAttrN",
+   "description": "Returns a numeric attribute for a subset, tied to a dimension's hierarchy",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchySubsetATTRN/"
+  },
+  {
+   "name": "HierarchySubsetAttrNL",
+   "description": "Returns a numeric attribute for a subset, tied to a dimension's hierarchy, given a locale",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetattrnl/"
+  },
+  {
+   "name": "HierarchySubsetAttrPutN",
+   "description": "Writes a numeric value to a subset’s attribute or set of elements in a hierarchy for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchySubsetAttrPutN/"
+  },
+  {
+   "name": "HierarchySubsetAttrPutS",
+   "description": "Writes a string value to a subset’s attribute or set of elements in a hierarchy for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetattrputs/"
+  },
+  {
+   "name": "HierarchySubsetAttrS",
+   "description": "Retrieve data from a string attribute associated to a subset in a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetattrs/"
+  },
+  {
+   "name": "HierarchySubsetAttrSL",
+   "description": "Retrieve data from a string attribute associated to a subset in a hierarchy, based on a language locale.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetattrsl/"
+  },
+  {
+   "name": "HierarchySubsetCreate",
+   "description": "Creates an empty public subset in a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetcreate/"
+  },
+  {
+   "name": "HierarchySubsetDeleteAllElements",
+   "description": "Deletes all elements in a subset from a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetdeleteallelements/"
+  },
+  {
+   "name": "HierarchySubsetDestroy",
+   "description": "Destroys a subset from a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetdestroy/"
+  },
+  {
+   "name": "HierarchySubsetElementDelete",
+   "description": "Deletes an element from a subset using an index number.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetelementdelete/"
+  },
+  {
+   "name": "HierarchySubsetElementExists",
+   "description": "Checks if an elements exists in a public subset. 1 is returned if the elements exists or 0 if it does not exist in the subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetelementexists/"
+  },
+  {
+   "name": "HierarchySubsetElementGetIndex",
+   "description": "Returns the index of an element in a subset for a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetelementgetindex/"
+  },
+  {
+   "name": "HierarchySubsetElementInsert",
+   "description": "Adds an element into a subset associated to a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetelementinsert/"
+  },
+  {
+   "name": "HierarchySubsetExists",
+   "description": "Checks if a public subset exists for a hierarchy. 1 is returned if the subset exists or 0 if the subset does not exist.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetexists/"
+  },
+  {
+   "name": "HierarchySubsetGetElementName",
+   "description": "Returns the name of an element from a subset using an index number that’s associated with a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetgetelementname/"
+  },
+  {
+   "name": "HierarchySubsetGetSize",
+   "description": "Returns the number of elements in a subset that’s associated with a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetgetsize/"
+  },
+  {
+   "name": "HierarchySubsetIsAllSet",
+   "description": "Sets a subset to contain all elements of the dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetisallset/"
+  },
+  {
+   "name": "HierarchySubsetMDXGet",
+   "description": "Returns the MDX expression used to for a subset that’s associated with a hierarchy.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetmdxget/"
+  },
+  {
+   "name": "HierarchySubsetMDXSet",
+   "description": "Inserts a MDX expression to a public subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchysubsetmdxset/"
+  },
+  {
+   "name": "HierarchyTimeLastUpdated",
+   "description": "Returns a number which refers to the last time the hierarchy was updated. This is a consecutive number that counts the days since 01/01/1900.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchytimelastupdated/"
+  },
+  {
+   "name": "HierarchyTopElementInsert",
+   "description": "Adds a root element to a hierarchy, if there isn't any root element in it. This action occurs after a commitment in the process (e.g. at the end of executing the metadata tab). To action this function immediately, use HierarchyTopElementInsertDirect.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchytopelementinsert/"
+  },
+  {
+   "name": "HierarchyTopElementInsertDirect",
+   "description": "Adds a root element to target hierarchy if there isn’t any root element in it. This function is actioned immediately.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-hierarchytopelementinsertdirect/"
+  },
+  {
+   "name": "HierarchyUpdateDirect",
+   "description": "Performs a full rewrite of a hierarchy that has been subject to direct editing.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-HierarchyUpdateDirect/"
+  },
+  {
+   "name": "HttpResponseGetBody",
+   "description": "Returns the body of the response to the previously executed HTTP request.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-httpresponsegetbody"
+  },
+  {
+   "name": "HttpResponseGetHeader",
+   "description": "Returns a specified response header of the previously executed HTTP request.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-httpresponsegetheader"
+  },
+  {
+   "name": "HttpResponseGetStatusCode",
+   "description": "Returns the status code of the response to the previously executed HTTP request.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-httpresponsegetstatuscode"
+  },
+  {
+   "name": "IF",
+   "description": "Uses a conditional expression to check if an expression is true or false.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-if/"
+  },
+  {
+   "name": "INSRT",
+   "description": "Inserts one string into another string at the given position number.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-insrt/"
+  },
+  {
+   "name": "INT",
+   "description": "Returns the largest value that is less than or equals to a specified value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-int/"
+  },
+  {
+   "name": "ISLEAF",
+   "description": "Determines if an element is leaf element or not.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-isleaf/"
+  },
+  {
+   "name": "ISUND",
+   "description": "Returns 1 if the argument value is undefined.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-isund/"
+  },
+  {
+   "name": "ISUNDEFINEDCELLVALUE",
+   "description": "Compares the argument value with default numeric cube value and returns 1 if the cell value is equal to cube’s default value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-isundefinedcellvalue/"
+  },
+  {
+   "name": "ItemReject",
+   "description": "Skips the current source data transaction like ItemSkip. However, ItemReject allows us to write a custom message in the log file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-itemreject/"
+  },
+  {
+   "name": "ItemSkip",
+   "description": "Skips the current transaction in the process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-itemskip/"
+  },
+  {
+   "name": "LevelCount",
+   "description": "Returns the number of levels in a dimension",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-levelcount/"
+  },
+  {
+   "name": "LN",
+   "description": "Converts a number into an absolute value. returns the natural base e logarithm of a number.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-ln/"
+  },
+  {
+   "name": "LOG",
+   "description": "Returns the base 10 logarithm of a positive number.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-log/"
+  },
+  {
+   "name": "LogOutput",
+   "description": "Writes a message to the tm1server.log file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-logoutput/"
+  },
+  {
+   "name": "LONG",
+   "description": "Returns the length of the string.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-long/"
+  },
+  {
+   "name": "LOWER",
+   "description": "Converts text characters to lower case.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-lower/"
+  },
+  {
+   "name": "MAX",
+   "description": "Returns the largest number between two numbers.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-max/"
+  },
+  {
+   "name": "MetadataMinorErrorCount",
+   "description": "A global variable that counts minor errors that occur in the Metadata portion in a process. For each minor error encountered, the variable value is incremented by 1.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-metadataminorerrorcount/"
+  },
+  {
+   "name": "MIN",
+   "description": "Returns the smallest number between two numbers.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-min/"
+  },
+  {
+   "name": "MinorErrorLogMax",
+   "description": "Sets the maximum number of minor errors written in the TM1 process error log file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-minorerrorlogmax/"
+  },
+  {
+   "name": "MOD",
+   "description": "Returns the remainder after a number is divided by a divisor.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-mod/"
+  },
+  {
+   "name": "MONTH",
+   "description": "Returns the month from a date in a numeric format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-month/"
+  },
+  {
+   "name": "NewDateFormatter",
+   "description": "Sets the date format used with ParseDate and FormatDate function.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-newdateformatter/"
+  },
+  {
+   "name": "NOW",
+   "description": "Returns the current Time in a serial number format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-now/"
+  },
+  {
+   "name": "NumberToString",
+   "description": "Converts a numeric value into a string.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-numbertostring/"
+  },
+  {
+   "name": "NumberToStringEx",
+   "description": "Converts a numeric value into a string based on a specific numeric format string, specified decimal separator and specified thousands separator.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-numbertostringex/"
+  },
+  {
+   "name": "NUMBR",
+   "description": "Converts string character to a number.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-numbr/"
+  },
+  {
+   "name": "NumericGlobalVariable",
+   "description": "Declare a numeric global variable.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-NumericGlobalVariable/"
+  },
+  {
+   "name": "NValue",
+   "description": "A TM1 reserved local variable. We don’t need to define this variable to use it in the TM1 script. However, we can only use this variable when the DatasourceType is cube view and the current cell value is numeric.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-nvalue/"
+  },
+  {
+   "name": "ODBCClose",
+   "description": "Closes an ODBC connection.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-odbcclose/"
+  },
+  {
+   "name": "ODBCOpen",
+   "description": "Opens a connection between TM1 to an ODBC database.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-odbcopen/"
+  },
+  {
+   "name": "ODBCOpenEx",
+   "description": "Opens an ODBC data source for output specifying that the connection should be opened as a Unicode connection.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-ODBCOpenEx/"
+  },
+  {
+   "name": "ODBCOutput",
+   "description": "Executes a SQL query from TM1 to an ODBC database. Used in conjunction with ODBCOpen.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-odbcoutput/"
+  },
+  {
+   "name": "OnMinorErrorDoItemSkip",
+   "description": "Instructs the process to skip to the next record when a minor error is encountered.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-onminorerrordoitemskip/"
+  },
+  {
+   "name": "ParseDate",
+   "description": "Parses a date string according to a formatter defined with the NewDateFormatter function.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-parsedate/"
+  },
+  {
+   "name": "PAYMT",
+   "description": "Returns the payment amount of an annuity based on the principal amount, rate, and number of periods",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-paymt/"
+  },
+  {
+   "name": "ProcessAttrDelete",
+   "description": "Deletes a process attribute.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrdelete/"
+  },
+  {
+   "name": "ProcessAttrInsert",
+   "description": "Creates a process attribute.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrinsert/"
+  },
+  {
+   "name": "ProcessAttrN",
+   "description": "Retrieves data from a numeric attribute for a process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrn/"
+  },
+  {
+   "name": "ProcessAttrNL",
+   "description": "Retrieves data from a numeric attribute for a process, for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrnl/"
+  },
+  {
+   "name": "ProcessAttrPutN",
+   "description": "Uploads data to a numeric attribute for a process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrputn/"
+  },
+  {
+   "name": "ProcessAttrPutS",
+   "description": "Upload to a string attribute for a process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrputs/"
+  },
+  {
+   "name": "ProcessAttrS",
+   "description": "Retrieves data from a string attribute for a process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrs/"
+  },
+  {
+   "name": "ProcessAttrSL",
+   "description": "Retrieves data from a string attribute for a process for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processattrsl/"
+  },
+  {
+   "name": "ProcessBreak",
+   "description": "Stops processing any data and moves straight to the Epilog.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processbreak/"
+  },
+  {
+   "name": "ProcessError",
+   "description": "Immediately terminates the process and produces an error.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processerror/"
+  },
+  {
+   "name": "ProcessExists",
+   "description": "Checks if a process exists. 1 is returned if the process exist, 0 if it does not exist. If a process exists, but has compilation errors, -1 is returned.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processexists/"
+  },
+  {
+   "name": "ProcessQuit",
+   "description": "Immediately terminates the process and returns a Process Quit message.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processquit/"
+  },
+  {
+   "name": "ProcessReturnCode",
+   "description": "A global variable that stores the exist status of the most recently executed process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processreturncode/"
+  },
+  {
+   "name": "ProcessRollback",
+   "description": "Terminates the process and begins a rollback. ProcessRollback cancels all pending edits and terminates the process with an error message.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-processrollback/"
+  },
+  {
+   "name": "PrologMinorErrorCount",
+   "description": "A global variable that counts minor errors that occur in the Prolog. For each minor error encountered, the variable value is incremented by 1.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-prologminorerrorcount/"
+  },
+  {
+   "name": "PublishSubset",
+   "description": "Converts a private subset to public.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-publishsubset/"
+  },
+  {
+   "name": "PublishView",
+   "description": "Converts a private cube view to public.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-publishview/"
+  },
+  {
+   "name": "PV",
+   "description": "Returns the initial or principal value of an annuity",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-pv/"
+  },
+  {
+   "name": "RAND",
+   "description": "Function generates a random number.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-rand/"
+  },
+  {
+   "name": "RefreshMDXHierarchy",
+   "description": "Refresh MDX hierarchies without requiring a server restart.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-RefreshMdxHierarchy/"
+  },
+  {
+   "name": "RemoveCAMIDAssociation",
+   "description": "Removes all associations of a specified CAMID with TM1 user groups.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-removecamidassociation/"
+  },
+  {
+   "name": "RemoveCAMIDAssociationFromGroup",
+   "description": "Removes an association between a TM1 user group and a CAMID.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-removecamidassociationfromgroup/"
+  },
+  {
+   "name": "RemoveClientFromGroup",
+   "description": "Removes a client from a TM1 user group.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-removeclientfromgroup/"
+  },
+  {
+   "name": "ROUND",
+   "description": "Function rounds a number to the nearest integer.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-round/"
+  },
+  {
+   "name": "ROUNDP",
+   "description": "Rounds a number at a specified decimal precision.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-roundp/"
+  },
+  {
+   "name": "RuleLoadFromFile",
+   "description": "Loads a text file that contain rules to a Cube",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-ruleloadfromfile/"
+  },
+  {
+   "name": "RunProcess",
+   "description": "Run multiple processes in parallel. This function can speed up data loads and other processes by dividing work into multiple parts. Each process thread is managed by TM1 Server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-runprocess/"
+  },
+  {
+   "name": "SaveDataAll",
+   "description": "Saves all changes made on the TM1 server. This moves the changes from memory to disk and restarts the log file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-savedataall/"
+  },
+  {
+   "name": "SCAN",
+   "description": "Searches the specified substring within a string and returns the starting position of the substring.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-scan/"
+  },
+  {
+   "name": "SecurityOverlayCreateGlobalDefault",
+   "description": "Creates Security Overlay cube for a specific cube with a dimension map based on the dimension order in the cube, to lock and unlock specific intersections at cell level.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-securityoverlaycreateglobaldefault/"
+  },
+  {
+   "name": "SecurityOverlayDestroyGlobalDefault",
+   "description": "Deletes the Security Overlay cube for a specific cube with a dimension map based on the dimension order in the cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-securityoverlaydestroyglobaldefault/"
+  },
+  {
+   "name": "SecurityOverlayGlobalLockCell",
+   "description": "Locks or unlocks specific intersection or cell in the cube based on the combination of dimension elements assigned in the Security Overlay cube of a specific cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-securityoverlaygloballockcell/"
+  },
+  {
+   "name": "SecurityOverlayGlobalLockNode",
+   "description": "Locks or unlocks specific intersection or cell in the cube based on the combination of dimension elements assigned in the Security Overlay cube of a specific cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-securityoverlaygloballocknode/"
+  },
+  {
+   "name": "SecurityRefresh",
+   "description": "Applies any security changes to the TM1 Server. This function reads all the security control cubes and apply security changes to the TM1 Server.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-securityrefresh/"
+  },
+  {
+   "name": "ServerActiveSandboxGet",
+   "description": "Returns the name of the active sandbox for the user. If no sandbox is set as active, the function returns a blank string.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serveractivesandboxget/"
+  },
+  {
+   "name": "ServerActiveSandboxSet",
+   "description": "Sets an existing sandbox as active for the user.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serveractivesandboxset/"
+  },
+  {
+   "name": "ServerSandboxClone",
+   "description": "Creates a sandbox that is a copy of an existing one.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxclone/"
+  },
+  {
+   "name": "ServerSandboxCreate",
+   "description": "Creates a new Sandbox for the user.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxcreate/"
+  },
+  {
+   "name": "ServerSandboxDiscardAllChanges",
+   "description": "Discards all changes for a given sandbox owned by the user who executed the process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxdiscardallchanges/"
+  },
+  {
+   "name": "ServerSandboxesDelete",
+   "description": "Delete user sandboxes from the TM1 server (Admin use only)",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxesdelete/"
+  },
+  {
+   "name": "ServerSandboxExists",
+   "description": "Checks if a sandbox exists for a user. It returns a numeric value of 1 if the sandbox exists or 0 if it does not exist.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxexists/"
+  },
+  {
+   "name": "ServerSandboxGet",
+   "description": "Returns the name of a user sandbox using an index.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxget/"
+  },
+  {
+   "name": "ServerSandboxListCountGet",
+   "description": "Returns the number of a sandboxes a user has.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxlistcountget/"
+  },
+  {
+   "name": "ServerSandboxMerge",
+   "description": "Merges a source sandbox into a target sandbox for the user who executed the process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-serversandboxmerge/"
+  },
+  {
+   "name": "ServerShutdown",
+   "description": "Shuts down the TM1 Server",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-ServerShutdown/"
+  },
+  {
+   "name": "SetChoreVerboseMessages",
+   "description": "Turn on or off more detailed messages to the tm1s.log file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setchoreverbosemessages/"
+  },
+  {
+   "name": "SetDimensionGroupsSecurity",
+   "description": "Sets level of security to a dimension for non-admin groups.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setdimensiongroupssecurity/"
+  },
+  {
+   "name": "SetElementGroupsSecurity",
+   "description": "Sets level of security to an element for non-admin groups.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setelementgroupssecurity/"
+  },
+  {
+   "name": "SetHierarchyElementGroupsSecurity",
+   "description": "Sets level of security to an element on a hierarchy to non-admin groups.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-sethierarchyelementgroupssecurity/"
+  },
+  {
+   "name": "SetHierarchyGroupsSecurity",
+   "description": "Sets level of security for a hierarchy to non-admin groups.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-sethierarchygroupssecurity/"
+  },
+  {
+   "name": "SetInputCharacterSet",
+   "description": "Specify the encoding used in the data source.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setinputcharacterset/"
+  },
+  {
+   "name": "SetODBCUnicodeInterface",
+   "description": "Sets whether the ODBC interface should use the Unicode wide functions or the regular single-byte character functions. Setting this function to 1 uses the wide character ODBC interface.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-SetODBCUnicodeInterface/"
+  },
+  {
+   "name": "SetOutputCharacterSet",
+   "description": "Specifies the character set when writing to a text file using TextOutput.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setoutputcharacterset/"
+  },
+  {
+   "name": "SetOutputEscapeDoubleQuote",
+   "description": "Retains or removes double quotes when outputting element names or data values to a text file.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setoutputescapedoublequote/"
+  },
+  {
+   "name": "SetUseActiveSandboxProperty",
+   "description": "Set whether the process reads/writes cube data to the base or active sandbox for the user.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-setuseactivesandboxproperty/"
+  },
+  {
+   "name": "SIGN",
+   "description": "Determines if the number is positive or negative.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-sign/"
+  },
+  {
+   "name": "SIN",
+   "description": "Returns the sine of an angle expressed in radians.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-sin/"
+  },
+  {
+   "name": "SKIPCHECK",
+   "description": "Forces TM1 engine to skip the check of all N level empty cells in a cube.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-skipcheck/"
+  },
+  {
+   "name": "Sleep",
+   "description": "Pauses a process for a specified interval.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/functions-library/tm1-function-for-ti-sleep/"
+  },
+  {
+   "name": "SQRT",
+   "description": "Returns the square root of a give value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-sqrt/"
+  },
+  {
+   "name": "STET",
+   "description": "Cancels the effect of rule for a specified element.",
+   "contexts": [
+    "Rules"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-stet/"
+  },
+  {
+   "name": "STR",
+   "description": "Converts number to a string character.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-str/"
+  },
+  {
+   "name": "StringGlobalVariable",
+   "description": "Defines a string global variable.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-stringglobalvariable/"
+  },
+  {
+   "name": "StringToNumber",
+   "description": "Converts a string into a numeric value.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-stringtonumber/"
+  },
+  {
+   "name": "StringToNumberEx",
+   "description": "Converts a string value into a number, based on a specified decimal and thousand separator.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-stringtonumberex/"
+  },
+  {
+   "name": "SUBNM",
+   "description": "Returns an element from a dimension set",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-subnm/"
+  },
+  {
+   "name": "SubsetAliasGet",
+   "description": "Retrieves the alias used for a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetaliasget/"
+  },
+  {
+   "name": "SubsetAliasSet",
+   "description": "Sets the alias attribute in the Subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetaliasset/"
+  },
+  {
+   "name": "SubsetAttrDelete",
+   "description": "Deletes a subset attribute from the dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrdelete/"
+  },
+  {
+   "name": "SubsetAttrInsert",
+   "description": "Creates a string, numeric or alias subset attribute for a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrinsert/"
+  },
+  {
+   "name": "SubsetATTRN",
+   "description": "Retrieves a value from a subset’s numeric attribute.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrn/"
+  },
+  {
+   "name": "SubsetAttrNL",
+   "description": "Retrieves a value from a subset’s numeric attribute for a given language. If the attribute is not defined for the language code, then the function returns the base attribute value.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrnl/"
+  },
+  {
+   "name": "SubsetAttrPutN",
+   "description": "Updates a numeric attribute from a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrputn/"
+  },
+  {
+   "name": "SubsetAttrPutS",
+   "description": "Updates a string attribute from a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrputs/"
+  },
+  {
+   "name": "SubsetAttrS",
+   "description": "Retrieves a string attribute from a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrs/"
+  },
+  {
+   "name": "SubsetAttrSL",
+   "description": "Retrieves a string attribute from a subset based on the local language code. If the attribute is not defined for the language code, then the function returns the base attribute value.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetattrsl/"
+  },
+  {
+   "name": "SubsetCreate",
+   "description": "Creates a subset in a dimension.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetcreate/"
+  },
+  {
+   "name": "SubsetCreateByMDX",
+   "description": "Creates a public subset based on a MDX statement.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetcreatebymdx/"
+  },
+  {
+   "name": "SubsetDeleteAllElements",
+   "description": "Deletes all elements from a public subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetdeleteallelements/"
+  },
+  {
+   "name": "SubsetDestroy",
+   "description": "Deletes a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetdestroy/"
+  },
+  {
+   "name": "SubsetElementDelete",
+   "description": "Deletes an element from a public subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetelementdelete/"
+  },
+  {
+   "name": "SubsetElementExists",
+   "description": "Checks if an element exists in the specified public subset. If an element exists in the subset then it returns 1 otherwise it returns 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetelementexists/"
+  },
+  {
+   "name": "SubsetElementGetIndex",
+   "description": "Retrieves an element’s index in a subset. If the element doesn’t exist in the subset, then the function returns 0. If the index is not between 1 and the size of the subset then the function return error and process will be aborted.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetelementgetindex/"
+  },
+  {
+   "name": "SubsetElementInsert",
+   "description": "Adds an element in an existing subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetelementinsert/"
+  },
+  {
+   "name": "SubsetExists",
+   "description": "Checks if a public subset exists. The function returns a 1 if the subset exists in the dimension, otherwise it returns 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetexists/"
+  },
+  {
+   "name": "SubsetExpandAboveSet",
+   "description": "Sets expand above to a subset. It returns 1 if successful otherwise it returns 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetexpandaboveset/"
+  },
+  {
+   "name": "SubsetFormatStyleSet",
+   "description": "Applies an existing display style to a named subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetformatstyleset/"
+  },
+  {
+   "name": "SubsetGetElementName",
+   "description": "Retrieves an element’s name from a subset based on an index.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetgetelementname/"
+  },
+  {
+   "name": "SubsetGetSize",
+   "description": "Returns the number of elements in a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetgetsize/"
+  },
+  {
+   "name": "SubsetIsAllSet",
+   "description": "Sets all elements to a public subset",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetisallset/"
+  },
+  {
+   "name": "SubsetMDXGet",
+   "description": "Retrieves the MDX statement used for a subset.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetmdxget/"
+  },
+  {
+   "name": "SubsetMDXSet",
+   "description": "Applies a MDX expression to a public subset. If the subset doesn’t exist, then an error will occur.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-subsetmdxset/"
+  },
+  {
+   "name": "SUBSIZ",
+   "description": "Returns the number of members in a dimension set.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-subsiz"
+  },
+  {
+   "name": "SUBST",
+   "description": "Returns the substring of a specified string.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-subst/"
+  },
+  {
+   "name": "SValue",
+   "description": "A TM1 reserved local variable. We don’t need to define this variable to use it in the TM1 script. However, we can only use this variable when the DatasourceType is cube view and the current cell value is string.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-svalue/"
+  },
+  {
+   "name": "Synchronized",
+   "description": "Forces processes to run in sequence.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-synchronized/"
+  },
+  {
+   "name": "TABDIM",
+   "description": "Returns the dimension name in a cube based on an index",
+   "contexts": [
+    "Excel",
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tabdim/"
+  },
+  {
+   "name": "TAN",
+   "description": "Returns the tangent of an angle expressed in radians.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-tan/"
+  },
+  {
+   "name": "TextOutput",
+   "description": "Writes and generate a text file in the specified path.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-textoutput/"
+  },
+  {
+   "name": "TIME",
+   "description": "Returns the current Time from the TM1 server in a string format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-time/"
+  },
+  {
+   "name": "TIMST",
+   "description": "Returns a formatted date/time in a string format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-timst/"
+  },
+  {
+   "name": "TIMVL",
+   "description": "Returns a formatted date/time in a string format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-timvl/"
+  },
+  {
+   "name": "TM1ELLIST",
+   "description": "Returns elements based on a list of elements, MDX or set",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1ellist/"
+  },
+  {
+   "name": "TM1GLOBALSANDBOX",
+   "description": "Returns the active sandbox for the user",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1globalsandbox/"
+  },
+  {
+   "name": "TM1INFO",
+   "description": "Returns information on the TM1 client",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1info/"
+  },
+  {
+   "name": "TM1PRIMARYDBNAME",
+   "description": "Returns the primary TM1 server name the user is authenticated in",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1primarydbname/"
+  },
+  {
+   "name": "TM1ProcessError.LOG",
+   "description": "Generates a log file when a process encounters an error.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-tm1processerror-log/"
+  },
+  {
+   "name": "TM1RptElIsConsolidated",
+   "description": "Returns a boolean value if an element is consolidated",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rptelisconsolidated/"
+  },
+  {
+   "name": "TM1RptElIsExpanded",
+   "description": "Returns a boolean value if an element is expanded on the row set",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rptelisexpanded/"
+  },
+  {
+   "name": "TM1RptElLev",
+   "description": "Returns an element’s level relative to the root in the subset",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rptellev/"
+  },
+  {
+   "name": "TM1RptFilter",
+   "description": "Apply a filter to the Dynamic report to sort the row based on a column",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rptfilter/"
+  },
+  {
+   "name": "TM1RptRow",
+   "description": "Returns the row set in a Dynamic Report",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rptrow/"
+  },
+  {
+   "name": "TM1RptTitle",
+   "description": "Used to define the title dimension",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rpttitle/"
+  },
+  {
+   "name": "TM1RptView",
+   "description": "Controls the definition of the report like zero suppression and the format area",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1rptview/"
+  },
+  {
+   "name": "TM1User",
+   "description": "Returns the user logged in",
+   "contexts": [
+    "Excel",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1user/"
+  },
+  {
+   "name": "TM1Val",
+   "description": "A hierarchy-aware formula that reads, writes, or clears a cell which works with TM1 Web and IBM Planning Analytics for Excel.",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-tm1val"
+  },
+  {
+   "name": "TODAY",
+   "description": "Returns the current date in a string yy-dd-mm format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-today/"
+  },
+  {
+   "name": "TRIM",
+   "description": "Removes any leading and trailing spaces from a string.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-trim/"
+  },
+  {
+   "name": "UNDEF",
+   "description": "Returns the undefined value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-undef/"
+  },
+  {
+   "name": "UNDEFINEDCELLVALUE",
+   "description": "Returns the default numeric cube value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-undefinedcellvalue/"
+  },
+  {
+   "name": "UNDEFVALS",
+   "description": "Changes the default value for the cube from zero to a special undefined value.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-undefvals/"
+  },
+  {
+   "name": "UPPER",
+   "description": "Converts text characters to upper case.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-upper/"
+  },
+  {
+   "name": "Value_Is_String",
+   "description": "A reserved local variable that checks if the data source type is a string or number. If the function return ‘1’, then the value is a string, otherwise it is numeric. For reserved variables, we don’t need to define it in the script.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-value_is_string/"
+  },
+  {
+   "name": "VIEW",
+   "description": "Sets up an optimised view for a cube that is cached in memory, so it can be referenced quicker",
+   "contexts": [
+    "Excel"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://edu.cubewise.com/tm1-function-for-excel-view/"
+  },
+  {
+   "name": "ViewAttrDelete",
+   "description": "Deletes a view attribute from a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrdelete/"
+  },
+  {
+   "name": "ViewAttrInsert",
+   "description": "Creates a new attribute for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrinsert/"
+  },
+  {
+   "name": "ViewAttrN",
+   "description": "Returns a numeric attribute from a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrn/"
+  },
+  {
+   "name": "ViewAttrNL",
+   "description": "Returns a numeric attribute from a cube view for a given language",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrnl/"
+  },
+  {
+   "name": "ViewAttrPutN",
+   "description": "Inserts a numeric value to an attribute for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrputn/"
+  },
+  {
+   "name": "ViewAttrPutS",
+   "description": "Inserts a string to an attribute for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrputs/"
+  },
+  {
+   "name": "ViewAttrS",
+   "description": "Returns a string from a cube view’s attribute.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrs/"
+  },
+  {
+   "name": "ViewAttrSL",
+   "description": "Returns a string from a cube view’s attribute for a given language.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewattrsl/"
+  },
+  {
+   "name": "ViewColumnDimensionSet",
+   "description": "Sets the dimension in a column position for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewcolumndimensionset/"
+  },
+  {
+   "name": "ViewColumnSuppressZeroesSet",
+   "description": "Hide or display columns containing zero values in a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewcolumnsuppresszeroesset/"
+  },
+  {
+   "name": "ViewConstruct",
+   "description": "Pre-calculates a view and stores the view in memory for faster access.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewconstruct/"
+  },
+  {
+   "name": "ViewCreate",
+   "description": "ViewCreate creates an empty view for a cube.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewcreate/"
+  },
+  {
+   "name": "ViewCreateByMDX",
+   "description": "Creates a cube view with a MDX expression.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewcreatebymdx/"
+  },
+  {
+   "name": "ViewDestroy",
+   "description": "Deletes cube view",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewdestroy/"
+  },
+  {
+   "name": "ViewExists",
+   "description": "Checks whether a view exists. If the view exists, the result is 1 and if it does not exist the result is 0.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewexists/"
+  },
+  {
+   "name": "ViewExtractFilterByTitlesSet",
+   "description": "Skip or include elements in the title axis when exporting a view using ASCIIOutput. Use in the Prolog tab.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewextractfilterbytitlesset/"
+  },
+  {
+   "name": "ViewExtractSkipCalcsSet",
+   "description": "Skip or include consolidated values when exporting a view using ASCIIOutput. Use in the Prolog tab.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewextractskipcalcsset/"
+  },
+  {
+   "name": "ViewExtractSkipConsolidatedStringsSet",
+   "description": "Skip or include strings on consolidated values when exporting a view using ASCIIOutput.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewextractskipconsolidatedstringsset/"
+  },
+  {
+   "name": "ViewExtractSkipRuleValuesSet",
+   "description": "Skip or include ruled values when exporting a view using ASCIIOutput.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewextractskiprulevaluesset/"
+  },
+  {
+   "name": "ViewExtractSkipZeroesSet",
+   "description": "Skip or include zeros when exporting a view using ASCIIOutput.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewextractskipzeroesset/"
+  },
+  {
+   "name": "ViewMDXGet",
+   "description": "Retrieves the MDX expression for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewmdxget/"
+  },
+  {
+   "name": "ViewMDXSet",
+   "description": "Sets the MDX expression for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewmdxset/"
+  },
+  {
+   "name": "ViewRowDimensionSet",
+   "description": "Sets the row for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewrowdimensionset/"
+  },
+  {
+   "name": "ViewRowSuppressZeroesSet",
+   "description": "Hides or displays rows containing zero values in a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewrowsuppresszeroesset/"
+  },
+  {
+   "name": "ViewSubsetAssign",
+   "description": "Assigns a named subset in a view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewsubsetassign/"
+  },
+  {
+   "name": "ViewSuppressZeroesSet",
+   "description": "Hides or displays all rows and columns containing zero values in a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewsuppresszeroesset/"
+  },
+  {
+   "name": "ViewTitleDimensionSet",
+   "description": "Set a dimension to the title position for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewtitledimensionset/"
+  },
+  {
+   "name": "ViewTitleElementSet",
+   "description": "Sets an element to a dimension in the title position for a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewtitleelementset/"
+  },
+  {
+   "name": "ViewZeroOut",
+   "description": "Zeroes out all data to a cube view.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-viewzeroout/"
+  },
+  {
+   "name": "WaitForAllJobs",
+   "description": "Instructs a main process to wait for all specified asynchronously executed processes to complete before continuing the main process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-waitforalljobs"
+  },
+  {
+   "name": "WaitForAnyJobs",
+   "description": "Instructs a main process to wait for any processes that have been asynchronously executed to complete before continuing the main process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-waitforanyjobs"
+  },
+  {
+   "name": "WaitForInternalJobs",
+   "description": "Waits for all asynchronous jobs that are directly launched by the current process to complete before continuing the current process.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-waitforinternaljobs"
+  },
+  {
+   "name": "While",
+   "description": "Repeats a set of command until a condition is true",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-while/"
+  },
+  {
+   "name": "WildcardFileSearch",
+   "description": "Searches files using wildcard characters in a folder.",
+   "contexts": [
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-ti-wildcardfilesearch/"
+  },
+  {
+   "name": "YEAR",
+   "description": "Returns the year from a date in a numeric format.",
+   "contexts": [
+    "Rules",
+    "TI"
+   ],
+   "versions": [
+    "v11",
+    "v12"
+   ],
+   "url": "https://cubewise.com/tm1-function-for-rules-year/"
+  }
+ ],
+ "corrections": {
+  "context_overrides": {
+   "DFRST": {
+    "from": [
+     "Excel"
+    ],
+    "to": [
+     "Excel",
+     "Rules",
+     "TI"
+    ]
+   },
+   "FILL": {
+    "from": [
+     "Rules"
+    ],
+    "to": [
+     "Rules",
+     "TI"
+    ]
+   },
+   "YEAR": {
+    "from": [
+     "TI"
+    ],
+    "to": [
+     "Rules",
+     "TI"
+    ]
+   }
+  },
+  "note": "Context tags corrected where the source scrape contradicted the function's own family; descriptions normalised for whitespace.",
+  "additions": {
+   "names": [
+    "DimensionElementComponentAdd"
+   ],
+   "note": "Restored functions absent from the source scrape but confirmed by their own family (Direct / Hierarchy / Delete counterparts present)."
+  }
+ }
+}

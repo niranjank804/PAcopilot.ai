@@ -8,7 +8,7 @@ from src.core.config import settings
 from src.core.exceptions import NotFoundException
 from src.database.models.knowledge_chunk import KnowledgeChunk
 from src.database.models.knowledge_document import KnowledgeDocument
-from src.knowledge import retrieval
+from src.knowledge import quality, retrieval
 from src.knowledge.chunking import chunk_text
 from src.knowledge.embeddings.registry import get_embedding_provider
 from src.knowledge.exceptions import KnowledgeServiceError
@@ -105,6 +105,19 @@ class KnowledgeService:
         try:
             loader = get_loader(content_type)
             text = loader.load(file_bytes)
+
+            # Checked before embedding: a junk document costs money to
+            # index and then degrades every later search by competing for
+            # retrieval slots. Failing here leaves the document row with
+            # processing_status='failed' and the reasons in error_message,
+            # so the uploader can see exactly what to fix.
+            problems = quality.assess(text)
+
+            if problems:
+                raise ValueError(
+                    "This document was not indexed: " + " ".join(problems)
+                )
+
             chunks = chunk_text(text)
 
             if not chunks:
