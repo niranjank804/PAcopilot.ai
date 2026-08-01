@@ -52,3 +52,6 @@ backend/coverage.xml
 
 # Coverage data file (the XML/lcov reports are the shareable artefacts)
 backend/.coverage
+
+# PR description drafts (working notes, not shipped)
+PULL_REQUEST.md
