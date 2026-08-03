@@ -18,6 +18,7 @@ from src.schemas.learning import (
 )
 from src.schemas.response import ApiResponse
 from src.tm1.ti.learning import get_conventions, learn_from_processes, parse_corpus
+
 from src.tm1.ti.patterns import PATTERNS
 from src.tm1.ti.report import build_report, render_markdown
 
@@ -145,7 +146,17 @@ async def learn_corpus(
         for name, reason in result.failed
     )
 
-    records, _ = parse_corpus(corpus)
+    note = None
+
+    if not result.replaced_existing:
+        note = (
+            f"This corpus of {result.parsed} process(es) produced no convention "
+            f"confident enough to become a standard, so the "
+            f"{result.previous_conventions} already learned for your "
+            "organization were kept. Upload a larger corpus — roughly eight "
+            "processes before a unanimous practice reaches confidence — to "
+            "replace them."
+        )
 
     return ApiResponse(
         success=True,
@@ -153,6 +164,8 @@ async def learn_corpus(
             processes_parsed=result.parsed,
             processes_failed=len(result.failed),
             conventions_learned=result.stored_conventions,
+            replaced_existing=result.replaced_existing,
+            note=note,
             patterns=[
                 PatternCountResponse(
                     key=key,
@@ -165,7 +178,7 @@ async def learn_corpus(
             ],
             rejected=rejected,
             files_with_stored_credentials=sum(
-                1 for r in records if r.has_stored_credentials
+                1 for r in result.records if r.has_stored_credentials
             ),
         ),
     )

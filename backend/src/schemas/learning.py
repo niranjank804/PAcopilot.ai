@@ -29,6 +29,12 @@ class LearningRunResponse(BaseModel):
     conventions_learned: int
     patterns: list[PatternCountResponse]
     rejected: list[RejectedFileResponse]
+    # True when this upload became the organization's standards. False when it
+    # produced none and the previously learned ones were kept instead.
+    replaced_existing: bool
+    # Present only when an upload was declined as the new source of truth, so
+    # the caller learns why nothing changed rather than assuming it worked.
+    note: str | None = None
     # Exports carry datasource credentials. The count is reported so an
     # uploader learns the files they just handled are secret material; the
     # values themselves are never read.

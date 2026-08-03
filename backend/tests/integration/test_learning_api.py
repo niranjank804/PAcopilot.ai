@@ -236,3 +236,60 @@ async def test_credential_bearing_exports_are_counted_not_stored(
     assert response.json()["data"]["files_with_stored_credentials"] == 1
     assert "svc_tm1_read" not in response.text
     assert "encrypted-secret" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_a_small_upload_does_not_destroy_learned_standards(
+    client, db_session
+):
+    """A trial upload must not wipe standards measured from a whole server.
+
+    Replacing a standard with a better measurement is the point; replacing it
+    with nothing because someone uploaded three files to see what happens is
+    destruction, and the agents would silently fall back to generic TM1 style.
+    """
+
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+
+    await client.post("/learning/corpus", files=exports(20), headers=headers)
+    before = (await client.get("/learning/standards", headers=headers)).json()
+
+    assert before["data"]["conventions"]
+
+    response = await client.post(
+        "/learning/corpus", files=exports(3, start=100), headers=headers
+    )
+
+    assert response.status_code == 201
+    data = response.json()["data"]
+
+    assert data["processes_parsed"] == 3
+    assert data["replaced_existing"] is False
+    assert "were kept" in data["note"]
+
+    after = (await client.get("/learning/standards", headers=headers)).json()
+    assert after["data"]["conventions"] == before["data"]["conventions"]
+
+
+@pytest.mark.asyncio
+async def test_a_large_upload_does_replace(client, db_session):
+    """The guard must not block a genuine relearn."""
+
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+
+    await client.post("/learning/corpus", files=exports(20), headers=headers)
+    response = await client.post(
+        "/learning/corpus", files=exports(9, start=100), headers=headers
+    )
+
+    assert response.json()["data"]["replaced_existing"] is True
+
+    after = await client.get("/learning/standards", headers=headers)
+    rule = next(
+        c
+        for c in after.json()["data"]["conventions"]
+        if c["key"] == "no_inline_comments"
+    )
+    assert rule["sample"] == 9

@@ -11,7 +11,7 @@ on how new code should look.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,12 +36,18 @@ class LearningResult:
     dna: CodingDNA
     patterns: dict[str, list[str]]
     stored_conventions: int
+    records: list[ProcessRecord] = field(default_factory=list)
+    # False when a corpus produced nothing and the organization's existing
+    # standards were therefore left in place.
+    replaced_existing: bool = True
+    previous_conventions: int = 0
 
     def summary(self) -> dict:
         return {
             "processes_parsed": self.parsed,
             "processes_failed": len(self.failed),
             "conventions_learned": self.stored_conventions,
+            "replaced_existing": self.replaced_existing,
             "patterns_recognised": {
                 key: len(names) for key, names in sorted(self.patterns.items())
             },
@@ -87,6 +93,31 @@ async def learn_from_processes(
             patterns.setdefault(match.key, []).append(record.name)
 
     keepers = [c for c in dna.conventions if c.confidence >= minimum_confidence]
+    existing = await get_conventions(db, organization_id=organization_id)
+
+    # Replacing a learned standard with a better measurement is the point.
+    # Replacing it with *nothing* is destruction: a corpus too small to reach
+    # confidence — someone uploading three files to see what happens — would
+    # otherwise silently wipe standards measured from a whole server, and the
+    # agents would go back to generic TM1 style with no one told why.
+    if not keepers and existing:
+        logger.info(
+            "Corpus of %d processes produced no conventions; keeping the "
+            "%d already learned for organization %s.",
+            len(records),
+            len(existing),
+            organization_id,
+        )
+        return LearningResult(
+            parsed=len(records),
+            failed=failed,
+            dna=dna,
+            patterns=patterns,
+            stored_conventions=len(existing),
+            records=records,
+            replaced_existing=False,
+            previous_conventions=len(existing),
+        )
 
     await db.execute(
         delete(TM1CodingConvention).where(
@@ -116,6 +147,9 @@ async def learn_from_processes(
         dna=dna,
         patterns=patterns,
         stored_conventions=len(keepers),
+        records=records,
+        replaced_existing=True,
+        previous_conventions=len(existing),
     )
 
 
