@@ -271,6 +271,42 @@ class TestPatterns:
         assert "cleanup" not in {m.key for m in classify(record)}
 
 
+class TestReport:
+    def test_reports_practices_a_corpus_does_not_follow(self):
+        """The absence of a good practice is the finding worth surfacing."""
+
+        from src.tm1.ti.report import build_report
+
+        report = build_report([parse(ODBC_EXPORT, f"p{i}.pro") for i in range(4)])
+        logging_row = next(h for h in report["health"] if h["key"] == "logging")
+
+        assert logging_row["followed"] == 0
+        assert logging_row["share"] == "0%"
+
+    def test_cleanup_share_is_measured_against_creators_only(self):
+        """Processes that create nothing cannot fail to clean up."""
+
+        from src.tm1.ti.report import build_report
+
+        report = build_report([parse(ODBC_EXPORT, f"p{i}.pro") for i in range(4)])
+        cleanup = next(h for h in report["health"] if h["key"] == "cleanup")
+
+        assert cleanup["total"] == 0
+        assert cleanup["share"] == "n/a"
+
+    def test_renders_without_established_standards(self):
+        from src.tm1.ti.report import build_report, render_markdown
+
+        markdown = render_markdown(build_report([parse(ODBC_EXPORT)]))
+
+        assert "No practice was consistent enough" in markdown
+
+    def test_empty_corpus_renders(self):
+        from src.tm1.ti.report import build_report, render_markdown
+
+        assert render_markdown(build_report([]))
+
+
 class TestConventions:
     def test_confidence_is_damped_by_sample_size(self):
         """Three unanimous files must not outrank a large majority."""
