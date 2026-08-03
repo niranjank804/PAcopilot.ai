@@ -18,7 +18,16 @@ from src.tm1.ti.patterns import PATTERNS, classify
 # their absence is the finding. Measured the same way as any convention; only
 # the framing differs.
 _HEALTH_CHECKS = (
-    ("error_handling", "Validates input and fails deliberately", "uses_error_handling"),
+    (
+        "error_handling",
+        "Fails deliberately on bad input (ProcessError / ProcessQuit / ItemReject)",
+        "uses_error_handling",
+    ),
+    (
+        "record_skipping",
+        "Skips bad source records (ItemSkip / ProcessBreak)",
+        "uses_record_skipping",
+    ),
     ("logging", "Writes an execution log", "uses_logging"),
 )
 

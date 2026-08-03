@@ -67,27 +67,41 @@ _DIMENSION_FUNCTIONS = {
     "ELPAR": 0,
     "ELCOMP": 0,
 }
-_ATTRIBUTE_FUNCTIONS = {
-    "ATTRPUTS": 1,
-    "ATTRPUTN": 1,
-    "ATTRS": 0,
-    "ATTRN": 0,
-    "ATTRINSERT": 0,
-    "ATTRDELETE": 0,
+# Attribute functions name the dimension that owns the attribute, not the
+# attribute itself: AttrPutS( Value, DimName, ElName, AttrName ).
+_ATTRIBUTE_FUNCTIONS: dict[str, tuple[tuple[int, str], ...]] = {
+    "ATTRPUTS": ((1, "dimension"), (3, "attribute")),
+    "ATTRPUTN": ((1, "dimension"), (3, "attribute")),
+    "ATTRS": ((0, "dimension"), (2, "attribute")),
+    "ATTRN": ((0, "dimension"), (2, "attribute")),
+    "ATTRINSERT": ((0, "dimension"), (2, "attribute")),
+    "ATTRDELETE": ((0, "dimension"), (1, "attribute")),
 }
-_VIEW_FUNCTIONS = {
-    "VIEWCREATE": 0,
-    "VIEWDESTROY": 0,
-    "VIEWEXISTS": 0,
-    "VIEWSUBSETASSIGN": 0,
+# Subset and view functions name their CONTAINER first and the object second:
+# SubsetCreate( DimName, SubName ), ViewCreate( CubeName, ViewName ). Reading
+# argument 0 as the subset or the view records a dimension under the name
+# "subset" and a cube under the name "view" — which then propagates into the
+# knowledge graph as a wrong-typed node. Each argument is therefore typed
+# individually below rather than by which family the function belongs to.
+#
+# SubsetCreateByMDX is the exception: SubsetCreateByMDX( SubName, MDX ) has no
+# dimension argument at all, so its argument 0 really is the subset.
+_VIEW_FUNCTIONS: dict[str, tuple[tuple[int, str], ...]] = {
+    "VIEWCREATE": ((0, "cube"), (1, "view")),
+    "VIEWDESTROY": ((0, "cube"), (1, "view")),
+    "VIEWEXISTS": ((0, "cube"), (1, "view")),
+    "VIEWZEROOUT": ((0, "cube"), (1, "view")),
+    "VIEWSUBSETASSIGN": ((0, "cube"), (1, "view"), (2, "dimension"), (3, "subset")),
+    "VIEWCREATEBYMDX": ((0, "cube"), (1, "view")),
 }
-_SUBSET_FUNCTIONS = {
-    "SUBSETCREATE": 0,
-    "SUBSETDESTROY": 0,
-    "SUBSETEXISTS": 0,
-    "SUBSETELEMENTINSERT": 0,
-    "SUBSETDELETEALLELEMENTS": 0,
-    "SUBSETCREATEBYMDX": 0,
+_SUBSET_FUNCTIONS: dict[str, tuple[tuple[int, str], ...]] = {
+    "SUBSETCREATE": ((0, "dimension"), (1, "subset")),
+    "SUBSETDESTROY": ((0, "dimension"), (1, "subset")),
+    "SUBSETEXISTS": ((0, "dimension"), (1, "subset")),
+    "SUBSETELEMENTINSERT": ((0, "dimension"), (1, "subset")),
+    "SUBSETDELETEALLELEMENTS": ((0, "dimension"), (1, "subset")),
+    "SUBSETMDXSET": ((0, "dimension"), (1, "subset")),
+    "SUBSETCREATEBYMDX": ((0, "subset"),),
 }
 _SECURITY_FUNCTIONS = {
     "SECURITYREFRESH",
@@ -100,7 +114,15 @@ _SECURITY_FUNCTIONS = {
     "DELETECLIENT",
     "DELETEGROUP",
 }
-_ERROR_FUNCTIONS = {"PROCESSERROR", "PROCESSQUIT", "PROCESSBREAK", "ITEMREJECT", "ITEMSKIP"}
+# Deliberately narrow. ProcessBreak is ordinary flow control — it stops
+# reading the source and falls through to the Epilog, which still runs — and
+# ItemSkip silently discards a record, which is the opposite of handling an
+# error. Counting either as error handling overstates how defensively a
+# codebase is written, which is exactly the measure a team would act on.
+_ERROR_FUNCTIONS = {"PROCESSERROR", "PROCESSQUIT", "ITEMREJECT"}
+
+# Flow control worth recording separately rather than discarding.
+_FLOW_FUNCTIONS = {"PROCESSBREAK", "ITEMSKIP"}
 _LOGGING_FUNCTIONS = {"ASCIIOUTPUT", "TEXTOUTPUT", "LOGOUTPUT"}
 _PERFORMANCE_FUNCTIONS = {
     "ENABLEBULKLOADMODE",
@@ -207,10 +229,17 @@ class ProcessRecord:
 
     uses_logging: bool = False
     uses_error_handling: bool = False
+    # ItemSkip / ProcessBreak: real and common, but a different practice from
+    # failing deliberately, and reporting them together hides how rarely a
+    # codebase actually validates its input.
+    uses_record_skipping: bool = False
     uses_security_functions: bool = False
     performance_functions: list[str] = field(default_factory=list)
     temporary_objects: list[str] = field(default_factory=list)
     has_cleanup: bool = False
+    # A view or subset created with the Temporary flag is destroyed by TM1
+    # when the session ends, so its absence from the Epilog is not a leak.
+    uses_temporary_objects: bool = False
 
     line_counts: dict[str, int] = field(default_factory=dict)
     unknown_tags: list[int] = field(default_factory=list)
@@ -236,6 +265,14 @@ class ProcessRecord:
     @property
     def dimensions_used(self) -> set[str]:
         return {o.name for o in self.objects if o.kind == "dimension"}
+
+
+def _access_for(function: str, default: str) -> str:
+    if function.endswith("CREATE") or function.endswith("CREATEBYMDX"):
+        return "create"
+    if function.endswith("DESTROY"):
+        return "destroy"
+    return default
 
 
 def _name_from_filename(source_file: str) -> str:
@@ -368,6 +405,8 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
             record.uses_logging = True
         if function in _ERROR_FUNCTIONS:
             record.uses_error_handling = True
+        if function in _FLOW_FUNCTIONS:
+            record.uses_record_skipping = True
         if function in _SECURITY_FUNCTIONS:
             record.uses_security_functions = True
         if function in _PERFORMANCE_FUNCTIONS:
@@ -392,24 +431,47 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
                 if is_literal and text.strip():
                     record.mdx_expressions.append(text.strip())
 
+        # Single-argument families: the whole call refers to one object.
         for table, kind, access in (
             (_CUBE_WRITE_FUNCTIONS, "cube", "write"),
             (_CUBE_READ_FUNCTIONS, "cube", "read"),
             (_DIMENSION_FUNCTIONS, "dimension", "reference"),
-            (_ATTRIBUTE_FUNCTIONS, "attribute", "reference"),
-            (_VIEW_FUNCTIONS, "view", "reference"),
-            (_SUBSET_FUNCTIONS, "subset", "reference"),
             (_CUBE_ADMIN_FUNCTIONS, "cube", "reference"),
         ):
             if function in table:
                 value = arg(table[function])
                 if value is not None:
-                    resolved_access = access
-                    if function.endswith("CREATE"):
-                        resolved_access = "create"
-                    elif function.endswith("DESTROY"):
-                        resolved_access = "destroy"
-                    add(value, kind, resolved_access)
+                    add(value, kind, _access_for(function, access))
+
+        # Families that name a container and the object inside it. Only the
+        # object itself is created or destroyed; naming its container is a
+        # reference, so a ViewDestroy must not mark the cube as destroyed.
+        # ViewCreate/SubsetCreate take an optional trailing Temporary flag;
+        # a temporary object is owned by the session and destroyed by TM1
+        # automatically, so it is not a leak when the Epilog does not destroy
+        # it. Recorded here so a cleanup check can tell the two cases apart.
+        if function in ("VIEWCREATE", "SUBSETCREATE") and len(args) > 2:
+            flag = args[2].strip().strip("'")
+            if flag and flag != "0":
+                record.uses_temporary_objects = True
+
+        for table in (_VIEW_FUNCTIONS, _SUBSET_FUNCTIONS, _ATTRIBUTE_FUNCTIONS):
+            if function not in table:
+                continue
+
+            positions = table[function]
+            innermost = positions[-1][0]
+
+            for position, kind in positions:
+                value = arg(position)
+                if value is None:
+                    continue
+                access = (
+                    _access_for(function, "reference")
+                    if position == innermost
+                    else "reference"
+                )
+                add(value, kind, access)
 
 
 def parse_process(text: str, source_file: str = "") -> ProcessRecord:

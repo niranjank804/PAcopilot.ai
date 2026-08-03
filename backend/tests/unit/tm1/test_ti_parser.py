@@ -186,6 +186,88 @@ class TestParser:
         assert reference.literal is False
         assert reference.name == "sCubeName"
 
+    def test_container_arguments_are_typed_as_their_own_kind(self):
+        """SubsetCreate( Dim, Sub ) names a dimension first, not a subset."""
+
+        text = "601,100\n572,1\nSubsetCreate( 'Account', 'zTmp' );\n"
+        record = parse(text)
+
+        kinds = {(o.name, o.kind, o.access) for o in record.objects}
+
+        assert ("Account", "dimension", "reference") in kinds
+        assert ("zTmp", "subset", "create") in kinds
+        assert not any(o.name == "Account" and o.kind == "subset" for o in record.objects)
+
+    def test_view_functions_name_the_cube_first(self):
+        text = "601,100\n572,1\nViewCreate( 'Finance', 'zTmpView' );\n"
+        record = parse(text)
+
+        kinds = {(o.name, o.kind, o.access) for o in record.objects}
+
+        assert ("Finance", "cube", "reference") in kinds
+        assert ("zTmpView", "view", "create") in kinds
+
+    def test_destroying_a_view_does_not_destroy_its_cube(self):
+        text = "601,100\n575,1\nViewDestroy( 'Finance', 'zTmpView' );\n"
+        record = parse(text)
+
+        cube = next(o for o in record.objects if o.kind == "cube")
+        view = next(o for o in record.objects if o.kind == "view")
+
+        assert cube.access == "reference"
+        assert view.access == "destroy"
+
+    def test_subset_create_by_mdx_has_no_dimension_argument(self):
+        """SubsetCreateByMDX( SubName, MDX ) — argument 0 really is the subset."""
+
+        text = "601,100\n572,1\nSubsetCreateByMDX( 'zTmp', '{ [a] }' );\n"
+        record = parse(text)
+
+        assert ("zTmp", "subset") in {(o.name, o.kind) for o in record.objects}
+        assert not any(o.kind == "dimension" for o in record.objects)
+
+    def test_attribute_functions_name_the_owning_dimension(self):
+        text = "601,100\n574,1\nAttrPutS( vName, 'Account', vElem, 'Description' );\n"
+        record = parse(text)
+
+        kinds = {(o.name, o.kind) for o in record.objects}
+
+        assert ("Account", "dimension") in kinds
+        assert ("Description", "attribute") in kinds
+
+    def test_view_subset_assign_records_all_four_containers(self):
+        text = (
+            "601,100\n572,1\n"
+            "ViewSubsetAssign( 'Finance', 'vTmp', 'Account', 'sTmp' );\n"
+        )
+        record = parse(text)
+
+        kinds = {(o.name, o.kind) for o in record.objects}
+
+        assert kinds >= {
+            ("Finance", "cube"),
+            ("vTmp", "view"),
+            ("Account", "dimension"),
+            ("sTmp", "subset"),
+        }
+
+    def test_temporary_flag_is_recorded(self):
+        """A Temporary view is destroyed by TM1, so it is not a leak."""
+
+        text = "601,100\n572,1\nViewCreate( 'Finance', 'zTmp', 1 );\n"
+
+        assert parse(text).uses_temporary_objects is True
+        assert parse("601,100\n572,1\nViewCreate( 'Finance', 'zTmp' );\n").uses_temporary_objects is False
+
+    def test_flow_control_is_not_counted_as_error_handling(self):
+        """ProcessBreak exits the source loop; the Epilog still runs."""
+
+        text = "601,100\n574,2\nItemSkip;\nProcessBreak;\n"
+        record = parse(text)
+
+        assert record.uses_error_handling is False
+        assert "ITEMSKIP" in record.functions_used
+
     def test_reports_functions_it_cannot_identify(self):
         text = "601,100\n572,1\nNotARealTM1Function( 1 );\n"
         record = parse(text)
