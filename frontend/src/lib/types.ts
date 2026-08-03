@@ -305,3 +305,45 @@ export interface TM1ChangeDetail {
     validation_errors: ProcessSyntaxError[] | null;
   };
 }
+
+export interface CodingConvention {
+  key: string;
+  statement: string;
+  confidence: number;
+  support: number;
+  sample: number;
+  examples: string[];
+  counter_examples: string[];
+}
+
+export interface LearnedStandards {
+  process_count: number;
+  conventions: CodingConvention[];
+}
+
+export interface RecognisedPattern {
+  key: string;
+  name: string;
+  description: string;
+  process_count: number;
+}
+
+export interface RejectedFile {
+  filename: string;
+  reason: string;
+}
+
+export interface LearningRun {
+  processes_parsed: number;
+  processes_failed: number;
+  conventions_learned: number;
+  patterns: RecognisedPattern[];
+  rejected: RejectedFile[];
+  replaced_existing: boolean;
+  note: string | null;
+  files_with_stored_credentials: number;
+}
+
+export interface StandardsReport {
+  markdown: string;
+}
