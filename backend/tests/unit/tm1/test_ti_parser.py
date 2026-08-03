@@ -402,6 +402,23 @@ class TestConventions:
 
         assert small_value < large_value
 
+    def test_separator_example_comes_from_the_corpus(self):
+        """A stock example would contradict the rule for most organizations."""
+
+        records = [
+            parse('601,100\n602,"load_actuals_%d"\n562,"NULL"\n572,1\nnX = 1;\n' % i)
+            for i in range(20)
+        ]
+        rule = next(
+            c
+            for c in infer_conventions(records).conventions
+            if c.key == "process_name_separator"
+        )
+
+        assert "'_'" in rule.statement
+        assert "load_actuals_0" in rule.statement
+        assert "DATA - Load - Oracle" not in rule.statement
+
     def test_detects_parameter_prefix(self):
         dna = infer_conventions([parse(ODBC_EXPORT)])
 

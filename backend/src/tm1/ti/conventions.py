@@ -177,6 +177,14 @@ def infer_conventions(records: Sequence[ProcessRecord]) -> CodingDNA:
 
     separator = _name_separator(r.name for r in records if r.name)
 
+    # Illustrate the rule with a name from this corpus rather than a stock
+    # example. A hardcoded 'DATA - Load - Oracle' contradicts the rule itself
+    # for any organization that does not use that separator.
+    separator_example = next(
+        (r.name for r in records if r.name and separator and separator in r.name),
+        "",
+    )
+
     process_words = Counter()
     for record in records:
         head = _WORD_SPLIT.split(record.name)[0] if record.name else ""
@@ -213,8 +221,8 @@ def infer_conventions(records: Sequence[ProcessRecord]) -> CodingDNA:
         ),
         _observe(
             "process_name_separator",
-            f"Process names separate their parts with '{separator}' "
-            "(for example 'DATA - Load - Oracle').",
+            f"Process names separate their parts with '{separator}'"
+            + (f" (for example '{separator_example}')." if separator_example else "."),
             records,
             lambda r: separator in r.name,
             applies=lambda r: bool(r.name) and bool(separator),
