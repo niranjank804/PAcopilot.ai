@@ -26,6 +26,11 @@ class Pattern:
     signals: tuple[Signal, ...]
     # Evidence count below which a match is not reported at all.
     threshold: int = 2
+    # A defining property the process must have before any signal is counted.
+    # Without this, weak signals that several patterns share — "has parameters
+    # and writes a cube" — are enough to clear the threshold on their own, and
+    # a process with no ODBC datasource gets labelled an ODBC loader.
+    gate: Signal | None = None
 
 
 @dataclass
@@ -126,6 +131,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_parameters(),
             _name_contains("load", "oracle", "sql", "extract"),
         ),
+        gate=_datasource("odbc"),
     ),
     Pattern(
         key="ascii_loader",
@@ -137,6 +143,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_parameters(),
             _name_contains("load", "import", "file", "csv"),
         ),
+        gate=_datasource("ascii_delimited", "ascii"),
     ),
     Pattern(
         key="cube_copy",
@@ -149,6 +156,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("VIEWZEROOUT", "CUBECLEARDATA"),
             _name_contains("copy", "version", "scenario", "snapshot"),
         ),
+        gate=lambda r: "reads and writes cubes" if (r.cubes_read and r.cubes_written) or r.datasource_type == "cube_view" else None,
     ),
     Pattern(
         key="dimension_maintenance",
@@ -164,6 +172,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("DIMENSIONDELETEALLELEMENTS"),
             _name_contains("dim", "hierarchy", "build"),
         ),
+        gate=_has_function("DIMENSIONELEMENTINSERT", "DIMENSIONELEMENTCOMPONENTADD", "DIMENSIONELEMENTDELETE", "DIMENSIONCREATE", "DIMENSIONDELETEALLELEMENTS"),
     ),
     Pattern(
         key="subset_builder",
@@ -175,6 +184,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("SUBSETEXISTS", "SUBSETDESTROY"),
             _name_contains("subset"),
         ),
+        gate=_has_function("SUBSETCREATE", "SUBSETCREATEBYMDX", "SUBSETELEMENTINSERT", "SUBSETMDXSET"),
     ),
     Pattern(
         key="attribute_loader",
@@ -185,6 +195,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("ATTRINSERT"),
             _name_contains("attribute", "attr"),
         ),
+        gate=_has_function("ATTRPUTS", "ATTRPUTN", "ATTRINSERT"),
     ),
     Pattern(
         key="allocation",
@@ -197,6 +208,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _name_contains("alloc", "spread", "driver", "distribut"),
         ),
         threshold=3,
+        gate=lambda r: "reads and writes cubes" if r.cubes_read and r.cubes_written else None,
     ),
     Pattern(
         key="security",
@@ -208,6 +220,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("ELEMENTSECURITYPUT", "CELLSECURITYCUBECREATE"),
             _name_contains("security", "access", "group", "client"),
         ),
+        gate=_flag("uses_security_functions", "uses security functions"),
     ),
     Pattern(
         key="export",
@@ -218,6 +231,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _datasource("cube_view", "dimension_subset"),
             _name_contains("export", "extract", "output", "unload"),
         ),
+        gate=_has_function("ASCIIOUTPUT", "TEXTOUTPUT"),
     ),
     Pattern(
         key="audit_logging",
@@ -228,6 +242,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("LOGOUTPUT"),
             _name_contains("log", "audit", "trace"),
         ),
+        gate=_flag("uses_logging", "writes a log file"),
     ),
     Pattern(
         key="error_handling",
@@ -238,6 +253,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("ITEMREJECT", "ITEMSKIP"),
             _has_function("PROCESSERROR", "PROCESSQUIT", "PROCESSBREAK"),
         ),
+        gate=_flag("uses_error_handling", "uses error-handling functions"),
     ),
     Pattern(
         key="performance_tuned",
@@ -253,6 +269,7 @@ PATTERNS: tuple[Pattern, ...] = (
             ),
         ),
         threshold=1,
+        gate=lambda r: "uses performance functions" if r.performance_functions else None,
     ),
     Pattern(
         key="cleanup",
@@ -263,6 +280,7 @@ PATTERNS: tuple[Pattern, ...] = (
             _has_function("VIEWDESTROY", "SUBSETDESTROY"),
         ),
         threshold=1,
+        gate=_has_function("VIEWDESTROY", "SUBSETDESTROY"),
     ),
 )
 
@@ -273,6 +291,9 @@ def classify(record: ProcessRecord, *, minimum_score: float = 0.0) -> list[Patte
     matches: list[PatternMatch] = []
 
     for pattern in PATTERNS:
+        if pattern.gate is not None and pattern.gate(record) is None:
+            continue
+
         evidence = [
             result
             for signal in pattern.signals

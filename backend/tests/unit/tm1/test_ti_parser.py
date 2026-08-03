@@ -246,6 +246,30 @@ class TestPatterns:
 
         assert classify(record) == []
 
+    def test_a_pattern_requires_its_defining_property(self):
+        """Shared weak signals must not add up to the wrong label.
+
+        This process has parameters and writes a cube — enough votes to clear
+        the threshold — but no ODBC datasource, so it is not an ODBC loader.
+        """
+
+        text = (
+            '601,100\n602,"DATA - Load - Manual"\n562,"NULL"\n'
+            "560,1\npMonth\n561,1\n2\n"
+            "574,1\nCellPutN( 1, 'Finance', pMonth );\n"
+        )
+        record = parse(text)
+
+        assert record.parameters
+        assert record.cubes_written == {"Finance"}
+        assert "oracle_loader" not in {m.key for m in classify(record)}
+        assert "ascii_loader" not in {m.key for m in classify(record)}
+
+    def test_cleanup_requires_a_destroy_call(self):
+        record = parse(ODBC_EXPORT)
+
+        assert "cleanup" not in {m.key for m in classify(record)}
+
 
 class TestConventions:
     def test_confidence_is_damped_by_sample_size(self):
