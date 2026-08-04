@@ -104,6 +104,19 @@ _SUBSET_FUNCTIONS: dict[str, tuple[tuple[int, str], ...]] = {
     "SUBSETMDXSET": ((0, "dimension"), (1, "subset")),
     "SUBSETCREATEBYMDX": ((0, "subset"),),
 }
+# Process-to-process calls. ExecuteProcess( Name, pParam, value, ... ) and
+# RunProcess both name the callee at argument 0; the pairs that follow are
+# parameter names and values, not objects.
+#
+# ExecuteCommand is deliberately absent: its argument is an operating-system
+# command line, not a TM1 process, and recording it as a process dependency
+# would invent an edge to something that does not exist.
+_PROCESS_FUNCTIONS = {
+    "EXECUTEPROCESS": 0,
+    "RUNPROCESS": 0,
+    "EXECUTEJAVAN": 0,
+    "EXECUTEJAVAS": 0,
+}
 _SECURITY_FUNCTIONS = {
     "SECURITYREFRESH",
     "ADDCLIENT",
@@ -192,8 +205,8 @@ class ObjectRef:
     """A named TM1 object a process touches, and how."""
 
     name: str
-    kind: str  # cube | dimension | view | subset | attribute
-    access: str  # read | write | create | destroy | reference
+    kind: str  # cube | dimension | view | subset | attribute | process
+    access: str  # read | write | create | destroy | reference | calls
     section: str
     literal: bool  # False when the name came from a variable, not a literal
 
@@ -266,6 +279,14 @@ class ProcessRecord:
     @property
     def cubes_read(self) -> set[str]:
         return {o.name for o in self.objects if o.kind == "cube" and o.access == "read"}
+
+    @property
+    def processes_called(self) -> set[str]:
+        """Names of processes this one executes, for the dependency graph."""
+
+        return {
+            o.name for o in self.objects if o.kind == "process" and o.literal
+        }
 
     @property
     def dimensions_used(self) -> set[str]:
@@ -501,6 +522,7 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
             (_CUBE_READ_FUNCTIONS, "cube", "read"),
             (_DIMENSION_FUNCTIONS, "dimension", "reference"),
             (_CUBE_ADMIN_FUNCTIONS, "cube", "reference"),
+            (_PROCESS_FUNCTIONS, "process", "calls"),
         ):
             if function in table:
                 value = arg(table[function])

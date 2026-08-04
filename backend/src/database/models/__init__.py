@@ -12,6 +12,7 @@ from .role import Role
 from .role_permission import RolePermission
 from .tm1_change import TM1Change
 from .tm1_coding_convention import TM1CodingConvention
+from .tm1_process import TM1Process, TM1ProcessPattern
 from .revoked_token import RevokedToken
 from .tm1_connection import TM1Connection
 from .tm1_object import TM1Object
@@ -36,6 +37,8 @@ __all__ = [
     "KnowledgeChunk",
     "TM1Change",
     "TM1CodingConvention",
+    "TM1Process",
+    "TM1ProcessPattern",
     "RevokedToken",
     "TM1Connection",
     "TM1Object",

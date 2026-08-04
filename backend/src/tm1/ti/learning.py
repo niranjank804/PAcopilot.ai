@@ -11,12 +11,14 @@ on how new code should look.
 """
 
 import logging
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.tm1_coding_convention import TM1CodingConvention
+from src.database.models.tm1_process import TM1Process, TM1ProcessPattern
 from src.tm1.ti.conventions import CodingDNA, infer_conventions
 from src.tm1.ti.parser import ProcessRecord, parse_process
 from src.tm1.ti.patterns import classify
@@ -119,6 +121,8 @@ async def learn_from_processes(
             previous_conventions=len(existing),
         )
 
+    await _persist_processes(db, organization_id=organization_id, records=records)
+
     await db.execute(
         delete(TM1CodingConvention).where(
             TM1CodingConvention.organization_id == organization_id
@@ -151,6 +155,67 @@ async def learn_from_processes(
         replaced_existing=True,
         previous_conventions=len(existing),
     )
+
+
+async def _persist_processes(
+    db: AsyncSession, *, organization_id, records: Sequence[ProcessRecord]
+) -> None:
+    """Replace the stored structure for an organization's processes.
+
+    Like the conventions, this is a snapshot of one corpus rather than an
+    accumulating history: leaving behind processes that no longer exist on the
+    server would let a deleted process keep appearing in dependency answers.
+
+    Source code is not stored — see the model docstring.
+    """
+
+    await db.execute(
+        delete(TM1Process).where(TM1Process.organization_id == organization_id)
+    )
+    # Pattern rows cascade from the process rows, but the delete above is
+    # issued as bulk SQL, so flush before inserting to guarantee ordering.
+    await db.flush()
+
+    seen: set[str] = set()
+
+    for record in records:
+        if not record.name or record.name in seen:
+            # The unique constraint is (organization_id, name). Two exports
+            # can carry the same process name — a re-download, or two folders
+            # merged — and one collision must not fail the whole upload.
+            continue
+
+        seen.add(record.name)
+
+        process = TM1Process(
+            organization_id=organization_id,
+            name=record.name,
+            source_file=record.source_file[:255],
+            datasource_type=record.datasource_type,
+            header_comment=record.header_comment,
+            has_stored_credentials=record.has_stored_credentials,
+            line_counts=record.line_counts,
+            parameters=record.parameters,
+            objects=[asdict(o) for o in record.objects],
+            functions_used=record.functions_used,
+            process_calls=sorted(record.processes_called),
+            object_count=len(record.objects),
+        )
+        db.add(process)
+        await db.flush()
+
+        for match in classify(record):
+            db.add(
+                TM1ProcessPattern(
+                    organization_id=organization_id,
+                    process_id=process.id,
+                    pattern_key=match.key,
+                    score=match.score,
+                    evidence=match.evidence,
+                )
+            )
+
+    await db.flush()
 
 
 async def get_conventions(

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +40,9 @@ class AskResult:
     def __init__(self, chat_result: ChatResult, citations: list[Citation]):
         self.chat_result = chat_result
         self.citations = citations
+
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeService:
@@ -91,6 +95,22 @@ class KnowledgeService:
     ) -> KnowledgeDocument:
 
         checksum = hashlib.sha256(file_bytes).hexdigest()
+
+        # The checksum was computed and stored but never queried, so uploading
+        # the same file twice paid to embed it twice and then let both copies
+        # compete for the same retrieval slots — the second copy crowding out
+        # a different document that had something new to say.
+        existing = await knowledge_document_repository.get_by_checksum(
+            db, organization_id, checksum
+        )
+
+        if existing is not None:
+            logger.info(
+                "Knowledge document %s matches already-indexed %s; reusing it.",
+                filename,
+                existing.filename,
+            )
+            return existing
 
         document = KnowledgeDocument(
             organization_id=organization_id,

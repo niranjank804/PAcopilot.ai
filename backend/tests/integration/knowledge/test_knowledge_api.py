@@ -368,3 +368,53 @@ async def test_delete_document(client, db_session, fake_embeddings):
         f"/knowledge/documents/{document_id}", headers=headers
     )
     assert get_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_reuploading_identical_content_reuses_the_document(
+    client, db_session, fake_embeddings
+):
+    """The checksum was stored and never queried, so duplicates competed for
+    the same retrieval slots and were embedded twice."""
+
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    payload = b"TM1 rules should feed only the cells they calculate."
+
+    first = await client.post(
+        "/knowledge/documents",
+        files={"file": ("notes.txt", payload, "text/plain")},
+        headers=headers,
+    )
+    second = await client.post(
+        "/knowledge/documents",
+        files={"file": ("copy-of-notes.txt", payload, "text/plain")},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json()["data"]["id"] == first.json()["data"]["id"]
+
+    listing = await client.get("/knowledge/documents", headers=headers)
+    assert len(listing.json()["data"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_irrelevant_chunks_are_not_returned_as_citations(db_session):
+    """Without a score floor, an unanswerable question still came back with
+    five confident-looking citations."""
+
+    from src.knowledge import retrieval
+
+    org, admin = await create_org_admin(db_session)
+
+    matches = await retrieval.search(
+        db_session,
+        organization_id=org.id,
+        query_embedding=[1.0, 0.0, 0.0],
+        top_k=5,
+        minimum_score=0.99,
+    )
+
+    assert matches == []

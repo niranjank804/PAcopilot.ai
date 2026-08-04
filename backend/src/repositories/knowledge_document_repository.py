@@ -34,6 +34,32 @@ class KnowledgeDocumentRepository:
 
         return list(result.scalars().all())
 
+    async def get_by_checksum(
+        self,
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        checksum: str,
+    ) -> KnowledgeDocument | None:
+        """An organization's successfully-indexed document with this content.
+
+        Only completed documents count: a previous upload that failed to
+        process left a row behind but no chunks, so matching it would return
+        a document that can never be retrieved.
+        """
+
+        result = await db.execute(
+            select(KnowledgeDocument)
+            .where(
+                KnowledgeDocument.organization_id == organization_id,
+                KnowledgeDocument.checksum == checksum,
+                KnowledgeDocument.processing_status == "completed",
+            )
+            .order_by(KnowledgeDocument.created_at.desc())
+            .limit(1)
+        )
+
+        return result.scalar_one_or_none()
+
     async def create(
         self,
         db: AsyncSession,

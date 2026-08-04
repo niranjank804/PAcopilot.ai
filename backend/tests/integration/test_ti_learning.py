@@ -204,3 +204,79 @@ async def test_conventions_are_scoped_to_one_organization(
     )
 
     assert await get_conventions(db_session, organization_id=other.id) == []
+
+
+@pytest.mark.asyncio
+async def test_parsed_processes_and_patterns_are_persisted(
+    db_session, organization
+):
+    """Both were computed on every run and thrown away."""
+
+    from sqlalchemy import select
+
+    from src.database.models.tm1_process import TM1Process, TM1ProcessPattern
+
+    await learn_from_processes(
+        db_session, organization_id=organization.id, files=corpus(12, 0)
+    )
+
+    processes = (
+        await db_session.execute(
+            select(TM1Process).where(
+                TM1Process.organization_id == organization.id
+            )
+        )
+    ).scalars().all()
+
+    assert len(processes) == 12
+    assert all(p.name for p in processes)
+    # Source code is deliberately not stored.
+    assert not hasattr(processes[0], "prolog")
+
+    patterns = (
+        await db_session.execute(
+            select(TM1ProcessPattern).where(
+                TM1ProcessPattern.organization_id == organization.id
+            )
+        )
+    ).scalars().all()
+
+    assert all(p.evidence for p in patterns)
+
+
+@pytest.mark.asyncio
+async def test_relearning_replaces_stored_processes(db_session, organization):
+    from sqlalchemy import func, select
+
+    from src.database.models.tm1_process import TM1Process
+
+    await learn_from_processes(
+        db_session, organization_id=organization.id, files=corpus(20, 0)
+    )
+    await learn_from_processes(
+        db_session, organization_id=organization.id, files=corpus(9, 0)
+    )
+
+    count = await db_session.scalar(
+        select(func.count())
+        .select_from(TM1Process)
+        .where(TM1Process.organization_id == organization.id)
+    )
+
+    assert count == 9
+
+
+@pytest.mark.asyncio
+async def test_duplicate_process_names_do_not_fail_the_upload(
+    db_session, organization
+):
+    """Two folders merged, or a re-download, can repeat a name."""
+
+    files = corpus(10, 0)
+    files["copy of DATA - Load - 0pro.txt"] = files["DATA - Load - 0pro.txt"]
+
+    result = await learn_from_processes(
+        db_session, organization_id=organization.id, files=files
+    )
+
+    assert result.parsed == 11

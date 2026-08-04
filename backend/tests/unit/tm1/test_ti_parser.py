@@ -501,3 +501,37 @@ class TestConventionApplicability:
         keys = {c.key for c in infer_conventions(records).conventions}
 
         assert "no_inline_comments" not in keys
+
+
+class TestProcessDependencies:
+    def test_execute_process_records_the_callee(self):
+        """115 of these in the reference corpus produced no edge before."""
+
+        text = (
+            "601,100\n602,\"DATA - Load - CALL\"\n572,1\n"
+            "ExecuteProcess( 'DATA - Load - Oracle', 'pMonth', pMonth );\n"
+        )
+        record = parse(text)
+
+        assert record.processes_called == {"DATA - Load - Oracle"}
+
+        ref = next(o for o in record.objects if o.kind == "process")
+        assert ref.access == "calls"
+
+    def test_execute_command_is_not_a_process_dependency(self):
+        """Its argument is an OS command line, not a TM1 process."""
+
+        text = "601,100\n572,1\nExecuteCommand( 'C:\\bat\\move.bat', 1 );\n"
+        record = parse(text)
+
+        assert record.processes_called == set()
+        assert not any(o.kind == "process" for o in record.objects)
+
+    def test_a_variable_callee_is_recorded_but_not_resolved(self):
+        text = "601,100\n572,1\nExecuteProcess( sProcName, 'p', 1 );\n"
+        record = parse(text)
+
+        ref = next(o for o in record.objects if o.kind == "process")
+
+        assert ref.literal is False
+        assert record.processes_called == set()

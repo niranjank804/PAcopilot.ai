@@ -26,13 +26,28 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+# Cosine similarity below which a chunk is not about the query. Unrelated text
+# under text-embedding-3-small sits near zero; genuinely relevant passages are
+# comfortably above this. Deliberately low — the aim is to drop noise, not to
+# second-guess ranking.
+MINIMUM_SCORE = 0.2
+
+
 async def search(
     db: AsyncSession,
     *,
     organization_id: uuid.UUID,
     query_embedding: list[float],
     top_k: int = 5,
+    minimum_score: float = MINIMUM_SCORE,
 ) -> list[ChunkMatch]:
+    """Rank an organization's chunks against a query embedding.
+
+    Returning nothing is a valid answer. Without a floor this returned the
+    top five chunks whatever they contained, so a question the knowledge base
+    could not answer still came back with five confident-looking citations —
+    which is how a grounded assistant ends up citing an unrelated document.
+    """
 
     chunks = await knowledge_chunk_repository.list_by_organization(
         db,
@@ -40,8 +55,10 @@ async def search(
     )
 
     matches = [
-        ChunkMatch(chunk, cosine_similarity(query_embedding, chunk.embedding))
+        match
         for chunk in chunks
+        if (match := ChunkMatch(chunk, cosine_similarity(query_embedding, chunk.embedding))).score
+        >= minimum_score
     ]
 
     matches.sort(key=lambda match: match.score, reverse=True)
