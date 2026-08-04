@@ -48,7 +48,8 @@ _CUBE_ADMIN_FUNCTIONS = {
     "CUBEDESTROY": 0,
     "CUBECLEARDATA": 0,
     "CUBEEXISTS": 0,
-    "VIEWZEROOUT": 0,
+    # ViewZeroOut lives in _VIEW_FUNCTIONS, which records both the cube and
+    # the view. Listing it here too emitted the cube reference twice.
 }
 _DIMENSION_FUNCTIONS = {
     "DIMENSIONCREATE": 0,
@@ -143,6 +144,10 @@ _COMMENT = re.compile(r"#[^\n]*")
 _NOISE = re.compile(r"'(?:[^']|'')*'|#[^\n]*")
 
 _CALL = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z][A-Za-z0-9_]*)\s*\(")
+
+# Longest argument list worth scanning. Real TI calls are well under this;
+# MDX passed to SubsetCreateByMDX is the longest legitimate case seen.
+MAX_ARGUMENT_SPAN = 8192
 
 # TM1 functions invoked as bare statements. `ProcessQuit;` has no argument
 # list, so a call regex anchored on '(' never sees it — and these are exactly
@@ -275,6 +280,29 @@ def _access_for(function: str, default: str) -> str:
     return default
 
 
+# TM1 object names are far shorter than this; the bound exists because the
+# name flows into convention statements, report markdown and the tool output
+# an LLM reads, and none of those should be sized by an uploaded file.
+MAX_NAME_LENGTH = 200
+
+
+def _clean_name(name: str) -> str:
+    """Strip control characters and bound the length of a parsed name.
+
+    A NUL reaching the database raises at flush time, which escapes the
+    per-file isolation in parse_corpus and fails the whole upload rather than
+    the one bad export.
+    """
+
+    cleaned = "".join(
+        character
+        for character in name
+        if character == " " or character.isprintable()
+    ).strip()
+
+    return cleaned[:MAX_NAME_LENGTH]
+
+
 def _name_from_filename(source_file: str) -> str:
     """`DATA - Load - FX Ratespro-1.txt` -> `DATA - Load - FX Rates`."""
 
@@ -289,21 +317,44 @@ def _name_from_filename(source_file: str) -> str:
     return stem.strip()
 
 
-def _split_args(call_text: str) -> list[str]:
-    """Split a call's argument list, respecting nesting and string literals."""
+def _scan_budget(code: str) -> int:
+    """Total characters `_split_args` may scan across one section.
+
+    Well-formed code costs about one pass: each call's arguments close within
+    a few dozen characters. Only input where parentheses never close makes
+    every call site scan its whole window, and that is malformed code rather
+    than a process worth extracting objects from. Four passes is generous for
+    the real corpus and still bounds the pathological case.
+    """
+
+    return max(200_000, len(code) * 4)
+
+
+def _split_args(call_text: str, start: int = 0) -> list[str]:
+    """Split a call's argument list, respecting nesting and string literals.
+
+    Reads in place from `start` rather than taking a slice: the caller has one
+    call site per function invocation, and slicing the remaining text at each
+    one turns parsing into quadratic work.
+
+    The scan is bounded. An unclosed parenthesis — which a malformed export
+    can easily contain — otherwise makes every later call site scan to the end
+    of the file, and 12KB of `CellPutN(` took three seconds before this.
+    """
 
     args: list[str] = []
     depth = 0
     current: list[str] = []
     in_string = False
-    index = 0
+    index = start
+    limit = min(len(call_text), start + MAX_ARGUMENT_SPAN)
 
-    while index < len(call_text):
+    while index < limit:
         char = call_text[index]
 
         if in_string:
             if char == "'":
-                if index + 1 < len(call_text) and call_text[index + 1] == "'":
+                if index + 1 < limit and call_text[index + 1] == "'":
                     current.append("''")
                     index += 2
                     continue
@@ -361,12 +412,16 @@ def _mask(code: str) -> str:
 
 
 def _iter_calls(code: str):
-    """Yield (FUNCTION_UPPER, raw_args_text) for each genuine call site."""
+    """Yield (FUNCTION_UPPER, code, offset) for each genuine call site.
+
+    The offset is where the argument list begins. Handing back the whole
+    string plus a position rather than a slice keeps this linear.
+    """
 
     masked = _mask(code)
 
     for match in _CALL.finditer(masked):
-        yield match.group(1).upper(), code[match.end():]
+        yield match.group(1).upper(), code, match.end()
 
 
 def _iter_statements(code: str):
@@ -416,10 +471,19 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
     for function in _iter_statements(code):
         note(function)
 
-    for function, tail in _iter_calls(code):
+    budget = _scan_budget(code)
+
+    for function, text, offset in _iter_calls(code):
         note(function)
 
-        args = _split_args(tail)
+        if budget <= 0:
+            # Malformed code whose parentheses never close. Function names are
+            # still counted above; object extraction stops because the
+            # arguments cannot be read reliably anyway.
+            continue
+
+        args = _split_args(text, offset)
+        budget -= sum(len(a) for a in args) + 1
 
         def arg(position: int) -> str | None:
             return args[position] if position < len(args) else None
@@ -483,7 +547,9 @@ def parse_process(text: str, source_file: str = "") -> ProcessRecord:
     # TM1 omits tag 602 in many exports — the process name is carried by the
     # filename instead (`DATA - Load - FX Ratespro.txt`). Falling back to it
     # is not a guess; it is where the server put the name.
-    record.name = pro.scalar("name") or _name_from_filename(source_file)
+    record.name = _clean_name(
+        pro.scalar("name") or _name_from_filename(source_file)
+    )
     record.format_version = pro.scalar("format_version")
     record.unknown_tags = sorted(set(pro.unknown_tags))
 

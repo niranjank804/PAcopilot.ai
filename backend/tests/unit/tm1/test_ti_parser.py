@@ -446,3 +446,58 @@ class TestConventions:
         dna = infer_conventions([parse(ODBC_EXPORT, f"p{i}.pro") for i in range(20)])
 
         assert all(c.confidence >= confidence for c in dna.enforced(confidence))
+
+
+class TestHostileInput:
+    """Cases found by adversarially probing the parser."""
+
+    def test_unclosed_parentheses_do_not_blow_up_parse_time(self):
+        """12KB of `CellPutN(` took three seconds before the scan budget."""
+
+        import time
+
+        code = "CellPutN( " * 20000
+        text = f"601,100\n572,1\n{code}\n"
+
+        started = time.perf_counter()
+        record = parse(text)
+        elapsed = time.perf_counter() - started
+
+        assert elapsed < 2.0, f"took {elapsed:.1f}s"
+        assert record.functions_used["CELLPUTN"] == 20000
+
+    def test_control_characters_are_stripped_from_the_name(self):
+        """A NUL reaching the database fails the whole upload, not one file."""
+
+        record = parse('601,100\n602,"DATA\x00 - Load"\n562,"NULL"\n')
+
+        assert "\x00" not in record.name
+        assert record.name == "DATA - Load"
+
+    def test_the_name_is_length_bounded(self):
+        """It flows into report markdown and into what an LLM reads."""
+
+        record = parse('601,100\n602,"' + "A" * 50000 + '"\n562,"NULL"\n')
+
+        assert len(record.name) <= 200
+
+    def test_view_zero_out_records_its_cube_once(self):
+        record = parse("601,100\n572,1\nViewZeroOut( 'Finance', 'vTmp' );\n")
+
+        cubes = [o for o in record.objects if o.kind == "cube"]
+
+        assert len(cubes) == 1
+        assert cubes[0].name == "Finance"
+
+
+class TestConventionApplicability:
+    def test_a_corpus_with_no_comments_cannot_vouch_for_comment_style(self):
+        """Absence of comments is not evidence of good comment placement."""
+
+        records = [
+            parse('601,100\n602,"p%d"\n562,"NULL"\n572,1\nnX = 1;\n' % i)
+            for i in range(20)
+        ]
+        keys = {c.key for c in infer_conventions(records).conventions}
+
+        assert "no_inline_comments" not in keys

@@ -241,6 +241,10 @@ def infer_conventions(records: Sequence[ProcessRecord]) -> CodingDNA:
             "never trailing on the same line as a statement.",
             records,
             lambda r: not any(_has_inline_comment(getattr(r, s)) for s in SECTIONS),
+            # Only a process that contains comments can testify about where
+            # comments go. Without this, a corpus with no comments at all
+            # scored as unanimously following the rule.
+            applies=lambda r: bool(r.comments),
         ),
         _observe(
             "error_handling",

@@ -43,7 +43,38 @@ def _decode(raw: bytes) -> str:
     return raw.decode("utf-8-sig", errors="replace")
 
 
-def _expand(filename: str, raw: bytes) -> tuple[dict[str, str], list[RejectedFileResponse]]:
+class _Budget:
+    """Expansion allowance for one request, shared across every uploaded part.
+
+    Scoping this per archive rather than per request let a caller send twenty
+    small zips and expand each to the full limit — twenty times the memory the
+    limit was written to cap.
+    """
+
+    def __init__(self) -> None:
+        self.bytes_left = MAX_EXPANDED_BYTES
+        self.files_left = MAX_FILES
+
+    def take(self, size: int) -> None:
+        self.bytes_left -= size
+
+        if self.bytes_left < 0:
+            raise ValidationException(
+                "This upload expands beyond the 100MB limit."
+            )
+
+    def take_file(self) -> None:
+        self.files_left -= 1
+
+        if self.files_left < 0:
+            raise ValidationException(
+                f"This upload contains more than {MAX_FILES} files."
+            )
+
+
+def _expand(
+    filename: str, raw: bytes, budget: _Budget
+) -> tuple[dict[str, str], list[RejectedFileResponse]]:
     """Turn one upload into `{name: text}`, expanding a zip if that is what it is."""
 
     rejected: list[RejectedFileResponse] = []
@@ -56,38 +87,53 @@ def _expand(filename: str, raw: bytes) -> tuple[dict[str, str], list[RejectedFil
                     reason="Not a .pro or .txt export, and not a zip archive.",
                 )
             ]
+        budget.take_file()
         return {filename: _decode(raw)}, []
 
     files: dict[str, str] = {}
-    expanded = 0
 
-    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-        members = [m for m in archive.infolist() if not m.is_dir()]
-
-        if len(members) > MAX_FILES:
-            raise ValidationException(
-                f"Archive contains {len(members)} files; the limit is {MAX_FILES}."
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(raw))
+    except zipfile.BadZipFile:
+        return {}, [
+            RejectedFileResponse(
+                filename=filename, reason="Archive is corrupt or unreadable."
             )
+        ]
 
-        for member in members:
+    with archive:
+        for member in archive.infolist():
+            if member.is_dir():
+                continue
+
             name = member.filename.rsplit("/", 1)[-1]
 
             if not name.lower().endswith(TEXT_SUFFIXES):
                 continue
 
-            # Trust the declared size only as a first filter, then measure what
-            # was actually read — a zip header can claim anything.
-            expanded += member.file_size
+            budget.take_file()
 
-            if expanded > MAX_EXPANDED_BYTES:
-                raise ValidationException(
-                    "Archive expands beyond the 100MB limit."
+            try:
+                with archive.open(member) as handle:
+                    # Read at most what the budget still allows, then charge
+                    # what was actually read — a zip header can claim anything,
+                    # so the declared size cannot be the control.
+                    payload = handle.read(max(budget.bytes_left, 0) + 1)
+            except (zipfile.BadZipFile, EOFError, RuntimeError) as exc:
+                # A corrupt member, a CRC mismatch, or an encrypted archive.
+                # One bad member should cost that member, not the upload.
+                rejected.append(
+                    RejectedFileResponse(
+                        filename=name,
+                        reason=f"Archive member could not be read: {exc}",
+                    )
                 )
+                continue
 
-            with archive.open(member) as handle:
-                files[name] = _decode(handle.read(MAX_EXPANDED_BYTES + 1))
+            budget.take(len(payload))
+            files[name] = _decode(payload)
 
-    if not files:
+    if not files and not rejected:
         rejected.append(
             RejectedFileResponse(
                 filename=filename,
@@ -96,6 +142,26 @@ def _expand(filename: str, raw: bytes) -> tuple[dict[str, str], list[RejectedFil
         )
 
     return files, rejected
+
+
+def _nothing_found(rejected: list[RejectedFileResponse]) -> str:
+    """Explain why an upload yielded nothing, using the reasons already known.
+
+    "No exports found" alone leaves the uploader guessing whether the file was
+    the wrong type, corrupt, or simply empty — when the per-file reason was
+    collected and then thrown away.
+    """
+
+    base = (
+        "No TurboIntegrator exports found. Upload .pro files, or a zip "
+        "containing them."
+    )
+
+    if not rejected:
+        return base
+
+    detail = "; ".join(f"{r.filename}: {r.reason}" for r in rejected[:5])
+    return f"{base} Rejected — {detail}"
 
 
 @router.post(
@@ -118,6 +184,7 @@ async def learn_corpus(
 
     corpus: dict[str, str] = {}
     rejected: list[RejectedFileResponse] = []
+    budget = _Budget()
     total = 0
 
     for upload in files:
@@ -127,15 +194,12 @@ async def learn_corpus(
         if total > MAX_UPLOAD_BYTES:
             raise ValidationException("Upload exceeds the 25MB limit.")
 
-        expanded, skipped = _expand(upload.filename or "untitled", raw)
+        expanded, skipped = _expand(upload.filename or "untitled", raw, budget)
         corpus.update(expanded)
         rejected.extend(skipped)
 
     if not corpus:
-        raise ValidationException(
-            "No TurboIntegrator exports found. Upload .pro files, or a zip "
-            "containing them."
-        )
+        raise ValidationException(_nothing_found(rejected))
 
     result = await learn_from_processes(
         db, organization_id=current_user.organization_id, files=corpus
@@ -234,6 +298,8 @@ async def standards_report(
     """
 
     corpus: dict[str, str] = {}
+    rejected: list[RejectedFileResponse] = []
+    budget = _Budget()
     total = 0
 
     for upload in files:
@@ -243,14 +309,12 @@ async def standards_report(
         if total > MAX_UPLOAD_BYTES:
             raise ValidationException("Upload exceeds the 25MB limit.")
 
-        expanded, _ = _expand(upload.filename or "untitled", raw)
+        expanded, skipped = _expand(upload.filename or "untitled", raw, budget)
         corpus.update(expanded)
+        rejected.extend(skipped)
 
     if not corpus:
-        raise ValidationException(
-            "No TurboIntegrator exports found. Upload .pro files, or a zip "
-            "containing them."
-        )
+        raise ValidationException(_nothing_found(rejected))
 
     records, _ = parse_corpus(corpus)
 

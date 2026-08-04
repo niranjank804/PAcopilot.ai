@@ -293,3 +293,91 @@ async def test_a_large_upload_does_replace(client, db_session):
         if c["key"] == "no_inline_comments"
     )
     assert rule["sample"] == 9
+
+
+@pytest.mark.asyncio
+async def test_a_corrupt_archive_is_rejected_not_a_500(client, db_session):
+    org, admin = await create_org_admin(db_session)
+
+    # A valid zip header followed by garbage: is_zipfile accepts it, reading
+    # a member does not.
+    broken = bytearray(zipped(3))
+    broken[80:200] = b"\xff" * 120
+
+    response = await client.post(
+        "/learning/corpus",
+        files={"files": ("tm1.zip", bytes(broken), "application/zip")},
+        headers=auth_headers(admin),
+    )
+
+    assert response.status_code < 500
+
+
+@pytest.mark.asyncio
+async def test_the_expansion_budget_is_per_request_not_per_archive(
+    client, db_session
+):
+    """Twenty small zips must not each get the full expansion allowance."""
+
+    from src.api.v1 import learning
+
+    org, admin = await create_org_admin(db_session)
+    original = learning.MAX_EXPANDED_BYTES
+    learning.MAX_EXPANDED_BYTES = 4000
+
+    try:
+        response = await client.post(
+            "/learning/corpus",
+            files=[
+                ("files", (f"part{i}.zip", zipped(6), "application/zip"))
+                for i in range(8)
+            ],
+            headers=auth_headers(admin),
+        )
+    finally:
+        learning.MAX_EXPANDED_BYTES = original
+
+    assert response.status_code == 422
+    assert "expands beyond" in response.text
+
+
+@pytest.mark.asyncio
+async def test_rejection_reasons_are_reported_when_nothing_is_usable(
+    client, db_session
+):
+    """"No exports found" alone leaves the uploader guessing."""
+
+    org, admin = await create_org_admin(db_session)
+
+    response = await client.post(
+        "/learning/corpus",
+        files={"files": ("notes.md", b"# not a process", "text/markdown")},
+        headers=auth_headers(admin),
+    )
+
+    assert response.status_code == 422
+    assert "notes.md" in response.text
+    assert "Not a .pro or .txt export" in response.text
+
+
+@pytest.mark.asyncio
+async def test_a_process_name_with_a_nul_byte_does_not_fail_the_upload(
+    client, db_session
+):
+    """A NUL reaching Postgres escapes the per-file failure isolation."""
+
+    org, admin = await create_org_admin(db_session)
+
+    hostile = '601,100\n602,"DATA\x00 - Load - Hostile"\n562,"NULL"\n572,1\nnX = 1;\n'
+
+    response = await client.post(
+        "/learning/corpus",
+        files=[
+            ("files", ("hostile.pro", hostile.encode(), "text/plain")),
+            *exports(12),
+        ],
+        headers=auth_headers(admin),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["processes_parsed"] == 13
