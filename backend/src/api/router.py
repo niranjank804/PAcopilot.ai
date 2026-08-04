@@ -2,9 +2,11 @@ from fastapi import APIRouter
 
 from src.api.v1.ai import router as ai_router
 from src.api.v1.auth import router as auth_router
+from src.api.v1.billing import router as billing_router
 from src.api.v1.database import router as database_router
 from src.api.v1.health import router as health_router
 from src.api.v1.knowledge import router as knowledge_router
+from src.api.v1.learning import router as learning_router
 from src.api.v1.monitoring import router as monitoring_router
 from src.api.v1.permissions import router as permissions_router
 from src.api.v1.roles import router as roles_router
@@ -24,4 +26,6 @@ api_router.include_router(permissions_router)
 api_router.include_router(ai_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(tm1_router)
+api_router.include_router(learning_router)
 api_router.include_router(monitoring_router)
+api_router.include_router(billing_router)

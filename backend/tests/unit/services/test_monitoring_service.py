@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta, timezone
 
 import pytest
 from cryptography.fernet import Fernet
@@ -129,7 +128,7 @@ async def test_get_tm1_status_defaults_to_closed_for_untouched_connection(
     org = await create_organization(db_session)
     user = await create_user(db_session, org.id)
 
-    connection = await tm1_integration_service.create_connection(
+    await tm1_integration_service.create_connection(
         db_session,
         organization_id=org.id,
         created_by=user.id,

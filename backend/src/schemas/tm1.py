@@ -169,6 +169,7 @@ class ChangeResponse(BaseModel):
     validation_errors: list | None
     impact: list | None
     error_message: str | None
+    superseded_by: uuid.UUID | None
     created_by: uuid.UUID
     executed_by: uuid.UUID | None
     created_at: datetime

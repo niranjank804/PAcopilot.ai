@@ -12,7 +12,16 @@ app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
-    debug=True,
+    # Was hardcoded True, so production served debug tracebacks regardless
+    # of configuration.
+    debug=settings.DEBUG,
+    # The interactive docs enumerate every route, parameter and schema —
+    # a map of the attack surface, served to anyone. Available in
+    # development, off in production. Set EXPOSE_API_DOCS=true to override
+    # (behind a network restriction, not on the open internet).
+    docs_url="/docs" if settings.EXPOSE_API_DOCS else None,
+    redoc_url="/redoc" if settings.EXPOSE_API_DOCS else None,
+    openapi_url="/openapi.json" if settings.EXPOSE_API_DOCS else None,
 )
 
 app.add_middleware(
@@ -28,6 +37,16 @@ app.include_router(api_router)
 
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
+    # A 429 without Retry-After tells a client it was throttled but not for
+    # how long, so the usual response is to retry immediately and be
+    # throttled again.
+    retry_after = getattr(exc, "retry_after", None)
+    headers = (
+        {"Retry-After": str(int(retry_after) + 1)}
+        if retry_after is not None
+        else None
+    )
+
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -37,6 +56,7 @@ async def app_exception_handler(request: Request, exc: AppException):
                 "message": exc.message,
             },
         },
+        headers=headers,
     )
 
 

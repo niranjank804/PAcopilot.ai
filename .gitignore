@@ -41,3 +41,17 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Quality measurement artefacts (regenerated every run)
+backend/.quality-history.jsonl
+backend/quality-report.json
+backend/coverage.xml
+
+# Local editor/agent settings — machine-specific, not project config
+.claude/
+
+# Coverage data file (the XML/lcov reports are the shareable artefacts)
+backend/.coverage
+
+# PR description drafts (working notes, not shipped)
+PULL_REQUEST.md

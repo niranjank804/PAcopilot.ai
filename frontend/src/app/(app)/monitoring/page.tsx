@@ -65,7 +65,7 @@ export default function MonitoringPage() {
           <CardTitle>AI Usage by Model</CardTitle>
           <CardDescription>
             {usageQuery.data
-              ? `${number.format(usageQuery.data.total_requests)} requests · ${number.format(usageQuery.data.total_tokens)} tokens total`
+              ? `${number.format(usageQuery.data.total_requests)} requests · ${number.format(usageQuery.data.total_tokens)} tokens total · ${Math.round(usageQuery.data.cache_hit_rate * 100)}% of prompt tokens served from cache`
               : "Token totals per model."}
           </CardDescription>
         </CardHeader>
@@ -132,6 +132,7 @@ export default function MonitoringPage() {
                   <TableHead>Tool</TableHead>
                   <TableHead className="text-right">Calls</TableHead>
                   <TableHead className="text-right">Succeeded</TableHead>
+                  <TableHead className="text-right">Not found</TableHead>
                   <TableHead className="text-right">Errors</TableHead>
                   <TableHead className="text-right">Avg duration</TableHead>
                 </TableRow>
@@ -147,6 +148,11 @@ export default function MonitoringPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       {number.format(row.success_count)}
+                    </TableCell>
+                    {/* An object that doesn't exist is a real answer, not a
+                        failure — shown plainly so it can't be misread as one. */}
+                    <TableCell className="text-right text-muted-foreground">
+                      {number.format(row.not_found_count)}
                     </TableCell>
                     <TableCell className="text-right">
                       {row.error_count > 0 ? (

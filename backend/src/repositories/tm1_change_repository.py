@@ -48,6 +48,33 @@ class TM1ChangeRepository:
 
         return list(result.scalars().all())
 
+    async def list_open_drafts(
+        self,
+        db: AsyncSession,
+        *,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        created_by: uuid.UUID,
+        change_type: str,
+        target_name: str,
+    ) -> list[TM1Change]:
+        """Still-executable drafts one author has open against one target."""
+
+        result = await db.execute(
+            select(TM1Change)
+            .where(
+                TM1Change.connection_id == connection_id,
+                TM1Change.organization_id == organization_id,
+                TM1Change.created_by == created_by,
+                TM1Change.change_type == change_type,
+                TM1Change.target_name == target_name,
+                TM1Change.status == "draft",
+            )
+            .order_by(TM1Change.created_at.desc())
+        )
+
+        return list(result.scalars().all())
+
     async def update(
         self,
         db: AsyncSession,

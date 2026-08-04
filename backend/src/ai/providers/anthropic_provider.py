@@ -19,12 +19,127 @@ from src.ai.schemas import (
 from src.core.config import settings
 
 
+def _usage_from(usage) -> Usage:
+    """Map provider usage, including the cache counters.
+
+    getattr-with-default because the cache fields are absent on older SDK
+    response shapes and on the fakes used in tests; a missing counter
+    should read as "no cache activity", not raise.
+    """
+
+    return Usage(
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_creation_input_tokens=(
+            getattr(usage, "cache_creation_input_tokens", 0) or 0
+        ),
+        cache_read_input_tokens=(
+            getattr(usage, "cache_read_input_tokens", 0) or 0
+        ),
+    )
+
+
+_CACHE_CONTROL = {"type": "ephemeral"}
+
+# The API allows 4 cache breakpoints per request. One is spent on the
+# stable system block (which also covers the tool schemas rendered ahead
+# of it), leaving three for the conversation.
+_MAX_MESSAGE_BREAKPOINTS = 3
+
+# A breakpoint only looks back 20 content blocks for an existing cache
+# entry. One agent round appends an assistant message (text + N tool_use)
+# and a user message (N tool_result), so a five-round loop can put 30+
+# blocks between turns — far enough that a single trailing breakpoint
+# would find nothing and silently miss. Rolling markers keep every
+# breakpoint within reach of the one before it.
+_LOOKBACK_BLOCKS = 15
+
+
 class AnthropicProvider(AIProvider):
 
     def __init__(self):
         self._client = anthropic.AsyncAnthropic(
             api_key=settings.ANTHROPIC_API_KEY,
         )
+
+    def _system_payload(self, request: ChatRequest):
+        """System prompt as blocks, with the stable half cached.
+
+        Render order is tools -> system -> messages, so a breakpoint on the
+        stable system block caches the tool schemas with it — the largest
+        single reusable span in the request.
+        """
+
+        if not request.system and not request.system_context:
+            return anthropic.NOT_GIVEN
+
+        blocks = []
+
+        if request.system:
+            blocks.append(
+                {
+                    "type": "text",
+                    "text": request.system,
+                    "cache_control": _CACHE_CONTROL,
+                }
+            )
+
+        # Deliberately unmarked, and last: this is the per-request half
+        # (retrieved excerpts, live connection state). Marking it would
+        # write a new cache entry on every request and never read one.
+        if request.system_context:
+            blocks.append({"type": "text", "text": request.system_context})
+
+        return blocks
+
+    def _apply_message_breakpoints(self, payload: list[dict]) -> None:
+        """Mark up to three trailing positions in the conversation.
+
+        Each agent round re-sends every prior tool result at full price
+        without this. Markers accrue: the newest one writes, the older
+        ones are read on the next round.
+        """
+
+        # (message index, block index) for every content block, in order.
+        positions: list[tuple[int, int]] = [
+            (message_index, block_index)
+            for message_index, message in enumerate(payload)
+            for block_index in range(
+                len(message["content"])
+                if isinstance(message["content"], list)
+                else 1
+            )
+        ]
+
+        if not positions:
+            return
+
+        chosen: list[tuple[int, int]] = []
+        since_last = 0
+
+        # Walk backwards from the newest block so the most recent turn is
+        # always a breakpoint, then step back in lookback-sized strides.
+        for offset, position in enumerate(reversed(positions)):
+            if offset == 0 or since_last >= _LOOKBACK_BLOCKS:
+                chosen.append(position)
+                since_last = 0
+
+                if len(chosen) == _MAX_MESSAGE_BREAKPOINTS:
+                    break
+
+            since_last += 1
+
+        for message_index, block_index in chosen:
+            message = payload[message_index]
+
+            # A plain string carries no place to hang cache_control, so
+            # promote it to a single text block first.
+            if not isinstance(message["content"], list):
+                message["content"] = [
+                    {"type": "text", "text": message["content"]}
+                ]
+
+            message["content"][block_index]["cache_control"] = _CACHE_CONTROL
 
     def _messages_payload(self, request: ChatRequest) -> list[dict]:
         payload = []
@@ -81,6 +196,8 @@ class AnthropicProvider(AIProvider):
                     {"role": message.role, "content": message.content}
                 )
 
+        self._apply_message_breakpoints(payload)
+
         return payload
 
     def _tools_payload(
@@ -108,7 +225,7 @@ class AnthropicProvider(AIProvider):
             response = await self._client.messages.create(
                 model=request.model,
                 max_tokens=request.max_tokens,
-                system=request.system or anthropic.NOT_GIVEN,
+                system=self._system_payload(request),
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
             )
@@ -133,10 +250,7 @@ class AnthropicProvider(AIProvider):
             content=text,
             model=response.model,
             stop_reason=response.stop_reason,
-            usage=Usage(
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens,
-            ),
+            usage=_usage_from(response.usage),
             tool_calls=tool_calls,
         )
 
@@ -149,7 +263,7 @@ class AnthropicProvider(AIProvider):
             async with self._client.messages.stream(
                 model=request.model,
                 max_tokens=request.max_tokens,
-                system=request.system or anthropic.NOT_GIVEN,
+                system=self._system_payload(request),
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
             ) as stream:
@@ -166,10 +280,7 @@ class AnthropicProvider(AIProvider):
 
                 yield StreamEvent(
                     type="message_stop",
-                    usage=Usage(
-                        input_tokens=final_message.usage.input_tokens,
-                        output_tokens=final_message.usage.output_tokens,
-                    ),
+                    usage=_usage_from(final_message.usage),
                     tool_calls=tool_calls,
                     stop_reason=final_message.stop_reason,
                 )
@@ -188,7 +299,7 @@ class AnthropicProvider(AIProvider):
         try:
             result = await self._client.messages.count_tokens(
                 model=request.model,
-                system=request.system or anthropic.NOT_GIVEN,
+                system=self._system_payload(request),
                 messages=self._messages_payload(request),
             )
         except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:

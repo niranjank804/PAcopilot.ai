@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
+from src.api.dependencies.rate_limit import ai_rate_limited
 from src.core.exceptions import ValidationException
 from src.database.session import get_db
 from src.errors.classifier import classify_error
@@ -162,6 +163,7 @@ async def ask(
     http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("knowledge.read")),
+    _: UserResponse = Depends(ai_rate_limited),
 ):
     ip_address, user_agent = _client_context(http_request)
 
@@ -216,6 +218,7 @@ async def explain_error(
     http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("knowledge.read")),
+    _: UserResponse = Depends(ai_rate_limited),
 ):
     ip_address, user_agent = _client_context(http_request)
 

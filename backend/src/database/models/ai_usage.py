@@ -75,6 +75,22 @@ class AIUsage(BaseModel, OrganizationScoped):
         nullable=False,
     )
 
+    # Cached prompt tokens, recorded apart from prompt_tokens because they
+    # are priced differently and because the hit rate is only measurable
+    # if reads and writes are kept distinct. Not a subset of prompt_tokens:
+    # that field is the uncached remainder.
+    cache_creation_tokens: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+    )
+
+    cache_read_tokens: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+    )
+
     estimated_cost_usd: Mapped[float] = mapped_column(
         Numeric(10, 6),
         nullable=False,

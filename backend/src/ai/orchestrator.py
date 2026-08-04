@@ -39,11 +39,50 @@ from src.repositories.ai_message_repository import ai_message_repository
 from src.repositories.ai_tool_execution_repository import (
     ai_tool_execution_repository,
 )
+from src.billing import monthly_token_limit_for
 from src.repositories.ai_usage_repository import ai_usage_repository
+from src.repositories.organization_repository import organization_repository
 from src.schemas.ai import AttachmentInput
 from src.services.audit_service import audit_service
+from src.tm1.exceptions import TM1NotFoundError
 from src.tm1.resilience import CircuitState, peek_circuit_breaker
 from src.tm1.service import tm1_integration_service
+
+
+async def _release_db(db: AsyncSession) -> None:
+    """Return this request's pooled connection for the duration of an LLM call.
+
+    A model call takes 20-40s and touches no database. SQLAlchemy hands the
+    connection back to the pool on commit and re-acquires it on the next
+    statement, so committing here frees the slot for other requests instead
+    of holding it idle across the whole agent turn — the difference between
+    ~15 concurrent AI users and a pool sized for real traffic.
+
+    The trade is that work already recorded this turn becomes durable before
+    the turn finishes: if round 3 fails, rounds 1-2's tool executions and
+    messages survive rather than rolling back with it. That is the behaviour
+    worth having — those rows are the audit trail you need precisely when a
+    request failed.
+    """
+
+    await db.commit()
+
+
+def _outcome_status(exc: AppException) -> str:
+    """Classify a failed tool call for reliability metrics.
+
+    "This object doesn't exist" is a normal, useful answer — the
+    Troubleshooter asking about a process the user misremembered is the
+    tool working, not failing. Counting it as an error puts read tools at
+    a permanently high error rate and makes the number useless for
+    alerting, so expected negatives get their own status.
+    """
+
+    if isinstance(exc, (NotFoundException, TM1NotFoundError)):
+        return "not_found"
+
+    return "error"
+
 
 MAX_TOOL_ROUNDS = 5
 # Hard cap on any persona's max_tool_rounds override, independent of what a
@@ -51,23 +90,59 @@ MAX_TOOL_ROUNDS = 5
 # request. Mirrors MAX_TRAVERSAL_NODES in the dependency analyzer.
 MAX_TOOL_ROUNDS_CEILING = 15
 
-# System prompt for plain chat (no persona, no tools). Without tools the
-# model can neither read the live TM1 model nor search the knowledge base,
-# so a code-generation request can only produce an invented, ungrounded
-# template — steer those to the code agents instead. Applied only when the
-# caller supplies no system override, so the Knowledge Base "Ask" path
-# (persona-less but grounded via `system`) is unaffected.
+# Tools that need no TM1 connection. A brand-new organization has no
+# connection configured and no documents uploaded, and previously got a
+# plain chat with no tools at all — so the product was unusable until
+# someone finished setup. These three work from the first minute: a
+# 480-function TM1 reference, static validation of TI and rule source, and
+# whatever the organization has uploaded.
+PLAIN_CHAT_TOOL_NAMES = [
+    "lookup_tm1_function",
+    "check_tm1_code",
+    "search_knowledge_base",
+]
+
 PLAIN_CHAT_SYSTEM_PROMPT = (
-    "You are a plain-chat assistant for IBM Planning Analytics (TM1). In "
-    "this mode you have no access to the live TM1 model or the "
-    "organization's knowledge base. If the user asks you to write or "
-    "generate TM1 code — a TurboIntegrator process, a rule, or a feeder — "
-    "do NOT produce ungrounded or placeholder code. Instead, tell them to "
-    "select the TI or Developer agent from the agent selector, which "
-    "grounds code in the live model and the organization's standards and "
-    "produces a reviewable, compile-validated draft. You may still answer "
-    "general conceptual TM1 questions directly."
+    "You are an assistant for IBM Planning Analytics (TM1). No TM1 server "
+    "is connected in this mode, so you cannot see the organization's cubes, "
+    "dimensions, processes or data.\n\n"
+    "You DO have a verified TM1 function reference. Whenever you name a "
+    "function, call lookup_tm1_function to confirm it exists, that it is "
+    "valid in the context you are using it (TI, Rules or Excel), and that "
+    "the server version supports it — do not rely on recall. Run "
+    "check_tm1_code over any TI or rule code before you present it. Call "
+    "search_knowledge_base for the organization's own standards and "
+    "reference material.\n\n"
+    "You MAY write TurboIntegrator, rule and feeder code. The rule is "
+    "about names, not about code: every FUNCTION you use must be confirmed "
+    "through the reference, and every CUBE, DIMENSION, ELEMENT, ATTRIBUTE "
+    "or PROCESS name must be an obvious placeholder the user replaces — "
+    "write <YourCube>, <YourDimension>. Never invent a plausible-looking "
+    "object name and never present one as if it came from their model; "
+    "that is the failure this rule exists to prevent. Say plainly which "
+    "placeholders they must fill in.\n\n"
+    "When the answer depends on what actually exists in their model — "
+    "which cube holds a figure, what a dimension contains, whether a "
+    "process already exists — say so, and point them at connecting a TM1 "
+    "server and selecting a specialist agent (TI or Developer for code, "
+    "Analyst for data questions), which grounds the work in the live model "
+    "and produces a compile-validated draft."
 )
+
+
+def _resolve_allowed_tools(
+    persona: AgentPersona | None,
+    caller_requested_all_tools: bool,
+) -> list[str] | None:
+    """Which tools this turn may use. None means every registered tool."""
+
+    if persona is not None:
+        return persona.tool_names
+
+    if caller_requested_all_tools:
+        return None
+
+    return list(PLAIN_CHAT_TOOL_NAMES)
 
 
 def _resolve_max_tool_rounds(persona: AgentPersona | None) -> int:
@@ -152,7 +227,22 @@ class AIOrchestrator:
         organization_id: uuid.UUID,
         system: str | None,
         persona: AgentPersona | None = None,
-    ) -> str | None:
+    ) -> tuple[str | None, str | None]:
+        """Returns (stable, volatile) halves of the system prompt.
+
+        Split by how often each part changes, because prompt caching is a
+        byte-exact prefix match: anything that varies per request has to
+        sit *after* everything that doesn't, or it invalidates the lot.
+
+        Stable — persona instructions and safety rules. Identical for every
+        request on this agent, and cached together with the tool schemas
+        that render ahead of them.
+
+        Volatile — retrieved knowledge-base excerpts (different for every
+        question) and the live connection list (which changes whenever a
+        circuit breaker opens). Deliberately uncached; putting either one
+        in the stable half would mean a permanent cache miss.
+        """
 
         connections = await tm1_integration_service.list_connections(
             db,
@@ -196,14 +286,23 @@ class AIOrchestrator:
             bullets = "\n".join(f"- {note}" for note in persona.safety_notes)
             safety_notes_block = f"Safety rules:\n{bullets}"
 
-        parts = [
+        stable_parts = [
             persona.system_prompt if persona is not None else None,
             safety_notes_block,
-            system,
-            connection_context,
         ]
 
-        return "\n\n".join(part for part in parts if part)
+        # `system` is the caller-supplied override, which on the knowledge
+        # path carries the retrieved document excerpts — different for
+        # every question, so it belongs here rather than in the stable half.
+        volatile_parts = [
+            connection_context,
+            system,
+        ]
+
+        stable = "\n\n".join(part for part in stable_parts if part)
+        volatile = "\n\n".join(part for part in volatile_parts if part)
+
+        return stable or None, volatile or None
 
     def _prepare_user_message(
         self,
@@ -343,7 +442,7 @@ class AIOrchestrator:
                 user_id=user_id,
                 tool_name=tool_call.name,
                 arguments=tool_call.input,
-                status="error",
+                status=_outcome_status(exc),
                 result_summary=None,
                 duration_ms=int((time.monotonic() - start) * 1000),
                 error_message=exc.message,
@@ -385,6 +484,7 @@ class AIOrchestrator:
         organization_id: uuid.UUID,
         user_id: uuid.UUID,
         conversation_id: uuid.UUID,
+        system_context: str | None = None,
         allowed_tools: list[str] | None = None,
         max_rounds: int = MAX_TOOL_ROUNDS,
     ) -> tuple[ChatResponse, Usage]:
@@ -399,6 +499,8 @@ class AIOrchestrator:
         tools = [tool.to_definition() for tool in available_tools]
         total_input_tokens = 0
         total_output_tokens = 0
+        total_cache_creation = 0
+        total_cache_read = 0
         response: ChatResponse | None = None
 
         for _ in range(max_rounds):
@@ -406,12 +508,16 @@ class AIOrchestrator:
                 messages=history,
                 model=model,
                 system=system,
+                system_context=system_context,
                 tools=tools,
             )
+            await _release_db(db)
             response = await provider.chat(request)
 
             total_input_tokens += response.usage.input_tokens
             total_output_tokens += response.usage.output_tokens
+            total_cache_creation += response.usage.cache_creation_input_tokens
+            total_cache_read += response.usage.cache_read_input_tokens
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
                 break
@@ -447,6 +553,8 @@ class AIOrchestrator:
         return response, Usage(
             input_tokens=total_input_tokens,
             output_tokens=total_output_tokens,
+            cache_creation_input_tokens=total_cache_creation,
+            cache_read_input_tokens=total_cache_read,
         )
 
     async def _check_usage_quota(
@@ -455,7 +563,24 @@ class AIOrchestrator:
         organization_id: uuid.UUID,
     ) -> None:
 
-        if settings.AI_MONTHLY_TOKEN_LIMIT is None:
+        # The ceiling comes from the organization's plan; the deployment-wide
+        # setting is the fallback for plans that are themselves unlimited, so
+        # an operator can still cap an unmetered plan.
+        #
+        # A missing organization resolves to the default plan's limit, not to
+        # unlimited: an absent row means corrupted or deleted state, and the
+        # expensive failure mode is granting uncapped AI spend to something we
+        # cannot identify.
+        organization = await organization_repository.get_by_id(
+            db, organization_id
+        )
+
+        limit = monthly_token_limit_for(
+            organization.plan if organization else None,
+            deployment_limit=settings.AI_MONTHLY_TOKEN_LIMIT,
+        )
+
+        if limit is None:
             return
 
         now = datetime.now(timezone.utc)
@@ -467,7 +592,7 @@ class AIOrchestrator:
             db, organization_id, start_of_month
         )
 
-        if total_tokens >= settings.AI_MONTHLY_TOKEN_LIMIT:
+        if total_tokens >= limit:
             raise QuotaExceededException(
                 "Monthly AI usage quota exceeded for this organization."
             )
@@ -490,6 +615,10 @@ class AIOrchestrator:
     ) -> ChatResult:
 
         persona: AgentPersona | None = None
+
+        # A caller asking for tools without naming an agent wants the full
+        # toolset; plain chat (neither) gets the connection-free subset.
+        caller_requested_all_tools = enable_tools
 
         if agent is not None:
             persona = get_agent(agent)
@@ -536,33 +665,29 @@ class AIOrchestrator:
 
         start = time.monotonic()
 
-        if enable_tools:
-            tool_system = await self._build_tool_system_prompt(
+        tool_system, tool_system_context = (
+            await self._build_tool_system_prompt(
                 db,
                 organization_id,
-                system,
+                system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
                 persona,
             )
-            response, usage = await self._run_tool_loop(
-                db,
-                provider=provider,
-                history=history,
-                model=resolved_model,
-                system=tool_system,
-                organization_id=organization_id,
-                user_id=user_id,
-                conversation_id=conversation.id,
-                allowed_tools=persona.tool_names if persona is not None else None,
-                max_rounds=_resolve_max_tool_rounds(persona),
-            )
-        else:
-            request = ChatRequest(
-                messages=history,
-                model=resolved_model,
-                system=system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
-            )
-            response = await provider.chat(request)
-            usage = response.usage
+        )
+        response, usage = await self._run_tool_loop(
+            db,
+            provider=provider,
+            history=history,
+            model=resolved_model,
+            system=tool_system,
+            system_context=tool_system_context,
+            organization_id=organization_id,
+            user_id=user_id,
+            conversation_id=conversation.id,
+            allowed_tools=_resolve_allowed_tools(
+                persona, caller_requested_all_tools
+            ),
+            max_rounds=_resolve_max_tool_rounds(persona),
+        )
 
         latency_ms = int((time.monotonic() - start) * 1000)
 
@@ -588,9 +713,17 @@ class AIOrchestrator:
                 model=resolved_model,
                 prompt_tokens=usage.input_tokens,
                 completion_tokens=usage.output_tokens,
+                # Cached prompt tokens are billed but are not part of
+                # input_tokens, so total_tokens has to add them back or
+                # the recorded prompt size shrinks as caching improves.
                 total_tokens=(
-                    usage.input_tokens + usage.output_tokens
+                    usage.input_tokens
+                    + usage.cache_creation_input_tokens
+                    + usage.cache_read_input_tokens
+                    + usage.output_tokens
                 ),
+                cache_creation_tokens=usage.cache_creation_input_tokens,
+                cache_read_tokens=usage.cache_read_input_tokens,
                 estimated_cost_usd=cost,
                 latency_ms=latency_ms,
             ),
@@ -638,6 +771,10 @@ class AIOrchestrator:
     ) -> AsyncIterator[OrchestratedStreamEvent]:
 
         persona: AgentPersona | None = None
+
+        # A caller asking for tools without naming an agent wants the full
+        # toolset; plain chat (neither) gets the connection-free subset.
+        caller_requested_all_tools = enable_tools
 
         if agent is not None:
             persona = get_agent(agent)
@@ -688,31 +825,40 @@ class AIOrchestrator:
         )
         allowed_tools: list[str] | None = None
 
-        if enable_tools:
-            resolved_system = await self._build_tool_system_prompt(
+        resolved_system_context: str | None = None
+
+        resolved_system, resolved_system_context = (
+            await self._build_tool_system_prompt(
                 db,
                 organization_id,
-                system,
+                system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
                 persona,
             )
-            allowed_tools = persona.tool_names if persona is not None else None
+        )
 
-            available_tools = list_tools()
+        # Plain chat is restricted to the tools that work with no TM1
+        # connection, so a brand-new organization is useful immediately.
+        allowed_tools = _resolve_allowed_tools(
+            persona, caller_requested_all_tools
+        )
 
-            if allowed_tools is not None:
-                available_tools = [
-                    tool for tool in available_tools if tool.name in allowed_tools
-                ]
+        available_tools = (
+            list_tools()
+            if allowed_tools is None
+            else [tool for tool in list_tools() if tool.name in allowed_tools]
+        )
 
-            tools = [tool.to_definition() for tool in available_tools]
+        tools = [tool.to_definition() for tool in available_tools]
 
         total_input_tokens = 0
         total_output_tokens = 0
+        total_cache_creation = 0
+        total_cache_read = 0
         final_content_parts: list[str] = []
 
         start = time.monotonic()
 
-        max_rounds = _resolve_max_tool_rounds(persona) if enable_tools else 1
+        max_rounds = _resolve_max_tool_rounds(persona)
 
         for _ in range(max_rounds):
             round_content_parts: list[str] = []
@@ -724,8 +870,11 @@ class AIOrchestrator:
                 messages=history,
                 model=resolved_model,
                 system=resolved_system,
+                system_context=resolved_system_context,
                 tools=tools,
             )
+
+            await _release_db(db)
 
             async for event in provider.stream_chat(request):
                 if event.type == "text_delta":
@@ -743,6 +892,8 @@ class AIOrchestrator:
             if round_usage is not None:
                 total_input_tokens += round_usage.input_tokens
                 total_output_tokens += round_usage.output_tokens
+                total_cache_creation += round_usage.cache_creation_input_tokens
+                total_cache_read += round_usage.cache_read_input_tokens
 
             final_content_parts = round_content_parts
 
@@ -802,6 +953,8 @@ class AIOrchestrator:
         usage = Usage(
             input_tokens=total_input_tokens,
             output_tokens=total_output_tokens,
+            cache_creation_input_tokens=total_cache_creation,
+            cache_read_input_tokens=total_cache_read,
         )
         cost = estimate_cost(resolved_model, usage)
 
@@ -816,7 +969,14 @@ class AIOrchestrator:
                 model=resolved_model,
                 prompt_tokens=usage.input_tokens,
                 completion_tokens=usage.output_tokens,
-                total_tokens=usage.input_tokens + usage.output_tokens,
+                total_tokens=(
+                    usage.input_tokens
+                    + usage.cache_creation_input_tokens
+                    + usage.cache_read_input_tokens
+                    + usage.output_tokens
+                ),
+                cache_creation_tokens=usage.cache_creation_input_tokens,
+                cache_read_tokens=usage.cache_read_input_tokens,
                 estimated_cost_usd=cost,
                 latency_ms=latency_ms,
             ),

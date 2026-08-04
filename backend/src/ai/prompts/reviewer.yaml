@@ -23,6 +23,8 @@ tool_names:
   - find_dependents
   - find_dependencies
   - find_unused_objects
+  - check_tm1_code
+  - get_coding_standards
 max_tool_rounds: 8
 safety_notes:
   - >-

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
+from src.api.dependencies.rate_limit import ai_rate_limited
 from src.database.models.tm1_connection import TM1Connection
 from src.database.session import get_db
 from src.schemas.auth import UserResponse
@@ -500,6 +501,7 @@ async def visualize(
     http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("tm1.read")),
+    _: UserResponse = Depends(ai_rate_limited),
 ):
     start = time.monotonic()
 

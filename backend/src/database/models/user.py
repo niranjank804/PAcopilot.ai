@@ -1,6 +1,7 @@
+from datetime import datetime
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -58,6 +59,17 @@ class User(BaseModel, OrganizationScoped):
     # is for an admin disabling an already-approved account. Existing rows
     # (created before self-registration existed) default to "approved" via
     # server_default so this migration doesn't lock anyone out.
+    # Every token issued before this instant is rejected, whatever
+    # its own expiry says. One write logs the user out everywhere —
+    # used by logout-all, password change and password reset, none
+    # of which can enumerate outstanding tokens the server never
+    # stored. Epoch default means 'nothing revoked'.
+    tokens_valid_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("'1970-01-01 00:00:00+00'"),
+    )
+
     registration_status: Mapped[str] = mapped_column(
         String(20),
         default="approved",

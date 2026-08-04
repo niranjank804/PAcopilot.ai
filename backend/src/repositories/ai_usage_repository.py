@@ -51,18 +51,37 @@ class AIUsageRepository:
                 func.count(AIUsage.id),
                 func.coalesce(func.sum(AIUsage.total_tokens), 0),
                 func.coalesce(func.sum(AIUsage.estimated_cost_usd), 0),
+                func.coalesce(func.sum(AIUsage.cache_read_tokens), 0),
+                func.coalesce(func.sum(AIUsage.cache_creation_tokens), 0),
+                func.coalesce(func.sum(AIUsage.prompt_tokens), 0),
             ).where(
                 AIUsage.organization_id == organization_id,
                 AIUsage.created_at >= since,
             )
         )
 
-        total_requests, total_tokens, total_cost_usd = result.one()
+        (
+            total_requests,
+            total_tokens,
+            total_cost_usd,
+            cache_read_tokens,
+            cache_creation_tokens,
+            prompt_tokens,
+        ) = result.one()
+
+        # Share of prompt tokens served from cache. Denominator is every
+        # token that went into a prompt — uncached, written, and read —
+        # so the figure reads as "how much of the prompt was free".
+        cacheable = prompt_tokens + cache_creation_tokens + cache_read_tokens
+        hit_rate = (cache_read_tokens / cacheable) if cacheable else 0.0
 
         return {
             "total_requests": total_requests,
             "total_tokens": total_tokens,
             "total_cost_usd": total_cost_usd,
+            "cache_read_tokens": cache_read_tokens,
+            "cache_creation_tokens": cache_creation_tokens,
+            "cache_hit_rate": round(hit_rate, 4),
         }
 
     async def summarize_by_model(

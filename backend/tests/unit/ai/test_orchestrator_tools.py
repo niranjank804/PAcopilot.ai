@@ -805,3 +805,50 @@ async def test_agent_safety_notes_appear_in_system_prompt(
     system = capturing_provider.last_request.system
     assert "Safety rules:" in system
     assert "This is a test persona; do not trust its output." in system
+
+
+# ---------------------------------------------------------------------------
+# Plain chat must be useful before any TM1 connection exists.
+# ---------------------------------------------------------------------------
+
+
+def test_plain_chat_tools_all_work_without_a_connection():
+    from src.ai.orchestrator import PLAIN_CHAT_TOOL_NAMES
+    from src.ai.tools.registry import get_tool
+
+    for name in PLAIN_CHAT_TOOL_NAMES:
+        tool = get_tool(name)
+
+        assert tool is not None, f"{name} is not registered"
+
+        properties = tool.to_definition().input_schema.get("properties") or {}
+
+        # A connection_id argument means the tool cannot answer until the
+        # user has finished setup — the thing this list exists to avoid.
+        assert "connection_id" not in properties, name
+
+
+def test_plain_chat_gets_the_connection_free_subset():
+    from src.ai.orchestrator import (
+        PLAIN_CHAT_TOOL_NAMES,
+        _resolve_allowed_tools,
+    )
+
+    assert _resolve_allowed_tools(None, False) == list(PLAIN_CHAT_TOOL_NAMES)
+
+
+def test_an_explicit_tool_request_without_an_agent_still_gets_everything():
+    from src.ai.orchestrator import _resolve_allowed_tools
+
+    assert _resolve_allowed_tools(None, True) is None
+
+
+def test_an_agent_still_gets_exactly_its_own_tools():
+    from src.ai.agents.registry import get_agent
+    from src.ai.orchestrator import _resolve_allowed_tools
+
+    persona = get_agent("ti")
+
+    assert _resolve_allowed_tools(persona, False) == persona.tool_names
+    # A persona's allowlist is not widened by the caller's flag.
+    assert _resolve_allowed_tools(persona, True) == persona.tool_names

@@ -1,0 +1,30 @@
+# Development and CI dependencies. Separate from requirements.txt so the
+# production image never ships test or lint tooling.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# Pinned to the versions the suite is actually verified green against, not
+# to guessed ones — CI that changes behaviour because an upstream release
+# landed is worse than no CI, since the failure looks like your commit.
+
+# Test runner
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+
+# HTTP client the integration tests drive the ASGI app with
+httpx2==2.7.0
+
+# Lint and static analysis
+ruff==0.16.1
+mypy==2.3.0
+
+# Dependency vulnerability scanning
+pip-audit==2.10.1
+
+# Deliberately NOT included:
+#   pytest-mock  - no test uses the `mocker` fixture; monkeypatch and
+#                  unittest.mock cover every case in this suite.
+#   faker / factory-boy - tests/fixtures/factories.py builds objects
+#                  directly; adding a factory library would be a second
+#                  way to do the same thing.

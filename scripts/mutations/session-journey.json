@@ -1,0 +1,24 @@
+{
+  "cwd": "frontend",
+  "command": ["npx", "vitest", "run", "src/__tests__/journeys"],
+  "mutations": [
+    {
+      "name": "rotated tokens are not persisted",
+      "file": "frontend/src/lib/auth-context.tsx",
+      "find": "window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));",
+      "replace": "void next;"
+    },
+    {
+      "name": "session not cleared when refresh is rejected",
+      "file": "frontend/src/lib/api-client.ts",
+      "find": "      setTokens(null);\n\n      if (typeof window !== \"undefined\") {\n        window.location.href = \"/login\";\n      }",
+      "replace": "      if (typeof window !== \"undefined\") {\n        window.location.href = \"/login\";\n      }"
+    },
+    {
+      "name": "401 no longer triggers a refresh",
+      "file": "frontend/src/lib/api-client.ts",
+      "find": "  if (response.status === 401 && !skipAuth) {",
+      "replace": "  if (false && response.status === 401 && !skipAuth) {"
+    }
+  ]
+}

@@ -96,18 +96,28 @@ async function refreshAccessToken(): Promise<boolean> {
   return refreshPromise;
 }
 
+/** Generous enough for an agent tool loop, finite so a stalled request
+ * surfaces as an error the UI can show instead of spinning forever. */
+const DEFAULT_TIMEOUT_MS = 120_000;
+
 interface RequestOptions {
   method?: string;
   body?: unknown;
   /** Skip attaching the access token — used for /auth/login itself. */
   skipAuth?: boolean;
+  timeoutMs?: number;
 }
 
 export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, skipAuth = false } = options;
+  const {
+    method = "GET",
+    body,
+    skipAuth = false,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  } = options;
 
   const doFetch = async (): Promise<Response> => {
     const headers: Record<string, string> = {
@@ -122,11 +132,31 @@ export async function apiRequest<T>(
       }
     }
 
-    return fetch(`${API_URL}${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    try {
+      return await fetch(`${API_URL}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      // Both a timeout and a dropped connection arrive here as a thrown
+      // DOMException; either way the caller needs an ApiError it can
+      // render, not an opaque rejection.
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new ApiError(
+          408,
+          "TIMEOUT",
+          `The server did not respond within ${Math.round(timeoutMs / 1000)}s.`,
+        );
+      }
+
+      throw new ApiError(
+        0,
+        "NETWORK_ERROR",
+        "Could not reach the server. Check your connection and try again.",
+      );
+    }
   };
 
   let response = await doFetch();
@@ -147,7 +177,24 @@ export async function apiRequest<T>(
     }
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  return unwrap<T>(response);
+}
+
+/** A non-JSON body means something between the browser and the API answered
+ * (proxy 502, gateway timeout page). Surfacing the status beats throwing a
+ * bare SyntaxError that reads as a frontend bug. */
+async function unwrap<T>(response: Response): Promise<T> {
+  let payload: ApiEnvelope<T>;
+
+  try {
+    payload = (await response.json()) as ApiEnvelope<T>;
+  } catch {
+    throw new ApiError(
+      response.status,
+      "INVALID_RESPONSE",
+      `The server returned an unreadable response (HTTP ${response.status}).`,
+    );
+  }
 
   if (!payload.success) {
     throw new ApiError(response.status, payload.error.code, payload.error.message);
@@ -197,13 +244,7 @@ export async function uploadRequest<T>(
     }
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
-
-  if (!payload.success) {
-    throw new ApiError(response.status, payload.error.code, payload.error.message);
-  }
-
-  return payload.data;
+  return unwrap<T>(response);
 }
 
 /** Same auth/refresh handling as apiRequest, but for POST endpoints that

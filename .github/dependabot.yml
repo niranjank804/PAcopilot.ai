@@ -1,0 +1,38 @@
+version: 2
+
+updates:
+  # Grouped so a week's updates arrive as a few reviewable PRs rather than
+  # thirty individual ones nobody reads. Security updates are ungrouped
+  # and unlimited — those should never queue behind a version bump.
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      production:
+        patterns: ['*']
+        exclude-patterns: ['pytest*', 'ruff', 'mypy', 'pip-audit', 'bandit']
+        update-types: [minor, patch]
+      development:
+        patterns: ['pytest*', 'ruff', 'mypy', 'pip-audit', 'bandit']
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+
+  # The workflows pin action versions; without this they silently rot.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

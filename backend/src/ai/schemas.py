@@ -42,7 +42,20 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
+
+    # The system prompt is split by *stability*, not by meaning. `system`
+    # holds what is identical across requests for a given agent (persona
+    # instructions, safety rules); `system_context` holds what varies per
+    # request (retrieved knowledge, live connection state).
+    #
+    # Callers declare stability; providers decide what to do with it. The
+    # Anthropic provider places a cache breakpoint between the two, which
+    # only works because the volatile half sits after the stable half —
+    # a prefix match is byte-exact, so one varying token early in the
+    # prompt makes everything after it uncacheable.
     system: str | None = None
+    system_context: str | None = None
+
     model: str
     max_tokens: int = 4096
     tools: list[ToolDefinition] | None = None
@@ -51,6 +64,12 @@ class ChatRequest(BaseModel):
 class Usage(BaseModel):
     input_tokens: int
     output_tokens: int
+
+    # Provider-neutral cache accounting. Zero on providers without a cache,
+    # so callers can always read them. Priced differently from
+    # input_tokens: reads are far cheaper, writes carry a premium.
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
 
 
 class ChatResponse(BaseModel):

@@ -18,12 +18,17 @@ from src.ai.tools.tm1.dimensions import (
     ListDimensionElementsTool,
     ListDimensionsTool,
 )
+from src.ai.tools.tm1.functions import (
+    CheckTM1CodeTool,
+    LookupTM1FunctionTool,
+)
 from src.ai.tools.tm1.metadata import (
     GetCubeDependenciesTool,
     GetDimensionDependentsTool,
     GetObjectRelationshipsTool,
 )
 from src.ai.tools.tm1.processes import GetProcessTool, ListProcessesTool
+from src.ai.tools.tm1.standards import GetCodingStandardsTool
 
 TOOLS: dict[str, Tool] = {
     tool.name: tool
@@ -49,6 +54,9 @@ TOOLS: dict[str, Tool] = {
         ProposeRuleUpdateTool(),
         ProposeProcessUpdateTool(),
         SearchKnowledgeBaseTool(),
+        LookupTM1FunctionTool(),
+        CheckTM1CodeTool(),
+        GetCodingStandardsTool(),
     )
 }
 

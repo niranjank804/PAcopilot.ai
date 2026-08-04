@@ -1,9 +1,26 @@
 import httpx2
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core import rate_limit
 from src.database.session import engine, get_db
 from src.main import app
+
+
+@pytest.fixture(autouse=True)
+def _clean_rate_limit_windows():
+    """Every test starts with an empty limiter.
+
+    The limiter stays *enabled* so tests exercise the real path, but every
+    request in the suite arrives from the same client address — without
+    this, the sixth registration in the whole run would 429 and failures
+    would depend on test ordering.
+    """
+
+    rate_limit.reset()
+    yield
+    rate_limit.reset()
 
 
 @pytest_asyncio.fixture

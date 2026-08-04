@@ -100,7 +100,13 @@ function ApproveRow({ user, roles }: { user: AppUser; roles: RoleInfo[] }) {
       <TableCell>
         <Select value={roleId} onValueChange={(v) => setRoleId(v ?? NO_ROLE)}>
           <SelectTrigger className="w-36" aria-label="Role to assign">
-            <SelectValue />
+            <SelectValue>
+              {(value: string) =>
+                value === NO_ROLE
+                  ? "No role yet"
+                  : (roles.find((r) => r.id === value)?.name ?? "No role yet")
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NO_ROLE}>No role yet</SelectItem>
