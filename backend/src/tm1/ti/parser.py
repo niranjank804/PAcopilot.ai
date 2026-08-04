@@ -15,17 +15,27 @@ from dataclasses import asdict, dataclass, field
 from src.tm1.functions import lookup as lookup_function
 from src.tm1.ti.format import ProFile, read_pro
 
-# TM1 datasource type codes as they appear in tag 562.
+# TM1 datasource type codes as they appear in tag 562, and as the DatasourceType
+# TI function accepts them. The full documented set is CharacterDelimited,
+# PositionDelimited, View, Subset, ODBC, OLEDBOLAP, SAPCharacteristicTexts and
+# NULL — an unmapped value used to fall through as a raw lower-cased string, so
+# a fixed-width loader was classified as nothing at all.
 DATASOURCE_TYPES = {
     "NULL": "none",
     "": "none",
     "ODBC": "odbc",
     "CHARACTERDELIMITED": "ascii_delimited",
+    # Fixed-width text. Settable from Architect and from the DatasourceType
+    # function, but not offered by the Planning Analytics Workspace modeler —
+    # see the note in the TI agent prompt about the SUBST approach.
+    "POSITIONDELIMITED": "ascii_fixed_width",
     "ASCII": "ascii",
     "VIEW": "cube_view",
     "SUBSET": "dimension_subset",
     "TM1CUBEVIEW": "cube_view",
     "TM1DIMENSIONSUBSET": "dimension_subset",
+    "OLEDBOLAP": "oledb_olap",
+    "SAPCHARACTERISTICTEXTS": "sap_characteristic_texts",
 }
 
 SECTIONS = ("prolog", "metadata", "data", "epilog")

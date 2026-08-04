@@ -535,3 +535,31 @@ class TestProcessDependencies:
 
         assert ref.literal is False
         assert record.processes_called == set()
+
+
+class TestFixedWidthDatasource:
+    """PositionDelimited — raised by a TM1 developer reviewing the product."""
+
+    def test_position_delimited_is_recognised(self):
+        record = parse('601,100\n602,"P"\n562,"POSITIONDELIMITED"\n572,1\nnX = 1;\n')
+
+        assert record.datasource_type == "ascii_fixed_width"
+
+    def test_a_fixed_width_loader_classifies_as_a_flat_file_loader(self):
+        text = (
+            '601,100\n602,"DATA - Load - Fixed"\n562,"POSITIONDELIMITED"\n'
+            "560,1\npMonth\n561,1\n2\n"
+            "574,2\nvAcct = SUBST( vRecord, 1, 10 );\n"
+            "CellPutN( 1, 'Finance', vAcct );\n"
+        )
+        record = parse(text)
+
+        assert "ascii_loader" in {m.key for m in classify(record)}
+
+    def test_the_other_documented_types_are_mapped(self):
+        for raw, expected in (
+            ("OLEDBOLAP", "oledb_olap"),
+            ("SAPCHARACTERISTICTEXTS", "sap_characteristic_texts"),
+        ):
+            record = parse(f'601,100\n562,"{raw}"\n')
+            assert record.datasource_type == expected, raw

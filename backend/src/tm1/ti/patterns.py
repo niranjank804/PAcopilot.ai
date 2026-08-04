@@ -138,12 +138,12 @@ PATTERNS: tuple[Pattern, ...] = (
         name="Flat File (ASCII) Loader",
         description="Loads data or metadata from a delimited text file.",
         signals=(
-            _datasource("ascii_delimited", "ascii"),
+            _datasource("ascii_delimited", "ascii", "ascii_fixed_width"),
             _writes_cube(),
             _has_parameters(),
             _name_contains("load", "import", "file", "csv"),
         ),
-        gate=_datasource("ascii_delimited", "ascii"),
+        gate=_datasource("ascii_delimited", "ascii", "ascii_fixed_width"),
     ),
     Pattern(
         key="cube_copy",
