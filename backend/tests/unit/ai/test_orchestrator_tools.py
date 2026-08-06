@@ -89,6 +89,16 @@ class AlwaysToolUseProvider(AIProvider):
     async def chat(self, request: ChatRequest) -> ChatResponse:
         self.call_count += 1
 
+        # No tools offered means none can be requested. The orchestrator uses
+        # this to force a real answer once the round budget is spent.
+        if not request.tools:
+            return ChatResponse(
+                content="answer from what I gathered",
+                model=request.model,
+                stop_reason="end_turn",
+                usage=Usage(input_tokens=1, output_tokens=1),
+            )
+
         return ChatResponse(
             content="",
             model=request.model,
@@ -321,9 +331,14 @@ async def test_tool_loop_stops_at_round_cap_without_hanging(
         enable_tools=True,
     )
 
-    assert provider.call_count == MAX_TOOL_ROUNDS
+    # One call per round, plus a final tool-less call that forces an answer.
+    assert provider.call_count == MAX_TOOL_ROUNDS + 1
     assert len(fake_tool.calls) == MAX_TOOL_ROUNDS
-    assert result.content == ""
+
+    # The user must get an answer, not the half-sentence the model happened to
+    # be part-way through when the budget ran out. This previously asserted
+    # `== ""`, which encoded the empty response as correct.
+    assert result.content == "answer from what I gathered"
 
 
 @pytest.mark.asyncio
@@ -438,6 +453,15 @@ class StreamAlwaysToolUseProvider(AIProvider):
 
     async def stream_chat(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
         self.call_count += 1
+
+        if not request.tools:
+            yield StreamEvent(type="text_delta", text="answer from what I gathered")
+            yield StreamEvent(
+                type="message_stop",
+                usage=Usage(input_tokens=1, output_tokens=1),
+                stop_reason="end_turn",
+            )
+            return
 
         yield StreamEvent(
             type="message_stop",
@@ -623,8 +647,13 @@ async def test_stream_tool_loop_stops_at_round_cap_without_hanging(
         )
     ]
 
-    assert provider.call_count == MAX_TOOL_ROUNDS
+    assert provider.call_count == MAX_TOOL_ROUNDS + 1
     assert len(fake_tool.calls) == MAX_TOOL_ROUNDS
+
+    # The forced answer reaches the user's screen and is persisted, rather
+    # than the stream simply stopping mid-thought.
+    streamed = "".join(e.text or "" for e in events if e.type == "text_delta")
+    assert "answer from what I gathered" in streamed
 
     done_event = [e for e in events if e.type == "done"][0]
     assert done_event.conversation_id is not None
@@ -746,8 +775,9 @@ async def test_persona_max_tool_rounds_overrides_the_default(
         agent="fake_agent_low_rounds",
     )
 
-    assert always_tool_use_provider.call_count == 2
-    assert always_tool_use_provider.call_count != MAX_TOOL_ROUNDS
+    # The persona allows 2 rounds; the third call is the tool-less final answer.
+    assert always_tool_use_provider.call_count == 3
+    assert always_tool_use_provider.call_count != MAX_TOOL_ROUNDS + 1
 
 
 @pytest.mark.asyncio
@@ -765,7 +795,7 @@ async def test_persona_max_tool_rounds_is_clamped_to_ceiling(
         agent="fake_agent_excessive_rounds",
     )
 
-    assert always_tool_use_provider.call_count == MAX_TOOL_ROUNDS_CEILING
+    assert always_tool_use_provider.call_count == MAX_TOOL_ROUNDS_CEILING + 1
 
 
 @pytest.mark.asyncio
@@ -784,7 +814,8 @@ async def test_stream_persona_max_tool_rounds_overrides_the_default(
     ):
         pass
 
-    assert stream_always_tool_use_provider.call_count == 2
+    # 2 rounds from the persona, plus the tool-less call that forces an answer.
+    assert stream_always_tool_use_provider.call_count == 3
 
 
 @pytest.mark.asyncio

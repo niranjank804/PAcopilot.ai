@@ -90,6 +90,18 @@ MAX_TOOL_ROUNDS = 5
 # request. Mirrors MAX_TRAVERSAL_NODES in the dependency analyzer.
 MAX_TOOL_ROUNDS_CEILING = 15
 
+# Sent as a final user turn when the tool budget runs out, so the model
+# answers from what it already gathered instead of leaving the user with a
+# dangling sentence. It must not be able to imply the checking was complete.
+_TOOL_BUDGET_EXHAUSTED = (
+    "You have used all the tool calls available for this turn. Do not "
+    "request any more. Give your complete answer now, using only what you "
+    "have already gathered. If you were part-way through verifying "
+    "something, say plainly which parts you confirmed and which you did "
+    "not, so the reader knows what still needs checking. Never present "
+    "unverified work as verified."
+)
+
 # Tools that need no TM1 connection. A brand-new organization has no
 # connection configured and no documents uploaded, and previously got a
 # plain chat with no tools at all — so the product was unusable until
@@ -549,6 +561,34 @@ class AIOrchestrator:
                     tool_results=tool_results,
                 )
             )
+        else:
+            # The budget ran out while the model still wanted tools. Without
+            # this branch the loop simply ended and whatever half-sentence the
+            # model last emitted became the answer — a TI request that spent
+            # every round verifying functions returned "Now let me validate the
+            # code I intend to give you." and nothing else.
+            #
+            # One more call with no tools forces a real answer out of what was
+            # already gathered, and the nudge makes the model say that its
+            # checking was cut short rather than implying it finished.
+            history.append(
+                ChatMessage(role="user", content=_TOOL_BUDGET_EXHAUSTED)
+            )
+
+            request = ChatRequest(
+                messages=history,
+                model=model,
+                system=system,
+                system_context=system_context,
+                tools=[],
+            )
+            await _release_db(db)
+            response = await provider.chat(request)
+
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
+            total_cache_creation += response.usage.cache_creation_input_tokens
+            total_cache_read += response.usage.cache_read_input_tokens
 
         return response, Usage(
             input_tokens=total_input_tokens,
@@ -938,6 +978,44 @@ class AIOrchestrator:
                     tool_results=tool_results,
                 )
             )
+        else:
+            # Budget exhausted with the model still asking for tools. See the
+            # note on the same branch in _run_tool_loop: without this the user
+            # is left with the last partial sentence and no answer.
+            history.append(
+                ChatMessage(role="user", content=_TOOL_BUDGET_EXHAUSTED)
+            )
+
+            request = ChatRequest(
+                messages=history,
+                model=resolved_model,
+                system=resolved_system,
+                system_context=resolved_system_context,
+                tools=[],
+            )
+
+            await _release_db(db)
+
+            final_parts: list[str] = []
+
+            async for event in provider.stream_chat(request):
+                if event.type == "text_delta":
+                    final_parts.append(event.text or "")
+
+                    yield OrchestratedStreamEvent(
+                        type="text_delta",
+                        text=event.text,
+                    )
+                elif event.type == "message_stop" and event.usage is not None:
+                    total_input_tokens += event.usage.input_tokens
+                    total_output_tokens += event.usage.output_tokens
+                    total_cache_creation += event.usage.cache_creation_input_tokens
+                    total_cache_read += event.usage.cache_read_input_tokens
+
+            # Appended, not replaced: the narration already streamed to the
+            # user's screen, and dropping it here would make the persisted
+            # conversation disagree with what they watched arrive.
+            final_content_parts = final_content_parts + final_parts
 
         latency_ms = int((time.monotonic() - start) * 1000)
 
