@@ -39,7 +39,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiRequest } from "@/lib/api-client";
-import { CHANGE_TYPE_LABEL, PROCESS_FIELD_MAP, STATUS_VARIANT } from "@/lib/change-format";
+import { CHANGE_TYPE_LABEL, PROCESS_FIELD_MAP, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
 import type {
   RelatedObject,
@@ -347,7 +347,7 @@ export default function DeploymentsPage() {
                           {new Date(change.created_at).toLocaleString()}
                         </span>
                         <Badge variant={STATUS_VARIANT[change.status]}>
-                          {change.status.replace("_", " ")}
+                          {statusLabel(change.status)}
                         </Badge>
                       </span>
                     </button>
@@ -383,7 +383,7 @@ export default function DeploymentsPage() {
               <>
                 <div className="flex items-center gap-2">
                   <Badge variant={STATUS_VARIANT[selectedDetail.change.status]}>
-                    {selectedDetail.change.status.replace("_", " ")}
+                    {statusLabel(selectedDetail.change.status)}
                   </Badge>
                   <span className="text-sm font-medium">
                     {selectedDetail.change.target_name}

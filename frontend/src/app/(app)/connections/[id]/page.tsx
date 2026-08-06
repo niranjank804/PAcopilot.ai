@@ -32,7 +32,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { ApiError, apiRequest } from "@/lib/api-client";
-import { CHANGE_TYPE_LABEL, STATUS_VARIANT } from "@/lib/change-format";
+import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import type { TM1ChangeSummary, TM1Connection } from "@/lib/types";
 
 function errorMessage(error: unknown): string {
@@ -374,7 +374,7 @@ export default function ConnectionDetailPage() {
                     </span>
                   </span>
                   <Badge variant={STATUS_VARIANT[change.status]}>
-                    {change.status.replace("_", " ")}
+                    {statusLabel(change.status)}
                   </Badge>
                 </li>
               ))}

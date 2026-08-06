@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/tabs";
 import { ObjectGraph } from "@/components/object-graph";
 import { ApiError, apiRequest } from "@/lib/api-client";
-import { CHANGE_TYPE_LABEL, STATUS_VARIANT } from "@/lib/change-format";
+import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
 import type {
   ChoreDetail,
@@ -832,7 +832,7 @@ export default function MetadataPage() {
                                 {new Date(change.created_at).toLocaleString()}
                               </span>
                               <Badge variant={STATUS_VARIANT[change.status]}>
-                                {change.status.replace("_", " ")}
+                                {statusLabel(change.status)}
                               </Badge>
                             </button>
                           </li>

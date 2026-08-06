@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Rocket, RotateCcw, X } from "lucide-react";
+import { Rocket, RotateCcw, ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api-client";
-import { CHANGE_TYPE_LABEL, STATUS_VARIANT } from "@/lib/change-format";
+import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import type { TM1ChangeDetail, TM1ChangeSummary } from "@/lib/types";
 
 function errorMessage(error: unknown): string {
@@ -111,12 +111,30 @@ export function ChangeActionCard({
       {showSummary ? (
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={STATUS_VARIANT[change.status]}>
-            {change.status.replace("_", " ")}
+            {statusLabel(change.status)}
           </Badge>
           <span className="text-sm font-medium">{change.target_name}</span>
           <span className="text-xs text-muted-foreground">
             {CHANGE_TYPE_LABEL[change.change_type]}
           </span>
+        </div>
+      ) : null}
+
+      {/* The one screen where the product's central guarantee is either
+          visible or invisible. A reviewer looking at generated TM1 needs to
+          know, without asking, that the server has not been touched yet. */}
+      {change.status === "draft" ? (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold tracking-wide text-primary">
+              STET MODE
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Nothing has been written to your TM1 server. This draft stands
+            until someone with deploy rights executes it.
+          </p>
         </div>
       ) : null}
 
