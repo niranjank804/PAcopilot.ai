@@ -20,7 +20,10 @@ dependencies = [
 # installs (and the test suite runs) on Linux CI, where the COM layer is
 # exercised through fakes.
 windows = ["pywin32>=306"]
-dev = ["pytest>=8.0", "pytest-cov>=4.1", "responses>=0.25"]
+# TM1py and openpyxl are used only by the live PAfE acceptance test:
+# TM1py seeds the value into TM1, openpyxl reads it back out of the
+# produced artifact. Neither is needed to run the worker.
+dev = ["pytest>=8.0", "pytest-cov>=4.1", "responses>=0.25", "TM1py>=2.0", "openpyxl>=3.1"]
 
 [project.scripts]
 pa-worker = "pa_worker.cli:main"
@@ -35,6 +38,10 @@ markers = [
     # automatically where Excel is absent, so `pytest` is safe to run
     # anywhere; `pytest -m "not excel"` skips them explicitly.
     "excel: requires a real Microsoft Excel installation (Windows only)",
+    # The Phase 1.5 acceptance test. Needs PAfE installed AND a live
+    # TM1 server AND an operator-supplied PAfE workbook, so it skips
+    # with a precise reason rather than failing when any is absent.
+    "pafe_live: requires real PAfE + a live TM1 server (see test_pafe_live.py)",
 ]
 
 [tool.ruff]

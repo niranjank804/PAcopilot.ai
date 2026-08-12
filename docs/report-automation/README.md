@@ -290,10 +290,48 @@ sides log it, so one report run is followable end to end.
 | Worker enrollment against a live server | **VERIFIED** |
 | Capability gating refuses jobs a host cannot run | **VERIFIED** (live) |
 | PAfE detection reports absence correctly | **VERIFIED** (this host has no PAfE) |
-| `RefreshAllData()` / `Wait()` / `TraceLog()` against real PAfE | **NOT VERIFIED** |
-| Refresh against a real TM1 server | **NOT VERIFIED** |
-| `Logon` / `LogonSSO` against a real PA server | **NOT VERIFIED** |
-| End-to-end SUCCEEDED with a real PAfE refresh | **NOT VERIFIED** |
+| TM1 connectivity + data-change verification mechanism | **VERIFIED** (Phase 1.5 — local TM1 Planning Sample) |
+| PAfE presence, via 4 independent probes | **VERIFIED ABSENT** on the only available host |
+| `RefreshAllData()` / `Wait()` / `TraceLog()` against real PAfE | **NOT VERIFIED — BLOCKED** |
+| Refresh against a real TM1 server *through PAfE* | **NOT VERIFIED — BLOCKED** |
+| `Logon` / `LogonSSO` against a real PA server | **NOT VERIFIED — BLOCKED** |
+| End-to-end SUCCEEDED with a real PAfE refresh | **NOT VERIFIED — BLOCKED** |
+
+### Phase 1.5 status: PAfE POC BLOCKED
+
+The blocker is a single missing component: the **PAfE Excel client**.
+Everything either side of it is proven.
+
+| Component | State |
+|---|---|
+| Microsoft Excel 16.0 | present, COM automation verified |
+| IBM TM1 Server 12.5.5, Planning Sample | running, reachable, read/write verified |
+| PAfE Excel add-in (`CognosOffice12.Connect`) | **absent** — no COM ProgID, no Excel add-in registration, no `IBM for Microsoft Office` directory |
+
+Run `pa-worker diagnostics-pafe` on any candidate host for a definitive
+verdict.
+
+### Completing the PAfE validation
+
+The acceptance test is written and will run unchanged once PAfE is
+installed — see `worker/tests/test_pafe_live.py`.
+
+1. Install the PAfE client on a Windows host with Excel.
+2. Confirm: `pa-worker diagnostics-pafe` must print
+   `VERDICT: INSTALLED_AND_AUTOMATION_AVAILABLE` and exit 0.
+3. Author a PAfE workbook in Excel with a cell bound (normally a `DBRW`
+   formula) to cube `PA_COPILOT_TEST`, elements `TestEntity` / `Value`.
+   This cannot be generated without PAfE, which is why it is supplied by
+   path.
+4. Set `PA_COPILOT_TM1_*`, `PA_COPILOT_PAFE_TEST_WORKBOOK` and
+   `PA_COPILOT_PAFE_TEST_CELL`, then:
+   `pytest worker/tests/test_pafe_live.py -m pafe_live -v`
+
+The test writes a **fresh random value** to TM1 immediately before each
+run and asserts that exact number appears in the produced artifact. A
+fixed sentinel would pass against a workbook that merely had the value
+saved in it from last time — the random value is what makes a silently
+failed refresh impossible to mistake for a success.
 
 > PA-Copilot uses IBM's supported Planning Analytics for Microsoft Excel
 > automation capabilities. Customer environments may have additional

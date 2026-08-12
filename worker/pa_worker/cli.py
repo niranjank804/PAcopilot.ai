@@ -157,6 +157,84 @@ def cmd_diagnostics(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_diagnostics_pafe(args: argparse.Namespace) -> int:
+    """Deep PAfE probe with an explicit four-state verdict.
+
+    Separate from `diagnostics` because it answers a different question:
+    not "can this host run jobs" but "exactly where does the PAfE chain
+    break". Exit code is non-zero unless automation is actually
+    available, so it can gate a deployment script.
+    """
+
+    from pa_worker.pafe.probe import PAfEStatus, probe_pafe
+
+    result = probe_pafe()
+
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+
+        return 0 if result.status == PAfEStatus.INSTALLED_AND_AUTOMATION_AVAILABLE else 1
+
+    def flag(value: bool | None) -> str:
+        if value is None:
+            return "UNKNOWN"
+
+        return "YES" if value else "NO"
+
+    print("PA-Copilot worker — PAfE diagnostics")
+    print()
+    print(f"  Windows version                      {result.windows_version}")
+    print(f"  Python version                       {result.python_version}")
+    print(f"  Excel version                        {result.excel_version or 'not detected'}")
+    print()
+    print(f"  PAfE detected                        {flag(result.registry_progid_found)}")
+    print(f"  PAfE version                         {result.pafe_version or 'not discoverable'}")
+    print(f"  Install directory                    {result.install_directory or 'not found'}")
+    print()
+    print("  COM chain (IBM's documented access path):")
+    print(f"    CognosOffice12.Connect add-in      {flag(result.com_addin_registered)}")
+    print(f"    Add-in connected                   {flag(result.com_addin_connected)}")
+    print(f"    AutomationServer                   {flag(result.automation_server_available)}")
+    print(f"    Application(\"COR\", \"1.1\")          {flag(result.application_object_available)}")
+    print(f"    TraceLog accessible                {flag(result.trace_log_accessible)}")
+    print()
+    print(f"  VERDICT: {result.status.value}")
+
+    if result.notes:
+        print()
+        print("  Notes:")
+
+        for note in result.notes:
+            print(f"    - {note}")
+
+    print()
+
+    if result.status == PAfEStatus.INSTALLED_AND_AUTOMATION_AVAILABLE:
+        print("  This host can run PAfE report jobs.")
+
+        return 0
+
+    if result.status == PAfEStatus.NOT_INSTALLED:
+        print(
+            "  Planning Analytics for Microsoft Excel is not installed.\n"
+            "  Install the PAfE client on this host, then re-run this command."
+        )
+    elif result.status == PAfEStatus.INSTALLED_BUT_UNAVAILABLE:
+        print(
+            "  PAfE is present but its automation object could not be\n"
+            "  reached. Check that the add-in is enabled in Excel\n"
+            "  (File > Options > Add-ins > COM Add-ins) and that Excel and\n"
+            "  PAfE have the same bitness."
+        )
+    else:
+        print(
+            "  PAfE status could not be determined. Excel may have failed to\n"
+            "  start, or this host is not Windows."
+        )
+
+    return 1
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     directory = _config_dir(args)
     config, credentials = _load(args)
@@ -452,6 +530,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="Machine-readable output."
     )
     diagnostics.set_defaults(func=cmd_diagnostics)
+
+    diagnostics_pafe = subparsers.add_parser(
+        "diagnostics-pafe",
+        help="Deep PAfE probe: exactly where the COM chain breaks.",
+    )
+    diagnostics_pafe.add_argument(
+        "--json", action="store_true", help="Machine-readable output."
+    )
+    diagnostics_pafe.set_defaults(func=cmd_diagnostics_pafe)
 
     test_report = subparsers.add_parser(
         "test-report", help="POC: claim and run exactly one job."

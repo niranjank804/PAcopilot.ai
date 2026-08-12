@@ -1,80 +1,136 @@
-"""What PA-Copilot itself is, so the assistant can describe its own product.
+"""Product self-knowledge, generated from the capability registry.
 
 Without this the assistant has no grounding for questions about the
 application it is embedded in. Asked "what are Reports and Report
-Workers?" — both visible in the navigation — it either guesses or
-searches the knowledge base, finds nothing (these are product features,
-not customer documents), and gives up. Both outcomes read as broken.
+Workers?" — both visible in the navigation — it searched the knowledge
+base, found nothing (these are product features, not customer documents)
+and gave up.
 
-Three constraints shape this block:
+The capability section is **generated from `capabilities.py`** rather
+than hand-maintained. A hand-written list drifts: a feature ships, or is
+disabled, or turns out not to work, and the prose keeps confidently
+describing the old world. Generating it means the prompt cannot disagree
+with the registry, and the registry is the thing a human updates
+deliberately.
 
-* **It goes in the stable half of the system prompt.** It never varies
-  per request, so putting it anywhere else would break the byte-exact
-  cache prefix `_build_tool_system_prompt` is built around.
+Three constraints hold:
 
-* **It describes, it does not enable.** Nothing here grants a capability.
-  The assistant can explain what report automation is and where to click;
-  it has no tool to create a report, start one, or register a worker.
-  That boundary is the point — AI proposes, humans decide — and it is
-  enforced by the absence of tools, not by this text.
+* **Stable.** Prompt caching is a byte-exact prefix match, so this block
+  must contain nothing organization-, user- or question-specific. It is
+  built once at import.
 
-* **It has to stay honest as the product changes.** Claiming a feature
-  that does not exist is worse than saying nothing, because a confident
-  wrong answer about your own product is indistinguishable from a bug.
-  Phase status is stated explicitly so the model does not fill the gap.
+* **Descriptive, not enabling.** Nothing here grants a capability. The
+  assistant can explain a feature and point at a screen; it has no tool
+  to create a report, start one, or register a worker. The boundary is
+  enforced by the absence of tools — this text just stops it offering.
+
+* **PLANNED is never described as usable.** A model asked "can you
+  schedule this weekly?" will otherwise fill the gap with what reporting
+  products normally do. Naming the unbuilt features explicitly, under a
+  heading that says they do not work, is what prevents that.
 """
 
-# Deliberately compact. This is prepended to every request on every
-# agent, and although it is cached, tokens spent here are tokens not
-# available for the user's actual problem.
-PRODUCT_OVERVIEW = """\
-About PA-Copilot (the application you are part of):
+from src.ai.capabilities import CAPABILITIES, CapabilityStatus
 
-PA-Copilot is an AI platform for IBM Planning Analytics / TM1. Its main \
-areas, as they appear in the left-hand navigation, are:
+_NAVIGATION = """\
+PA-Copilot is an AI platform for IBM Planning Analytics / TM1. The left-\
+hand navigation contains: Dashboard, TM1 Connections, AI Chat, Knowledge \
+Base, Coding Standards, Metadata Explorer, Visualize, Deployments, \
+Reports, Report Workers, Executions, Monitoring, Users, Settings."""
 
-- TM1 Connections — register and test connections to TM1 servers.
-- AI Chat — this assistant, with specialist agents for analysis, \
-development, TI, troubleshooting, review, architecture and documentation.
-- Knowledge Base — upload organizational documents that ground answers.
-- Coding Standards — the organization's TM1 conventions, applied when \
-generating or reviewing code.
-- Metadata Explorer — the dependency graph of cubes, dimensions, \
-processes and rules.
-- Visualize — natural-language questions turned into charts from live \
-cube data.
-- Deployments — proposed TM1 changes (rules, TI processes) held as STET \
-drafts until a human with deploy rights executes them.
-- Reports / Report Workers / Executions — report automation, described \
-below.
-- Monitoring, Users, Settings — usage dashboards, access control, \
-configuration.
+_BOUNDARY = """\
+What you can and cannot do:
 
-Report automation (DEVELOPER PREVIEW):
+You can explain any of the above and point users to the right screen. You \
+cannot create reports, start executions, register workers, deploy TM1 \
+changes, or send anything — you have no tool for those. They are \
+deliberate human actions, gated by permissions. If asked to perform one, \
+say so plainly and describe where the user can do it themselves.
 
-Runs existing Planning Analytics for Microsoft Excel (PAfE) workbooks on \
-a schedule-free, on-demand basis today, and delivers the output as \
-downloadable artifacts.
+Never describe anything under NOT CURRENTLY AVAILABLE as though it works, \
+and never imply that one capability being available means a related one \
+is. A worker being online does not mean reports can be emailed; a Reports \
+screen existing does not mean schedules can be created."""
 
-- A "report" pairs an uploaded PAfE workbook with the output formats \
-wanted (XLSX, PDF).
-- A "report worker" is a customer-operated Windows machine running \
-Microsoft Excel and PAfE. It is registered in PA-Copilot, enrolled with \
-a single-use token, and connects outbound only — PA-Copilot never dials \
-into the customer network. Excel never runs in PA-Copilot's cloud.
-- An "execution" is one attempt at running one report. A worker claims \
-it, refreshes the workbook through IBM's PAfE automation API, exports \
-the output, and uploads it. Executions show status, duration, the worker \
-that ran them, retries, and any error.
-- Running a report requires the reports.execute permission; registering \
-or disabling workers requires workers.manage.
 
-What report automation does NOT do yet (do not imply otherwise): there \
-is no recurring scheduler, no email delivery, no AI-generated report \
-drafts or schedules, and no native TM1 report engine. Reports only run \
-when a permitted person presses "Run now".
+def _render_group(
+    heading: str,
+    statuses: tuple[CapabilityStatus, ...],
+    *,
+    preview: bool = False,
+    unavailable: bool = False,
+) -> str | None:
+    items = [c for c in CAPABILITIES if c.status in statuses]
 
-You can explain these features and point users to the right screen. You \
-cannot create reports, start executions, or register workers yourself — \
-those are deliberate human actions, and you have no tool for them. If a \
-user asks you to perform one, say so and describe where they can do it."""
+    if not items:
+        return None
+
+    lines = [heading]
+
+    for capability in items:
+        line = f"- {capability.name}: {capability.summary}"
+
+        if preview:
+            # Required by the consistency tests: a preview capability is
+            # never described without the words that mark it as one.
+            line += (
+                " (DEVELOPER PREVIEW — not validated end-to-end; do not "
+                "rely on it for production reporting.)"
+            )
+
+        if capability.permission and not unavailable:
+            line += f" Requires the {capability.permission} permission."
+
+        if capability.caveat:
+            line += f" {capability.caveat}"
+
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
+def _build_overview() -> str:
+    sections: list[str] = [
+        "About PA-Copilot (the application you are part of):",
+        _NAVIGATION,
+        "",
+        "PA-COPILOT PRODUCT CAPABILITIES",
+    ]
+
+    available = _render_group(
+        "AVAILABLE (these work today):",
+        (CapabilityStatus.AVAILABLE,),
+    )
+
+    preview = _render_group(
+        "DEVELOPER PREVIEW (implemented, not yet validated end-to-end):",
+        (CapabilityStatus.DEVELOPER_PREVIEW,),
+        preview=True,
+    )
+
+    # PLANNED, DISABLED and DEPRECATED collapse into one heading on
+    # purpose: from the user's point of view the answer to "can I do
+    # this?" is the same "no", and three near-identical headings invite
+    # the model to treat one of them as a soft yes.
+    unavailable = _render_group(
+        "NOT CURRENTLY AVAILABLE (these do NOT work — say so plainly):",
+        (
+            CapabilityStatus.PLANNED,
+            CapabilityStatus.DISABLED,
+            CapabilityStatus.DEPRECATED,
+        ),
+        unavailable=True,
+    )
+
+    for section in (available, preview, unavailable):
+        if section:
+            sections.extend(["", section])
+
+    sections.extend(["", _BOUNDARY])
+
+    return "\n".join(sections)
+
+
+#: Built once at import — stable for the life of the process, which is
+#: what keeps the cached prompt prefix byte-identical.
+PRODUCT_OVERVIEW = _build_overview()
