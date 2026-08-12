@@ -29,6 +29,19 @@ PERMISSIONS = [
     ("tm1.security.read", "View TM1 security groups and their members."),
     ("tm1.deploy", "Execute and roll back TM1 changes (rules, TI processes)."),
     ("monitoring.view", "View AI usage, tool, and TM1 status dashboards."),
+    # Report automation (DEVELOPER PREVIEW). Split so that running a
+    # report — which starts Excel on a customer machine and reads live
+    # TM1 data — is a distinct grant from merely viewing report history.
+    ("reports.read", "View reports, execution history, and artifacts."),
+    ("reports.create", "Create reports and upload PAfE workbooks."),
+    ("reports.update", "Update, pause, resume, and archive reports."),
+    ("reports.execute", "Run a report now and cancel a running execution."),
+    ("reports.manage", "Delete workbooks and administer report automation."),
+    ("workers.read", "View report automation workers and their health."),
+    (
+        "workers.manage",
+        "Register, enroll, disable, and rotate credentials for workers.",
+    ),
 ]
 
 READ_ONLY = [
@@ -50,6 +63,16 @@ GENERAL_ROLE_PERMISSIONS = READ_ONLY + ["ai.chat", "knowledge.read", "monitoring
 # hold live credentials to external enterprise systems, so only roles
 # that plausibly do planning/analysis work get it - Viewer does not.
 PLANNING_ROLE_PERMISSIONS = GENERAL_ROLE_PERMISSIONS + ["tm1.read"]
+
+# Report automation follows the same shape as TM1: reading is broad,
+# acting is narrow. Planner/Analyst can see reports and their history
+# (reports.read) but cannot start one — reports.execute launches Excel on
+# a customer's machine and reads live TM1 data, so it stays with the
+# admin roles via the full PERMISSIONS list, alongside reports.create,
+# reports.update, reports.manage and both workers.* codes. Viewer gets
+# nothing here: report artifacts can contain financial detail that the
+# least-privileged role has no reason to reach.
+PLANNING_ROLE_PERMISSIONS = PLANNING_ROLE_PERMISSIONS + ["reports.read"]
 
 # tm1.deploy (executing writes against live TM1 servers) follows the same
 # admin-only pattern as tm1.security.read: Super Admin/Organization Admin

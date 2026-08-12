@@ -232,6 +232,62 @@ class Settings(BaseSettings):
     TM1_CIRCUIT_BREAKER_COOLDOWN_SECONDS: float = 30.0
 
     # ------------------------------------------------------------------
+    # Report automation (DEVELOPER PREVIEW)
+    # ------------------------------------------------------------------
+    # How long a worker may hold one report execution before the control
+    # plane considers it lost. A PAfE refresh of a large workbook against
+    # a busy TM1 server is routinely minutes, not seconds — the existing
+    # TM1_REQUEST_TIMEOUT_SECONDS (30s) is the wrong order of magnitude
+    # for this and is deliberately not reused. 20 minutes is generous
+    # enough for real reports and short enough that a wedged Excel is
+    # noticed the same morning. Never unbounded.
+    REPORT_EXECUTION_TIMEOUT_SECONDS: int = 1200
+
+    # Ceiling on what a report may request per execution, so a
+    # misconfigured report cannot pin a worker for hours.
+    REPORT_EXECUTION_MAX_TIMEOUT_SECONDS: int = 7200
+
+    # A claimed execution's lease. The worker extends it by heartbeating;
+    # once it lapses the reaper may time the execution out. Must stay
+    # comfortably above REPORT_WORKER_HEARTBEAT_SECONDS or a healthy
+    # worker loses its own job to a slow network.
+    REPORT_EXECUTION_LEASE_SECONDS: int = 120
+
+    # How often a worker is expected to check in, both while idle (so the
+    # console can show ONLINE) and while running (to extend its lease).
+    REPORT_WORKER_HEARTBEAT_SECONDS: int = 30
+
+    # A worker that has not been heard from for this long is reported
+    # OFFLINE. Three missed heartbeats — one missed beat is a network
+    # hiccup, not an outage.
+    REPORT_WORKER_OFFLINE_AFTER_SECONDS: int = 90
+
+    # Worker credentials. The enrollment token is single-use and only
+    # exchangeable for a credential; a short window limits how long a
+    # value pasted into a chat or ticket stays live.
+    REPORT_WORKER_ENROLLMENT_TTL_MINUTES: int = 60
+
+    # Access tokens issued to workers. Deliberately short: a worker
+    # renews continuously, so a stolen token is useful for minutes rather
+    # than for the life of the deployment (which is what a static API key
+    # would give an attacker).
+    REPORT_WORKER_TOKEN_EXPIRE_MINUTES: int = 15
+
+    REPORT_MAX_WORKBOOK_BYTES: int = 25 * 1024 * 1024
+    REPORT_MAX_ARTIFACT_BYTES: int = 50 * 1024 * 1024
+
+    # Attempts include the first one, so 3 means "the original plus two
+    # retries". Backoff is exponential from this base.
+    REPORT_MAX_ATTEMPTS: int = 3
+    REPORT_RETRY_BACKOFF_SECONDS: int = 60
+    REPORT_RETRY_BACKOFF_MAX_SECONDS: int = 1800
+
+    # IBM's TraceLog can be large. Stored truncated — it is diagnostic
+    # context, not an archive, and an unbounded text column on a
+    # per-execution row is a slow-motion storage problem.
+    REPORT_TRACE_LOG_MAX_CHARS: int = 20000
+
+    # ------------------------------------------------------------------
     # Tenancy
     # ------------------------------------------------------------------
     # Session-level org-scoping backstop (src/database/tenancy.py) behind

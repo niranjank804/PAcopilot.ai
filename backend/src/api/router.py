@@ -9,10 +9,12 @@ from src.api.v1.knowledge import router as knowledge_router
 from src.api.v1.learning import router as learning_router
 from src.api.v1.monitoring import router as monitoring_router
 from src.api.v1.permissions import router as permissions_router
+from src.api.v1.reports import router as reports_router
 from src.api.v1.roles import router as roles_router
 from src.api.v1.system import router as system_router
 from src.api.v1.tm1 import router as tm1_router
 from src.api.v1.users import router as users_router
+from src.api.v1.worker import router as worker_router
 
 api_router = APIRouter()
 
@@ -29,3 +31,7 @@ api_router.include_router(tm1_router)
 api_router.include_router(learning_router)
 api_router.include_router(monitoring_router)
 api_router.include_router(billing_router)
+api_router.include_router(reports_router)
+# Worker plane: authenticated as a machine, not a user. Separate router
+# so the two auth families never share a dependency by accident.
+api_router.include_router(worker_router)

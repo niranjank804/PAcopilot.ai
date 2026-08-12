@@ -8,6 +8,12 @@ from .knowledge_document import KnowledgeDocument
 from .organization import Organization
 from .password_reset_token import PasswordResetToken
 from .permission import Permission
+from .report_artifact import ReportArtifact
+from .report_blob import ReportBlob
+from .report_definition import ReportDefinition
+from .report_execution import ReportExecution
+from .report_workbook import ReportWorkbook
+from .report_worker import ReportWorker
 from .role import Role
 from .role_permission import RolePermission
 from .tm1_change import TM1Change
@@ -43,4 +49,10 @@ __all__ = [
     "TM1Connection",
     "TM1Object",
     "TM1Relationship",
+    "ReportWorker",
+    "ReportWorkbook",
+    "ReportDefinition",
+    "ReportExecution",
+    "ReportArtifact",
+    "ReportBlob",
 ]

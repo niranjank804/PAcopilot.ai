@@ -1,0 +1,9 @@
+# PA-Copilot Report Automation worker.
+#
+# On the Windows host that actually runs Excel, install with:
+#   pip install -r requirements.txt -r requirements-windows.txt
+#
+# pywin32 lives in the separate file so this one stays installable on
+# Linux for CI, where the COM layer is tested through fakes.
+requests==2.34.2
+psutil==6.1.1

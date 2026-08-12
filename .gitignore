@@ -5,6 +5,16 @@
 backend/.env
 frontend/.env.local
 
+# Report automation worker state. The worker normally keeps these under
+# PROGRAMDATA, but PA_WORKER_HOME can point anywhere — including inside a
+# checkout. credentials.json holds the long-lived machine credential, so
+# these are ignored defensively rather than relying on that never
+# happening.
+credentials.json
+worker.pid
+worker.json
+worker/**/pa-copilot-*/
+
 # --- Python ---
 __pycache__/
 *.py[cod]

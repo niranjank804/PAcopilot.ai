@@ -1,0 +1,7 @@
+# Windows-only worker dependencies.
+#
+# pywin32 provides the COM automation layer (win32com.client, pythoncom,
+# win32process) used to drive Excel and reach the IBM PAfE automation
+# object. There is no cross-platform substitute — this is why the worker
+# must run on Windows.
+pywin32==308

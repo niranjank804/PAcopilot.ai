@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pa-copilot-worker"
+version = "0.1.0"
+description = "PA-Copilot Report Automation worker (DEVELOPER PREVIEW)"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    # Process ownership and tree termination. Without it the worker
+    # cannot safely clean up a hung Excel, so it declines to force
+    # anything rather than guessing — see excel/session.py.
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+# Windows-only. Kept out of the base dependency set so the package
+# installs (and the test suite runs) on Linux CI, where the COM layer is
+# exercised through fakes.
+windows = ["pywin32>=306"]
+dev = ["pytest>=8.0", "pytest-cov>=4.1", "responses>=0.25"]
+
+[project.scripts]
+pa-worker = "pa_worker.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pa_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    # Tests that drive real Microsoft Excel via COM. They skip
+    # automatically where Excel is absent, so `pytest` is safe to run
+    # anywhere; `pytest -m "not excel"` skips them explicitly.
+    "excel: requires a real Microsoft Excel installation (Windows only)",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F", "E9"]
