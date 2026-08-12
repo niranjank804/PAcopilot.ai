@@ -9,6 +9,7 @@ from src.ai.agents.base import AgentPersona
 from src.ai.agents.registry import get_agent
 from src.ai.attachment_processing import process_attachments
 from src.ai.pricing import estimate_cost
+from src.ai.product_knowledge import PRODUCT_OVERVIEW
 from src.ai.providers.base import AIProvider
 from src.ai.registry import get_provider
 from src.ai.schemas import (
@@ -299,6 +300,13 @@ class AIOrchestrator:
             safety_notes_block = f"Safety rules:\n{bullets}"
 
         stable_parts = [
+            # First, and unconditional. With no specialist agent selected
+            # `persona` is None and the whole stable half would otherwise
+            # be empty — which is exactly the case where a user asks
+            # "what is this screen for?" and the assistant has nothing to
+            # answer from. Stable by construction, so it caches with the
+            # tool schemas rather than costing a lookup per request.
+            PRODUCT_OVERVIEW,
             persona.system_prompt if persona is not None else None,
             safety_notes_block,
         ]
