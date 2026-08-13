@@ -42,6 +42,21 @@ PERMISSIONS = [
         "workers.manage",
         "Register, enroll, disable, and rotate credentials for workers.",
     ),
+    # Planning Analytics provider layer (DEVELOPER PREVIEW). Read-only by
+    # design: this phase deliberately seeds no write permission, so there
+    # is no grant that could authorise an MCP write even if one were
+    # implemented by mistake. reports.execute must never imply any of
+    # these — running a PAfE report and querying IBM MCP are separate
+    # capabilities with separate licensing.
+    ("pa.connections.read", "View Planning Analytics provider connections."),
+    (
+        "pa.connections.manage",
+        "Configure Planning Analytics provider connections and endpoints.",
+    ),
+    ("pa.mcp.read", "Discover and read via IBM Planning Analytics MCP."),
+    ("pa.mcp.analyze", "Run read-only IBM MCP analysis capabilities."),
+    ("pa.pax.read", "Read via the PAx API where available."),
+    ("pa.pafe.read", "Read PAfE worker capability and health information."),
 ]
 
 READ_ONLY = [

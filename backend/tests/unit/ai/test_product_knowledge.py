@@ -206,7 +206,11 @@ class TestDPermissionsExist:
             REPO_ROOT / "backend" / "scripts" / "seed_permissions.py"
         ).read_text(encoding="utf-8")
 
-        return set(re.findall(r'"([a-z0-9_]+\.[a-z0-9_]+)"', seed))
+        # Codes have two or three dotted segments (tm1.read,
+        # pa.connections.read), so the pattern must allow both — a
+        # two-segment-only pattern silently drops pa.* codes and then
+        # reports them as unseeded.
+        return set(re.findall(r'"([a-z0-9_]+(?:\.[a-z0-9_]+)+)"', seed))
 
     @pytest.mark.parametrize(
         "capability",
@@ -225,7 +229,9 @@ class TestDPermissionsExist:
         seeded = self._seeded_permissions()
 
         mentioned = set(
-            re.findall(r"the ([a-z0-9_]+\.[a-z0-9_]+) permission", PRODUCT_OVERVIEW)
+            re.findall(
+                r"the ([a-z0-9_]+(?:\.[a-z0-9_]+)+) permission", PRODUCT_OVERVIEW
+            )
         )
 
         assert mentioned, "no permissions mentioned — the check would be vacuous"

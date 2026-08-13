@@ -25,6 +25,18 @@ from pa_worker.pafe.automation import (
 
 logger = get_logger("pafe.probe")
 
+#: Every ProgID PAfE has been observed or documented to register under.
+#: `ADDIN_PROGID` (CognosOffice12.Connect) is the one IBM's automation
+#: documentation names and the one the automation path uses; the others
+#: are checked so that "not installed" is a conclusion drawn from all
+#: known names rather than from one.
+KNOWN_PAFE_PROGIDS: tuple[str, ...] = (
+    ADDIN_PROGID,
+    "CognosOffice12.ConnectPAfEAddin",
+    "CognosOffice12.ConnectPAfE",
+    "CognosOfficePAfE.Connect",
+)
+
 
 class PAfEStatus(str, Enum):
     """Deliberately four states, not a boolean.
@@ -38,6 +50,24 @@ class PAfEStatus(str, Enum):
     INSTALLED_BUT_UNAVAILABLE = "INSTALLED_BUT_UNAVAILABLE"
     INSTALLED_AND_AUTOMATION_AVAILABLE = "INSTALLED_AND_AUTOMATION_AVAILABLE"
     UNKNOWN = "UNKNOWN"
+
+
+class PAfEFailure(str, Enum):
+    """Precisely which link in the chain broke.
+
+    `PAfEStatus` answers "can this host run jobs"; this answers "what do
+    I fix". They are separate because the same status has several
+    different remedies — Excel missing, add-in never installed, add-in
+    installed but unregistered, and COM refusing to hand over the
+    automation object are four different afternoons of work.
+    """
+
+    EXCEL_NOT_INSTALLED = "EXCEL_NOT_INSTALLED"
+    PAFE_NOT_INSTALLED = "PAFE_NOT_INSTALLED"
+    PAFE_ADDIN_NOT_REGISTERED = "PAFE_ADDIN_NOT_REGISTERED"
+    PAFE_COM_UNAVAILABLE = "PAFE_COM_UNAVAILABLE"
+    AUTOMATION_SERVER_UNAVAILABLE = "AUTOMATION_SERVER_UNAVAILABLE"
+    PAFE_READY = "PAFE_READY"
 
 
 @dataclass
@@ -59,7 +89,11 @@ class PAfEProbeResult:
     # Evidence gathered outside COM, so "not installed" is a conclusion
     # rather than one failed call.
     registry_progid_found: bool | None = None
+    registered_progids: tuple[str, ...] = ()
     install_directory: str | None = None
+
+    #: Which link in the chain broke — see PAfEFailure.
+    failure: "PAfEFailure | None" = None
 
     notes: list[str] = field(default_factory=list)
 
@@ -70,6 +104,8 @@ class PAfEProbeResult:
             "python_version": self.python_version,
             "excel_version": self.excel_version,
             "pafe_version": self.pafe_version,
+            "failure": self.failure.value if self.failure else None,
+            "registered_progids": list(self.registered_progids),
             "com_addin_registered": self.com_addin_registered,
             "com_addin_connected": self.com_addin_connected,
             "automation_server_available": self.automation_server_available,
@@ -89,11 +125,18 @@ _INSTALL_CANDIDATES = (
 
 
 def _probe_registry(result: PAfEProbeResult) -> None:
-    """Is the COM class registered at all?
+    """Is any known PAfE COM class registered?
 
     Independent of Excel: it distinguishes "never installed" from
     "installed but Excel will not load it", which is the difference
     between an install task and a configuration task.
+
+    Checks **every** known ProgID variant, not just the one the
+    automation path uses. PAfE has shipped under more than one class
+    name across releases, so reporting NOT_INSTALLED after testing a
+    single ProgID would misdiagnose a host where PAfE is present under
+    the other name — an install task raised against a machine that
+    only needed the add-in re-registering.
     """
 
     if os.name != "nt":
@@ -103,14 +146,43 @@ def _probe_registry(result: PAfEProbeResult) -> None:
 
     try:
         import winreg
-
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, ADDIN_PROGID):
-            result.registry_progid_found = True
-    except FileNotFoundError:
-        result.registry_progid_found = False
-    except OSError as exc:
+    except ImportError:
         result.registry_progid_found = None
-        result.notes.append(f"Registry probe failed: {type(exc).__name__}")
+
+        return
+
+    found: list[str] = []
+    checked_cleanly = True
+
+    for progid in KNOWN_PAFE_PROGIDS:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, progid):
+                found.append(progid)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            checked_cleanly = False
+            result.notes.append(
+                f"Registry probe for {progid} failed: {type(exc).__name__}"
+            )
+
+    result.registered_progids = tuple(found)
+
+    if found:
+        result.registry_progid_found = True
+
+        if ADDIN_PROGID not in found:
+            # Present, but not under the name the automation path uses.
+            result.notes.append(
+                f"PAfE is registered as {found[0]}, but the automation "
+                f"ProgID '{ADDIN_PROGID}' is absent. The add-in may need "
+                "re-registering."
+            )
+    elif checked_cleanly:
+        result.registry_progid_found = False
+    else:
+        # Some probe errored, so absence is not established.
+        result.registry_progid_found = None
 
     for candidate in _INSTALL_CANDIDATES:
         if os.path.isdir(candidate):
@@ -246,6 +318,44 @@ def _derive_status(result: PAfEProbeResult) -> PAfEStatus:
     return PAfEStatus.UNKNOWN
 
 
+def _derive_failure(result: PAfEProbeResult) -> PAfEFailure | None:
+    """Which link broke, walked in the order an operator would fix them.
+
+    Excel first: without it nothing downstream can be judged, and
+    reporting PAFE_NOT_INSTALLED on a host that simply has no Excel
+    sends someone to install the wrong product.
+    """
+
+    if result.application_object_available:
+        return PAfEFailure.PAFE_READY
+
+    if not result.excel_version:
+        return PAfEFailure.EXCEL_NOT_INSTALLED
+
+    # Registered somewhere, but not under the automation ProgID Excel
+    # was asked for — a re-registration problem, not an install one.
+    if (
+        result.registry_progid_found
+        and result.registered_progids
+        and ADDIN_PROGID not in result.registered_progids
+    ):
+        return PAfEFailure.PAFE_ADDIN_NOT_REGISTERED
+
+    if result.registry_progid_found is False and not result.com_addin_registered:
+        return PAfEFailure.PAFE_NOT_INSTALLED
+
+    if result.com_addin_registered is False:
+        return PAfEFailure.PAFE_ADDIN_NOT_REGISTERED
+
+    if result.com_addin_connected is False:
+        return PAfEFailure.PAFE_COM_UNAVAILABLE
+
+    if result.automation_server_available is False:
+        return PAfEFailure.AUTOMATION_SERVER_UNAVAILABLE
+
+    return None
+
+
 def probe_pafe(*, excel_startup_timeout_seconds: int = 120) -> PAfEProbeResult:
     """Full PAfE probe. Launches Excel, and always closes it."""
 
@@ -260,6 +370,7 @@ def probe_pafe(*, excel_startup_timeout_seconds: int = 120) -> PAfEProbeResult:
     if platform.system() != "Windows":
         result.notes.append("Not Windows — COM automation is unavailable.")
         result.status = PAfEStatus.UNKNOWN
+        result.failure = PAfEFailure.EXCEL_NOT_INSTALLED
 
         return result
 
@@ -268,6 +379,7 @@ def probe_pafe(*, excel_startup_timeout_seconds: int = 120) -> PAfEProbeResult:
     except Exception as exc:  # noqa: BLE001
         result.notes.append(f"Cannot import the Excel session ({type(exc).__name__}).")
         result.status = _derive_status(result)
+        result.failure = _derive_failure(result)
 
         return result
 
@@ -285,6 +397,7 @@ def probe_pafe(*, excel_startup_timeout_seconds: int = 120) -> PAfEProbeResult:
             "not be probed through COM."
         )
         result.status = _derive_status(result)
+        result.failure = _derive_failure(result)
 
         return result
 
@@ -294,5 +407,6 @@ def probe_pafe(*, excel_startup_timeout_seconds: int = 120) -> PAfEProbeResult:
         session.close()
 
     result.status = _derive_status(result)
+    result.failure = _derive_failure(result)
 
     return result

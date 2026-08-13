@@ -233,7 +233,56 @@ CAPABILITIES: tuple[Capability, ...] = (
         implementation="backend/src/reports/artifact_service.py",
         permission="reports.read",
     ),
+    Capability(
+        key="pa_provider_layer",
+        name="Planning Analytics provider layer",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "A provider-neutral capability layer that can route read-only "
+            "Planning Analytics requests to different interfaces. Native "
+            "TM1 REST remains the preferred and only validated provider."
+        ),
+        implementation="backend/src/planning_analytics/registry.py",
+        permission="pa.connections.read",
+    ),
+    Capability(
+        key="ibm_pa_mcp",
+        name="IBM Planning Analytics MCP integration",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Optional integration with IBM's remote Planning Analytics MCP "
+            "server. Tool discovery and risk classification are "
+            "implemented; no tool is executed."
+        ),
+        implementation="backend/src/planning_analytics/mcp_adapter.py",
+        permission="pa.mcp.read",
+        caveat=(
+            "IBM ties access to the Planning Analytics Assistant licence / "
+            "PA Agent feature addon, so it is unavailable unless the "
+            "customer is separately entitled. Never validated against a "
+            "live IBM MCP server."
+        ),
+    ),
     # --- Planned: NOT built. Must never be described as usable. ---
+    Capability(
+        key="ibm_pa_mcp_execution",
+        name="IBM MCP tool execution",
+        status=CapabilityStatus.PLANNED,
+        summary=(
+            "Running IBM Planning Analytics MCP tools. Tools are currently "
+            "discovered and classified only; none can be invoked."
+        ),
+    ),
+    Capability(
+        key="pax_api",
+        name="PAx API integration",
+        status=CapabilityStatus.PLANNED,
+        summary=(
+            "IBM's PAx automation API. It is a COM interface that only "
+            "exists inside a Windows Excel process, so it belongs to the "
+            "worker rather than the cloud service."
+        ),
+    ),
     Capability(
         key="report_scheduling",
         name="Recurring report schedules",
