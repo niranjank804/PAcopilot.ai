@@ -1,6 +1,13 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,36 +40,52 @@ class TM1Process(BaseModel, OrganizationScoped):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    source_file: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-
-    datasource_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="none"
+    source_file: Mapped[str] = mapped_column(
+        String(255), nullable=False, default="", server_default=text("''")
     )
 
-    header_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    datasource_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="none", server_default=text("'none'")
+    )
+
+    header_comment: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=text("''")
+    )
 
     # Whether the export this was parsed from carried datasource credentials.
     # The values are never read; the flag lets an operator find which exports
     # need treating as secret.
     has_stored_credentials: Mapped[bool] = mapped_column(
-        nullable=False, default=False
+        nullable=False, default=False, server_default=text("false")
     )
 
-    line_counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    line_counts: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'")
+    )
 
-    parameters: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    parameters: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'")
+    )
 
     # Object references as the parser emitted them: name, kind, access,
     # section, and whether the name was a literal. Non-literal names are
     # variables resolved at runtime and cannot be matched to a real object
     # without live server metadata, so the flag has to survive.
-    objects: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    objects: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'")
+    )
 
-    functions_used: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    functions_used: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'")
+    )
 
-    process_calls: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    process_calls: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'")
+    )
 
-    object_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    object_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
 
 
 class TM1ProcessPattern(BaseModel, OrganizationScoped):
@@ -103,4 +126,6 @@ class TM1ProcessPattern(BaseModel, OrganizationScoped):
 
     # The signals that produced the match. A pattern claim you cannot justify
     # to a TM1 developer is worse than no claim.
-    evidence: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    evidence: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'")
+    )

@@ -38,8 +38,42 @@ async def _create_connection(db, organization_id, name):
 
 
 @pytest.mark.asyncio
-async def test_flag_off_by_default_no_filtering_applied(db_session):
-    assert settings.TENANCY_ENFORCEMENT_ENABLED is False
+async def test_enforcement_is_on_by_default(db_session):
+    """The backstop must be active in a default deployment.
+
+    It shipped inert so it could be verified against the whole suite
+    first. That happened, and the default flipped. This test is what
+    stops it silently reverting: a backstop that exists in the codebase
+    but not in production protects nobody.
+    """
+
+    assert settings.TENANCY_ENFORCEMENT_ENABLED is True
+
+    org_a = await create_organization(db_session)
+    org_b = await create_organization(db_session)
+    await _create_connection(db_session, org_a.id, "Org A Conn (default)")
+    await _create_connection(db_session, org_b.id, "Org B Conn (default)")
+
+    db_session.info["organization_id"] = org_a.id
+
+    # An unscoped select — no .where() — still only returns this org's
+    # rows, purely because of the session-level filter.
+    result = await db_session.execute(select(TM1Connection))
+    names = {c.name for c in result.scalars().all()}
+
+    assert "Org A Conn (default)" in names
+    assert "Org B Conn (default)" not in names
+
+
+@pytest.mark.asyncio
+async def test_flag_off_disables_filtering(db_session, monkeypatch):
+    """The escape hatch still works.
+
+    Kept because turning enforcement off is the supported way to
+    diagnose a suspected over-filtering bug, and that path must not rot.
+    """
+
+    monkeypatch.setattr(settings, "TENANCY_ENFORCEMENT_ENABLED", False)
 
     org_a = await create_organization(db_session)
     org_b = await create_organization(db_session)

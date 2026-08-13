@@ -25,6 +25,12 @@ services:
     envVars:
       - key: DEBUG
         value: "False"
+      # Session-level org-scoping backstop. On by default in config.py;
+      # pinned here so the security posture is visible in the deployment
+      # manifest rather than only in a code default that a later refactor
+      # could quietly change.
+      - key: TENANCY_ENFORCEMENT_ENABLED
+        value: "True"
       # Sized per *worker*: --workers 2 means two processes, each with its
       # own pool, so the real connection count against Postgres is twice
       # these numbers (2 x (10 + 10) = 40). Raise only alongside the

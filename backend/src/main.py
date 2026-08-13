@@ -1,12 +1,35 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.api.router import api_router
+from src.core import error_tracking, scheduler
 from src.core.config import settings
 from src.core.exceptions import AppException
 from src.core.logging import app_logger
+from src.reports.tasks import register_tasks
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start periodic tasks with the app, stop them with it.
+
+    Registration happens here rather than at import so that importing
+    this module (as the test suite does) never starts a background loop
+    against the real database.
+    """
+
+    error_tracking.initialize()
+    register_tasks()
+    scheduler.start()
+
+    try:
+        yield
+    finally:
+        await scheduler.stop()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -22,6 +45,7 @@ app = FastAPI(
     docs_url="/docs" if settings.EXPOSE_API_DOCS else None,
     redoc_url="/redoc" if settings.EXPOSE_API_DOCS else None,
     openapi_url="/openapi.json" if settings.EXPOSE_API_DOCS else None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(

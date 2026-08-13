@@ -1,6 +1,14 @@
 import uuid
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,8 +55,10 @@ class TM1CodingConvention(BaseModel, OrganizationScoped):
     # Process names on each side of the observation. Names only — never source
     # code, which may carry embedded credentials or business logic that has no
     # reason to be duplicated out of the knowledge base.
-    examples: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    examples: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'")
+    )
 
     counter_examples: Mapped[list] = mapped_column(
-        JSONB, nullable=False, default=list
+        JSONB, nullable=False, default=list, server_default=text("'[]'")
     )

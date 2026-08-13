@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,8 +27,12 @@ class RevokedToken(BaseModel):
     jti: Mapped[str] = mapped_column(
         String(64),
         nullable=False,
+        # `unique=True` alone. Postgres backs a UNIQUE constraint with a
+        # unique index, so adding `index=True` here created a *second*,
+        # non-unique index on the same column — paid for on every insert
+        # and every revocation sweep, for nothing. Migration
+        # c4f1a8b39e02 drops the redundant one.
         unique=True,
-        index=True,
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -51,4 +55,5 @@ class RevokedToken(BaseModel):
         String(32),
         nullable=False,
         default="logout",
+        server_default=text("'logout'"),
     )

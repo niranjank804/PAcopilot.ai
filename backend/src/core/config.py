@@ -288,13 +288,54 @@ class Settings(BaseSettings):
     REPORT_TRACE_LOG_MAX_CHARS: int = 20000
 
     # ------------------------------------------------------------------
+    # Error tracking (src/core/error_tracking.py)
+    # ------------------------------------------------------------------
+    # Optional. Unset means no error tracking at all and no dependency —
+    # sentry-sdk is deliberately not in requirements.txt, so a
+    # deployment that does not want a third-party error sink is
+    # unaffected. Events are scrubbed before sending; request bodies are
+    # dropped outright because a report payload can carry customer
+    # financials.
+    SENTRY_DSN: str | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+
+    # ------------------------------------------------------------------
+    # Periodic tasks (src/core/scheduler.py)
+    # ------------------------------------------------------------------
+    # In-process periodic runner. Recurring work previously had nowhere
+    # to live: the stale-execution reaper only ran when a worker polled,
+    # so an organization with no worker running never had its abandoned
+    # executions reclaimed. Guarded by a Postgres advisory lock so
+    # multiple gunicorn workers do not each run every task.
+    #
+    # Turn off to run the API with no background activity at all (useful
+    # when diagnosing whether a periodic task is causing load).
+    SCHEDULER_ENABLED: bool = True
+
+    # How often to reclaim executions whose worker stopped heartbeating.
+    # Comfortably shorter than REPORT_EXECUTION_LEASE_SECONDS so a lapsed
+    # lease is noticed promptly rather than a whole lease later.
+    REPORT_REAPER_INTERVAL_SECONDS: float = 60.0
+
+    # ------------------------------------------------------------------
     # Tenancy
     # ------------------------------------------------------------------
     # Session-level org-scoping backstop (src/database/tenancy.py) behind
-    # the existing service-layer ownership checks. Off by default so this
-    # can roll out gradually: the listener stays registered either way, it
-    # just no-ops when this is False. See docs/AUDIT.md for the rollout plan.
-    TENANCY_ENFORCEMENT_ENABLED: bool = False
+    # the existing service-layer ownership checks. The listener stays
+    # registered either way; it no-ops when this is False.
+    #
+    # Now ON by default. It shipped inert so it could be verified against
+    # the whole suite before becoming the default — that verification has
+    # now happened: the full suite passes with it enabled (1003/1004, the
+    # one failure being a test that asserted the old default). Leaving it
+    # off any longer would mean the backstop exists in the codebase and
+    # not in production, which is the worst of both.
+    #
+    # It is defence in depth, not the primary control: every by-ID service
+    # method already checks organization ownership. This catches the
+    # future endpoint that calls a repository directly and skips that.
+    # Set to False only to diagnose a suspected over-filtering bug.
+    TENANCY_ENFORCEMENT_ENABLED: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
