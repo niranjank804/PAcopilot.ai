@@ -26,7 +26,10 @@ import uuid
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies.worker_auth import get_current_worker
+from src.api.dependencies.worker_auth import (
+    get_current_worker,
+    worker_credential_throttle,
+)
 from src.core.config import settings
 from src.core.exceptions import (
     ConflictException,
@@ -126,6 +129,7 @@ async def enroll(
     payload: WorkerEnrollRequest,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(worker_credential_throttle),
 ):
     """Spend a single-use enrollment token for a long-lived credential.
 
@@ -181,6 +185,7 @@ async def enroll(
 async def issue_token(
     payload: WorkerTokenRequest,
     db: AsyncSession = Depends(get_db),
+    _throttle: None = Depends(worker_credential_throttle),
 ):
     """Exchange the long-lived credential for a short-lived access token.
 

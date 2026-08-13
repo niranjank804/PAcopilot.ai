@@ -170,3 +170,38 @@ def reset() -> None:
 
     _WINDOWS.clear()
     _hits_since_sweep = 0
+
+
+def client_ip_of(request) -> str | None:
+    """The real client address, honouring a trusted proxy chain.
+
+    Every IP-keyed limit was reading `request.client.host` directly.
+    Behind a reverse proxy that is the *proxy's* address, so all clients
+    share one bucket: the login and password-reset throttles stop being
+    per-attacker and become a global cap that a single busy proxy can
+    exhaust for everyone. `settings.TRUSTED_PROXY_COUNT` existed for this
+    and was never wired up.
+
+    X-Forwarded-For is appended to by each hop, so the rightmost entries
+    are the ones added by infrastructure we control. Taking the entry
+    `TRUSTED_PROXY_COUNT` from the right gives the address our own edge
+    observed. Reading the *leftmost* entry instead — the common mistake —
+    trusts a value the client supplied, letting anyone forge a new
+    identity per request and bypass the limit entirely.
+    """
+
+    trusted = max(0, settings.TRUSTED_PROXY_COUNT)
+
+    if trusted:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        hops = [part.strip() for part in forwarded.split(",") if part.strip()]
+
+        if hops:
+            # Clamp: fewer hops than configured means the request did not
+            # traverse the whole expected chain, so use the leftmost we
+            # actually have rather than indexing off the end.
+            index = min(trusted, len(hops))
+
+            return hops[len(hops) - index]
+
+    return request.client.host if request.client else None

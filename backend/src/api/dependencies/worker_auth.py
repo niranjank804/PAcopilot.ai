@@ -15,10 +15,12 @@ unless something separates them, so `type` is checked on both sides:
 usable against the whole user-facing API.
 """
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core import rate_limit
+from src.core.config import settings
 from src.database.models.report_worker import ReportWorker
 from src.database.session import get_db
 from src.reports.worker_credentials import decode_worker_token
@@ -53,4 +55,43 @@ async def get_current_worker(
     db.info.pop("organization_id", None)
     db.info["organization_id"] = worker.organization_id
 
+    # Bound what one credential can do. A worker is a machine on a
+    # polling loop, so its legitimate rate is far above a human's — but
+    # "far above" is not "unbounded", and until now every /worker/*
+    # route was uncapped. A stolen credential could poll `claim` in a
+    # tight loop against the database.
+    #
+    # Keyed on the worker rather than a user: the worker *is* the
+    # principal here, and one runaway machine must not consume its
+    # organization's whole budget.
+    rate_limit.enforce(
+        scope="worker",
+        user_id=worker.id,
+        organization_id=worker.organization_id,
+        user_limit=settings.RATE_LIMIT_WORKER_PER_WINDOW,
+        organization_limit=settings.RATE_LIMIT_WORKER_ORG_PER_WINDOW,
+    )
+
     return worker
+
+
+def worker_credential_throttle(request: Request) -> None:
+    """IP throttle for the unauthenticated credential endpoints.
+
+    `/worker/token` and `/worker/enroll` accept a secret and answer
+    whether it was right — the same shape of risk as `/auth/login`, and
+    the last unbounded endpoints in the application. There is no
+    authenticated identity to key on yet, so the client address is all
+    there is.
+
+    Weaker than the authenticated limiter (a rotating proxy pool spreads
+    across addresses), but it closes the single-host guessing case,
+    which is the one that is otherwise free.
+    """
+
+    rate_limit.enforce_ip(
+        scope="worker_credential",
+        client_ip=rate_limit.client_ip_of(request),
+        limit=settings.RATE_LIMIT_WORKER_CREDENTIAL_IP_PER_WINDOW,
+        window=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    )

@@ -161,6 +161,22 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH_IP_PER_WINDOW: int = 20
     RATE_LIMIT_PASSWORD_RESET_IP_PER_WINDOW: int = 5
 
+    # Report-automation worker plane. Workers are machines on a polling
+    # loop, so their legitimate rate is far higher than a human's: with
+    # one job running a worker makes ~30 progress calls/min (the
+    # supervisor renews its lease every 2s), ~6 claim polls/min and ~2
+    # heartbeats/min. 120 leaves roughly 3x headroom over that worst
+    # case while still bounding a compromised credential.
+    RATE_LIMIT_WORKER_PER_WINDOW: int = 120
+    RATE_LIMIT_WORKER_ORG_PER_WINDOW: int = 600
+
+    # /worker/token and /worker/enroll are reachable without a token and
+    # are the credential-guessing surface of the worker plane — the same
+    # shape of risk as /auth/login, and previously the only unbounded
+    # endpoints left in the application. Keyed by client IP, because
+    # there is no authenticated identity yet.
+    RATE_LIMIT_WORKER_CREDENTIAL_IP_PER_WINDOW: int = 20
+
     # Number of proxies in front of the app whose X-Forwarded-For entries
     # can be trusted. Render terminates TLS and appends the real client IP,
     # so 1 is correct there. Set 0 when the app is directly exposed —

@@ -57,7 +57,10 @@ def auth_throttle(scope: str, limit_setting: str):
     async def checker(request: Request) -> None:
         rate_limit.enforce_ip(
             scope=f"auth:{scope}",
-            client_ip=request.client.host if request.client else None,
+            # Not request.client.host: behind a proxy that is the
+            # proxy's address, which collapses every client into one
+            # bucket and turns a per-attacker limit into a global cap.
+            client_ip=rate_limit.client_ip_of(request),
             limit=getattr(settings, limit_setting),
         )
 
