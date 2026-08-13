@@ -9,7 +9,6 @@ report rather than faked and claimed.
 """
 
 import hashlib
-import json
 
 import pytest
 

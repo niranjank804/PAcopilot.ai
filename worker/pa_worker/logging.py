@@ -143,7 +143,14 @@ def configure(level: str = "INFO", log_file: str | None = None) -> None:
         "%(asctime)s | %(levelname)-7s | %(name)s | %(context)s | %(message)s"
     )
 
-    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    # stderr, never stdout. stdout is a *result channel*: the execution
+    # child process writes its one JSON document there and the parent
+    # parses it whole, and `diagnostics-pafe --json` is meant to be
+    # machine-readable. A log line on stdout corrupts both — it turned
+    # every real job into "the execution process returned an unreadable
+    # result", which no test caught because the suite drives a fake
+    # supervisor rather than the real child.
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)]
 
     if log_file:
         handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
