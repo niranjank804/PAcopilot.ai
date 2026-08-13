@@ -13,7 +13,7 @@ pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 
 # HTTP client the integration tests drive the ASGI app with
-httpx2==2.7.0
+httpx2==2.10.0
 
 # Lint and static analysis
 ruff==0.16.1
