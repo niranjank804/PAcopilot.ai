@@ -48,7 +48,30 @@ Then find what is actually billable — `render.yaml` is not it:
 2. Look for any service not on a free plan, and any **paid Postgres**.
 3. Delete or downgrade whatever you are not using.
 
-## Step 2 — frontend to Vercel
+## Step 2 — frontend to Vercel — DONE
+
+**Live at https://pa-copilot-frontend.vercel.app**
+
+Deployed via the Vercel CLI rather than the web UI, because the browser
+flow landed on Vercel's *clone* screen ("Cloning from GitHub" with a
+"Private Repository Name" field), which creates a duplicate repository
+instead of importing the existing one — and offers no Root Directory
+setting, which this monorepo needs.
+
+Reproduce or redeploy with:
+
+```bash
+cd frontend
+npx vercel link --yes --project pa-copilot-frontend
+echo "https://pa-copilot-backend.onrender.com" | npx vercel env add NEXT_PUBLIC_API_URL production
+npx vercel --prod --yes
+```
+
+Note the deployment-specific URL (`...-lsj8vjnyp-...vercel.app`) returns
+302 — Vercel's deployment protection covers those. The clean project
+alias above is the public one.
+
+### Original UI instructions
 
 Zero code changes. Next.js is Vercel's own framework.
 
