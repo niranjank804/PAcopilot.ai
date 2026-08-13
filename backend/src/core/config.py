@@ -288,6 +288,21 @@ class Settings(BaseSettings):
     REPORT_TRACE_LOG_MAX_CHARS: int = 20000
 
     # ------------------------------------------------------------------
+    # Object storage (src/reports/s3_storage.py)
+    # ------------------------------------------------------------------
+    # Set S3_BUCKET to move workbook and artifact bytes out of Postgres.
+    # Unset means the database backend, which is correct for local
+    # development and was the only option before a bucket existed.
+    #
+    # AWS credentials are deliberately NOT settings. boto3 resolves them
+    # from its standard chain (environment, shared credentials file,
+    # instance role), so a deployment on an instance role holds no
+    # long-lived key at all, and no key passes through a settings object
+    # that could be logged or serialized.
+    S3_BUCKET: str | None = None
+    S3_REGION: str = "eu-north-1"
+
+    # ------------------------------------------------------------------
     # Error tracking (src/core/error_tracking.py)
     # ------------------------------------------------------------------
     # Optional. Unset means no error tracking at all and no dependency —

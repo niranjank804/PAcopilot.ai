@@ -63,6 +63,23 @@ services:
         generateValue: true
       # Set these manually in the Render dashboard after the first deploy —
       # never committed to the repo:
+      # Object storage. Setting S3_BUCKET moves workbook and artifact
+      # bytes out of Postgres; leaving it unset keeps the database
+      # backend. Existing rows keep resolving either way — a reference
+      # carries its own scheme.
+      - key: S3_BUCKET
+        value: pacopilot-s3
+      - key: S3_REGION
+        value: eu-north-1
+      # Resolved by boto3's standard credential chain, not by app
+      # config, so no key passes through a settings object. Set these in
+      # the Render dashboard — never commit them. Prefer a scoped IAM
+      # user limited to s3:GetObject/PutObject/DeleteObject on
+      # arn:aws:s3:::pacopilot-s3/*.
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
       - key: TM1_CREDENTIALS_KEY
         sync: false
       - key: ANTHROPIC_API_KEY

@@ -60,3 +60,7 @@ tzdata==2026.3
 urllib3==2.7.0
 uvicorn==0.51.0
 xgboost==3.3.0
+
+# S3 artifact/workbook storage. Sync SDK, called via asyncio.to_thread
+# (same discipline as smtplib and TM1py elsewhere in this codebase).
+boto3==1.35.99

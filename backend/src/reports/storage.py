@@ -1,16 +1,19 @@
 """Where workbook and artifact bytes actually live.
 
-PA-Copilot has no object store today (no S3/GCS credentials, no bucket in
-render.yaml), so the only correct place for binary content right now is
-the database it already has. That is a real constraint, not a preference:
-the deployed platform is a Render web service with an ephemeral filesystem,
-so writing to local disk would lose every artifact on the next deploy and
-would not be visible to a second gunicorn worker in the first place.
+Two backends, chosen by configuration:
 
-The interface below exists so that stays a swap rather than a rewrite.
-An S3 backend implements the same three methods; the reference string
-carries its own scheme (`db://<uuid>`, later `s3://<bucket>/<key>`), so
-rows written by one backend keep resolving after another is added.
+* `S3StorageBackend` (src/reports/s3_storage.py) when `S3_BUCKET` is set.
+  The right answer for a real deployment — Postgres is not an object
+  store and a free-tier database is a hard ceiling.
+* `DatabaseStorageBackend` otherwise. Correct for local development, and
+  the only option before a bucket existed: a Render web service has an
+  ephemeral filesystem, so local disk would lose every artifact on the
+  next deploy and would not be visible to a second gunicorn worker.
+
+The interface is what made that a swap rather than a rewrite. A
+reference carries its own scheme (`db://<uuid>` or `s3://<bucket>/<key>`),
+so artifacts written to Postgres before a bucket existed keep resolving
+afterwards — switching backends does not orphan existing rows.
 
 Two invariants every backend must keep:
 
@@ -169,8 +172,44 @@ class DatabaseStorageBackend(StorageBackend):
             return None
 
 
-_backend: StorageBackend = DatabaseStorageBackend()
+def _select_backend() -> StorageBackend:
+    """S3 when a bucket is configured, Postgres otherwise.
+
+    Resolved once, lazily, on first use — not at import — so tests and
+    scripts can set S3_BUCKET before anything touches storage, and so an
+    unconfigured deployment never constructs an S3 client or attempts
+    credential resolution.
+
+    Existing rows keep working across the switch: a reference carries its
+    own scheme (`db://` or `s3://`), so artifacts written to Postgres
+    before a bucket existed still resolve afterwards.
+    """
+
+    from src.core.config import settings
+
+    if settings.S3_BUCKET:
+        from src.reports.s3_storage import S3StorageBackend
+
+        return S3StorageBackend()
+
+    return DatabaseStorageBackend()
+
+
+_backend: StorageBackend | None = None
 
 
 def get_storage_backend() -> StorageBackend:
+    global _backend
+
+    if _backend is None:
+        _backend = _select_backend()
+
     return _backend
+
+
+def reset_storage_backend() -> None:
+    """Force re-selection. For tests that change S3_BUCKET."""
+
+    global _backend
+
+    _backend = None
