@@ -16,7 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -181,7 +181,7 @@ function ObjectList({
   );
 }
 
-export default function MetadataPage() {
+function MetadataExplorer() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [connectionId, setConnectionId] = useState<string | null>(
@@ -925,5 +925,41 @@ export default function MetadataPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * `useSearchParams` is read below to pre-select a connection from the
+ * URL. Next's docs are explicit about the consequence: on a prerendered
+ * route it "will cause the Client Component tree up to the closest
+ * Suspense boundary to be client-side rendered". With no boundary that
+ * tree is the whole page, so the prerendered HTML is thrown away and
+ * nothing is interactive until React has rendered everything on the
+ * client.
+ *
+ * That is the reported bug: immediately after load, the first click on a
+ * cube only produced the CSS hover state — React had not attached the
+ * handler yet — and a second click worked. It went unnoticed in
+ * development because, again per the docs, "routes are rendered
+ * on-demand, so useSearchParams doesn't suspend and things may appear to
+ * work without Suspense".
+ *
+ * The boundary confines the client-side render to this subtree so the
+ * surrounding layout is prerendered and the page becomes interactive
+ * sooner.
+ */
+export default function MetadataPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Loading metadata explorer…
+          </p>
+        </div>
+      }
+    >
+      <MetadataExplorer />
+    </Suspense>
   );
 }
