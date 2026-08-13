@@ -63,10 +63,10 @@ services:
         generateValue: true
       # Set these manually in the Render dashboard after the first deploy —
       # never committed to the repo:
-      # Object storage. Setting S3_BUCKET moves workbook and artifact
-      # bytes out of Postgres; leaving it unset keeps the database
-      # backend. Existing rows keep resolving either way — a reference
-      # carries its own scheme.
+      # Object storage. Set by default because free-tier Postgres is
+      # ~0.5GB and report artifacts would consume it quickly. Existing
+      # rows keep resolving either way — a reference carries its own
+      # scheme, so switching backends orphans nothing.
       - key: S3_BUCKET
         value: pacopilot-s3
       - key: S3_REGION
@@ -112,18 +112,26 @@ services:
       - key: SMTP_FROM_EMAIL
         sync: false
 
-  - type: web
-    name: pa-copilot-frontend
-    runtime: node
-    plan: free
-    rootDir: frontend
-    buildCommand: "npm ci && npm run build"
-    startCommand: "npm run start -- --port $PORT"
-    envVars:
-      # Set to the backend service's actual Render URL after the first
-      # deploy (Render assigns it at service creation — can't be known
-      # until then):
-      - key: NEXT_PUBLIC_API_URL
-        sync: false
-      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
-        sync: false
+  # The frontend is deployed to Vercel, not here — see
+  # docs/deployment/FREE-STACK.md.
+  #
+  # Two reasons. 750 free instance-hours is 31.25 days and a month is up
+  # to 744, so one service fits the allowance and two do not. And Vercel
+  # runs Next.js natively, including the one dynamic route
+  # (/connections/[id]) that would otherwise block a static export.
+  #
+  # Uncomment to move it back, and expect the allowance to run out
+  # mid-month.
+  #
+  # - type: web
+  #   name: pa-copilot-frontend
+  #   runtime: node
+  #   plan: free
+  #   rootDir: frontend
+  #   buildCommand: "npm ci && npm run build"
+  #   startCommand: "npm run start -- --port $PORT"
+  #   envVars:
+  #     - key: NEXT_PUBLIC_API_URL
+  #       sync: false
+  #     - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  #       sync: false
