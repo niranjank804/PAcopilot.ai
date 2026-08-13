@@ -3,14 +3,23 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.dependencies.auth import get_current_active_user
 from src.api.dependencies.permissions import require_permission
+from src.core.exceptions import NotFoundException
 from src.database.session import get_db
 from src.schemas.auth import ApproveUserRequest, UserResponse
 from src.schemas.response import ApiResponse
 from src.schemas.role import RoleResponse, UserRoleAssign
+from src.schemas.user import (
+    OrganizationResponse,
+    OrganizationUpdate,
+    ProfileUpdate,
+)
 from src.services.audit_service import audit_service
 from src.services.role_service import role_service
 from src.services.user_service import user_service
+from src.repositories.organization_repository import organization_repository
+from src.repositories.user_repository import user_repository
 
 router = APIRouter(
     prefix="/users",
@@ -257,3 +266,137 @@ async def remove_role(
     )
 
     return ApiResponse(success=True, data=None)
+
+
+def _client_context(http_request: Request) -> tuple[str | None, str | None]:
+    ip_address = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
+
+    return ip_address, user_agent
+
+
+@router.patch(
+    "/me",
+    response_model=ApiResponse[UserResponse],
+)
+async def update_my_profile(
+    payload: ProfileUpdate,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_active_user),
+):
+    """Update the signed-in user's own display name.
+
+    Requires no permission beyond being signed in — this is the one
+    resource a user unambiguously owns. The subject comes from the
+    authenticated session, never from the request body, so there is no
+    id a caller could substitute to edit somebody else.
+    """
+
+    user = await user_repository.get_by_id(db, current_user.id)
+
+    if user is None:
+        raise NotFoundException("User not found.")
+
+    before = {"first_name": user.first_name, "last_name": user.last_name}
+
+    user.first_name = payload.first_name.strip()
+    user.last_name = payload.last_name.strip()
+
+    await user_repository.update(db, user)
+
+    ip_address, user_agent = _client_context(http_request)
+
+    await audit_service.log(
+        db,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="USER_PROFILE_UPDATED",
+        entity="user",
+        entity_id=user.id,
+        old_values=before,
+        new_values={
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        },
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return ApiResponse(success=True, data=UserResponse.model_validate(user))
+
+
+@router.get(
+    "/organization",
+    response_model=ApiResponse[OrganizationResponse],
+)
+async def get_my_organization(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("organization.read")),
+):
+    """The caller's own organization, resolved from their session."""
+
+    organization = await organization_repository.get_by_id(
+        db, current_user.organization_id
+    )
+
+    if organization is None:
+        raise NotFoundException("Organization not found.")
+
+    return ApiResponse(
+        success=True, data=OrganizationResponse.model_validate(organization)
+    )
+
+
+@router.patch(
+    "/organization",
+    response_model=ApiResponse[OrganizationResponse],
+)
+async def update_my_organization(
+    payload: OrganizationUpdate,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("organization.write")),
+):
+    """Update the caller's own organization.
+
+    There is deliberately no organization id in the path or body: it is
+    taken from the session. An endpoint that accepted one would need its
+    own ownership check, and that is exactly the check that gets
+    forgotten.
+    """
+
+    organization = await organization_repository.get_by_id(
+        db, current_user.organization_id
+    )
+
+    if organization is None:
+        raise NotFoundException("Organization not found.")
+
+    before = {"name": organization.name, "domain": organization.domain}
+
+    organization.name = payload.name.strip()
+    organization.domain = (
+        payload.domain.strip() if payload.domain and payload.domain.strip() else None
+    )
+
+    await organization_repository.update(db, organization)
+
+    ip_address, user_agent = _client_context(http_request)
+
+    await audit_service.log(
+        db,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="ORGANIZATION_UPDATED",
+        entity="organization",
+        entity_id=organization.id,
+        old_values=before,
+        new_values={"name": organization.name, "domain": organization.domain},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return ApiResponse(
+        success=True, data=OrganizationResponse.model_validate(organization)
+    )
