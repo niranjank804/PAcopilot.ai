@@ -189,3 +189,53 @@ def validate_mcp_endpoint(
         port=port,
         resolved=resolved,
     )
+
+
+def assert_redirect_allowed(
+    location: str,
+    *,
+    allow_insecure_http: bool = False,
+    allow_private_networks: bool = False,
+) -> EndpointValidation:
+    """Re-validate a redirect target before following it.
+
+    Redirects are the practical way around endpoint validation: the
+    configured URL is a perfectly ordinary public host, and it answers
+    `302 Location: http://169.254.169.254/`. Validating only the
+    configured URL and then letting the HTTP client follow redirects
+    hands the attacker exactly what the check was meant to prevent.
+
+    The client is therefore configured not to follow redirects at all,
+    and any redirect is put back through full validation here — same
+    rules, including DNS resolution of the new host.
+    """
+
+    return validate_mcp_endpoint(
+        location,
+        allow_insecure_http=allow_insecure_http,
+        allow_private_networks=allow_private_networks,
+    )
+
+
+#: Honest statement of what endpoint validation does and does not
+#: achieve, so the limitation is not quietly forgotten.
+#:
+#: Validation resolves DNS and checks every resolved address, then the
+#: connection is made by hostname. Between those two steps DNS can
+#: change (DNS rebinding), so a determined attacker controlling the
+#: authoritative nameserver for a host they also control can still aim
+#: the second lookup somewhere else.
+#:
+#: Closing that fully requires connecting to a *pinned, validated IP*
+#: while still presenting the original hostname for TLS SNI and
+#: certificate verification. That needs a custom transport/connector,
+#: which is not implemented. Mitigations in place: HTTPS is mandatory
+#: (so a rebound host fails certificate validation for the original
+#: name), redirects are refused rather than followed, and only an
+#: administrator can set the endpoint.
+SSRF_RESIDUAL_RISK = (
+    "DNS rebinding is not fully prevented: validation resolves and checks "
+    "every address, but the connection is then made by hostname. Full "
+    "prevention requires pinning the connection to a validated IP while "
+    "preserving TLS SNI, which is not implemented."
+)

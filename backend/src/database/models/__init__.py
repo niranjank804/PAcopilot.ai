@@ -8,6 +8,9 @@ from .knowledge_document import KnowledgeDocument
 from .organization import Organization
 from .password_reset_token import PasswordResetToken
 from .permission import Permission
+from .planning_analytics_connection import (
+    PlanningAnalyticsConnection,
+)
 from .report_artifact import ReportArtifact
 from .report_blob import ReportBlob
 from .report_definition import ReportDefinition
@@ -55,4 +58,5 @@ __all__ = [
     "ReportExecution",
     "ReportArtifact",
     "ReportBlob",
+    "PlanningAnalyticsConnection",
 ]

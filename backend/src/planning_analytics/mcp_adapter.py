@@ -49,7 +49,10 @@ from src.planning_analytics.results import (
     ProviderStatus,
 )
 from src.planning_analytics.risk import assess
-from src.planning_analytics.ssrf import validate_mcp_endpoint
+from src.planning_analytics.ssrf import (
+    assert_redirect_allowed,
+    validate_mcp_endpoint,
+)
 
 #: IBM's four announced categories, used only to group tools for display.
 #: Never used for risk — risk comes from risk.py.
@@ -420,7 +423,14 @@ def build_http_transport():
     async def transport(
         endpoint: str, payload: dict, headers: dict, timeout: float
     ) -> dict:
-        async with httpx2.AsyncClient(timeout=timeout) as client:
+        # follow_redirects=False is load-bearing, not a default. A
+        # redirect is the practical way around endpoint validation: the
+        # configured host is ordinary and public, and answers
+        # "302 Location: http://169.254.169.254/". Any redirect is
+        # re-validated below instead of being followed.
+        async with httpx2.AsyncClient(
+            timeout=timeout, follow_redirects=False
+        ) as client:
             try:
                 response = await client.post(
                     endpoint, json=payload, headers=headers
@@ -429,6 +439,23 @@ def build_http_transport():
                 raise MCPTransportError(
                     f"Could not reach the MCP server ({type(exc).__name__}).",
                     category=ErrorCategory.UNREACHABLE,
+                )
+
+            if 300 <= response.status_code < 400:
+                location = response.headers.get("location", "")
+
+                try:
+                    assert_redirect_allowed(location)
+                except Exception:
+                    raise MCPTransportError(
+                        "The MCP server redirected to a destination that is "
+                        "not allowed.",
+                        category=ErrorCategory.SYSTEM_ERROR,
+                    )
+
+                raise MCPTransportError(
+                    "The MCP server redirected; redirects are not followed.",
+                    category=ErrorCategory.SYSTEM_ERROR,
                 )
 
             if response.status_code in (401, 403):
