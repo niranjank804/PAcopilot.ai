@@ -28,6 +28,24 @@ _TOKEN_RENEW_MARGIN_SECONDS = 60
 _CONNECT_TIMEOUT = 10
 _READ_TIMEOUT = 120
 
+# Statuses that mean "the edge accepted the request but the application
+# never saw it" — a proxy could not reach an upstream that is booting.
+# On a free-tier host that spins down after ~15 minutes idle, this is
+# the normal first request after a quiet spell, not a fault.
+#
+# Retrying these is safe *because* the request never reached the app:
+# there is no chance a job was claimed or an artifact stored and only
+# the response lost. A read timeout is deliberately NOT in this set —
+# there the request may well have been processed, and blindly retrying
+# `claim` would take a second job while the first sat orphaned.
+_COLD_START_STATUSES = frozenset({502, 503, 504})
+
+# Roughly 2 + 4 + 8 + 16 = 30s of waiting, which covers a typical
+# free-tier cold start. Bounded, so a genuinely dead server still fails
+# in well under a minute rather than hanging the poll loop.
+_COLD_START_ATTEMPTS = 4
+_COLD_START_BACKOFF_SECONDS = 2
+
 
 class ControlPlaneClient:
 
@@ -278,7 +296,48 @@ class ControlPlaneClient:
                     f"Could not reach PA-Copilot ({type(exc).__name__})."
                 ) from exc
 
+        response = self._await_cold_start(
+            response, method, url, headers, kwargs
+        )
+
         self._raise_for_status(response)
+
+        return response
+
+    def _await_cold_start(self, response, method, url, headers, kwargs):
+        """Wait out a sleeping backend rather than failing the job.
+
+        Without this, the first call after the host spun down surfaces
+        as "Could not reach PA-Copilot" and the worker treats a perfectly
+        healthy deployment as an outage.
+        """
+
+        for attempt in range(_COLD_START_ATTEMPTS):
+            if response.status_code not in _COLD_START_STATUSES:
+                return response
+
+            delay = _COLD_START_BACKOFF_SECONDS * (2**attempt)
+
+            logger.info(
+                f"PA-Copilot is starting up (HTTP {response.status_code}); "
+                f"retrying in {delay}s"
+            )
+
+            time.sleep(delay)
+
+            try:
+                response = self._session.request(
+                    method,
+                    url,
+                    headers=headers,
+                    timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
+                    verify=self.config.verify_tls,
+                    **kwargs,
+                )
+            except requests.RequestException as exc:
+                raise ControlPlaneError(
+                    f"Could not reach PA-Copilot ({type(exc).__name__})."
+                ) from exc
 
         return response
 
