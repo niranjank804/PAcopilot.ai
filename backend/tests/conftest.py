@@ -4,8 +4,26 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import rate_limit
+from src.knowledge.embeddings import cache as embedding_cache
 from src.database.session import engine, get_db
 from src.main import app
+
+
+@pytest.fixture(autouse=True)
+def _clean_embedding_cache():
+    """Every test starts with an empty query-embedding cache.
+
+    The cache is process-global by design — that is what makes it useful
+    across requests — but it also means one test's cached query silently
+    changes another's behaviour. A test asserting that a failing
+    embedding provider surfaces an error will pass on its own and fail in
+    the suite, because the cache short-circuits before the provider is
+    ever called. Same reasoning as the rate-limit fixture below.
+    """
+
+    embedding_cache.clear()
+    yield
+    embedding_cache.clear()
 
 
 @pytest.fixture(autouse=True)

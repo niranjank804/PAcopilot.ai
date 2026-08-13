@@ -25,6 +25,7 @@ from src.ai.schemas import (
 )
 from src.ai.tools.registry import get_tool, list_tools
 from src.core.config import settings
+from src.core.logging import app_logger
 from src.core.exceptions import (
     AppException,
     NotFoundException,
@@ -471,6 +472,52 @@ class AIOrchestrator:
             return ToolResult(
                 tool_call_id=tool_call.id,
                 content=exc.message,
+                is_error=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            # A tool raising something that is not an AppException used to
+            # escape this handler and take the whole conversation turn
+            # with it — the user got a 500 instead of an answer.
+            #
+            # The common case is not exotic: 18 of 24 tools parse a
+            # model-supplied connection_id with uuid.UUID(), and a model
+            # passing a connection *name* ("pa trial") rather than its id
+            # raises ValueError. That is a mistake the model can fix by
+            # itself, given the chance.
+            #
+            # So it is caught, recorded, and handed back as a tool error.
+            # The model sees what went wrong and retries; the turn
+            # survives.
+            await self._record_tool_execution(
+                db,
+                conversation_id=conversation_id,
+                organization_id=organization_id,
+                user_id=user_id,
+                tool_name=tool_call.name,
+                arguments=tool_call.input,
+                status="error",
+                result_summary=None,
+                duration_ms=int((time.monotonic() - start) * 1000),
+                # Type name only. An arbitrary exception message can carry
+                # a connection string, a path, or a TM1 credential, and
+                # this row is shown in the monitoring UI.
+                error_message=f"{type(exc).__name__}",
+            )
+
+            app_logger.error(
+                f"Tool '{tool_call.name}' raised {type(exc).__name__} "
+                f"(organization_id={organization_id})"
+            )
+
+            return ToolResult(
+                tool_call_id=tool_call.id,
+                content=(
+                    f"The '{tool_call.name}' tool failed because an argument "
+                    "was not valid. Check that connection_id is one of the "
+                    "connection ids listed in the system context (a UUID, "
+                    "not a connection name), and that every required "
+                    "argument is present."
+                ),
                 is_error=True,
             )
 

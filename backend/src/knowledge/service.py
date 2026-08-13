@@ -11,6 +11,7 @@ from src.database.models.knowledge_chunk import KnowledgeChunk
 from src.database.models.knowledge_document import KnowledgeDocument
 from src.knowledge import quality, retrieval
 from src.knowledge.chunking import chunk_text
+from src.knowledge.embeddings import cache as embedding_cache
 from src.knowledge.embeddings.registry import get_embedding_provider
 from src.knowledge.exceptions import KnowledgeServiceError
 from src.knowledge.loaders.registry import get_loader
@@ -179,8 +180,26 @@ class KnowledgeService:
 
         embedding_provider = get_embedding_provider("openai")
 
+        # ~3s of a measured ~3.5s search was this one API round trip, so
+        # a repeat question should not pay for it twice. Cached on
+        # (model, text); ingestion at upload_document deliberately is
+        # not, since each chunk is embedded exactly once.
+        query_embedding = embedding_cache.get(settings.EMBEDDING_MODEL, query)
+
+        if query_embedding is not None:
+            return await retrieval.search(
+                db,
+                organization_id=organization_id,
+                query_embedding=query_embedding,
+                top_k=top_k,
+            )
+
         try:
             [query_embedding] = await embedding_provider.embed([query])
+
+            embedding_cache.put(
+                settings.EMBEDDING_MODEL, query, query_embedding
+            )
         except Exception as exc:
             # Mirrors upload_document's own broad catch around the same
             # embedding call — any failure here (missing API key, rate
