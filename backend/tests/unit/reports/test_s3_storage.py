@@ -137,6 +137,22 @@ class TestTenantIsolation:
 
 class TestBackendSelection:
 
+    def test_the_suite_never_reaches_s3_by_default(self):
+        """The invariant the autouse fixture in conftest exists for.
+
+        Note there is no monkeypatch here — that is the point. This
+        asserts what an *arbitrary* test sees on a developer machine
+        with a real bucket in `.env`, which is the situation that had
+        28 report tests uploading to AWS.
+
+        A green suite is not evidence on its own: with working
+        credentials those tests pass either way, and quietly leave
+        objects in the production bucket. This is the only thing that
+        distinguishes the two.
+        """
+
+        assert isinstance(get_storage_backend(), DatabaseStorageBackend)
+
     def test_database_backend_when_no_bucket_configured(self, monkeypatch):
         monkeypatch.setattr(settings, "S3_BUCKET", None)
         reset_storage_backend()

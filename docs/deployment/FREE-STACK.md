@@ -148,9 +148,18 @@ green run on a bare machine is never mistaken for proof:
 cd backend && python -m pytest tests/unit/reports/test_s3_storage.py -q
 ```
 
-25 passed means the bucket really accepted an upload, returned it byte
-for byte, refused a cross-tenant read, and cleaned up. 24 passed with
+26 passed means the bucket really accepted an upload, returned it byte
+for byte, refused a cross-tenant read, and cleaned up. 25 passed with
 one skip means it never contacted AWS at all.
+
+The IAM user needs only `s3:PutObject`, `s3:GetObject` and
+`s3:DeleteObject` on `arn:aws:s3:::pacopilot-s3/*`. Notably **not**
+`s3:ListBucket` — nothing in the application enumerates the bucket, and
+withholding it means a leaked key cannot even discover what is stored.
+One consequence when debugging by hand: without `ListBucket`, S3 answers
+`403` instead of `404` for an object that is not there, deliberately, so
+that a caller cannot probe for existence. A 403 on HEAD is what a
+successfully deleted object looks like.
 
 ## What you lose on free tiers
 
