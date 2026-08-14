@@ -71,11 +71,17 @@ services:
         value: pacopilot-s3
       - key: S3_REGION
         value: eu-north-1
-      # Resolved by boto3's standard credential chain, not by app
-      # config, so no key passes through a settings object. Set these in
-      # the Render dashboard — never commit them. Prefer a scoped IAM
-      # user limited to s3:GetObject/PutObject/DeleteObject on
-      # arn:aws:s3:::pacopilot-s3/*.
+      # Set these in the Render dashboard — never commit them. Prefer a
+      # scoped IAM user limited to s3:GetObject/PutObject/DeleteObject
+      # on arn:aws:s3:::pacopilot-s3/* — deliberately without
+      # s3:ListBucket, so a leaked key cannot enumerate what is stored.
+      #
+      # Dashboard vars become the process environment, so boto3's own
+      # chain would find them; they are also declared in Settings and
+      # passed explicitly, which is what makes a local .env work (that
+      # file is read by pydantic and never exported to os.environ).
+      # Leave both unset on an instance role and the chain takes over,
+      # so no long-lived key need exist at all.
       - key: AWS_ACCESS_KEY_ID
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
