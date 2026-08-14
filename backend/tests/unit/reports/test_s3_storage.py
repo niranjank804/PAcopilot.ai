@@ -282,6 +282,19 @@ class TestPutAndGet:
 
 
 def _aws_available() -> bool:
+    """Whether the backend can actually authenticate.
+
+    Both halves matter. Settings-supplied credentials come from a local
+    `.env`, which pydantic-settings never exports to os.environ — so
+    boto3's own chain cannot see them and asking it alone would skip this
+    test on exactly the machine it was written for. The chain still has
+    to be consulted second, because a deployment on an instance role
+    sets neither setting and is the case this test most needs to cover.
+    """
+
+    if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+        return True
+
     try:
         import boto3
 
@@ -293,12 +306,13 @@ def _aws_available() -> bool:
 requires_live_s3 = pytest.mark.skipif(
     not (_aws_available() and settings.S3_BUCKET),
     reason=(
-        "live S3 unavailable: needs AWS credentials on the standard chain "
-        "AND S3_BUCKET set"
+        "live S3 unavailable: needs AWS credentials (settings or the "
+        "standard chain) AND S3_BUCKET set"
     ),
 )
 
 
+@pytest.mark.live_aws
 @requires_live_s3
 class TestLiveS3:
     """Real round-trip against the configured bucket.

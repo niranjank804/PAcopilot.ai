@@ -116,6 +116,42 @@ pg_dump "<old-render-url>" --no-owner --no-privileges -f backup.sql
 psql "<new-neon-url>" -f backup.sql
 ```
 
+## Step 4 — artifact storage to S3
+
+`S3_BUCKET=pacopilot-s3`, `S3_REGION=eu-north-1`. Where the credentials
+go depends on which machine you mean, and getting this wrong is silent:
+
+**On Render (and any real host).** Set `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` as dashboard environment variables. Those become
+the process environment, which is the first place boto3 looks, so
+nothing else is needed. Better still on EC2/ECS: attach an instance role
+and set neither — no long-lived key exists to leak.
+
+**Locally, in `backend/.env`.** This is the case that does not work by
+itself. pydantic-settings reads `.env` into the settings object and
+never exports it to `os.environ`, so boto3's credential chain cannot see
+it. Both keys are therefore declared in `Settings` and passed to the
+client explicitly when present. Two consequences:
+
+- A key in `.env` that is *not* declared in `Settings` does not merely
+  go unused — `Settings` forbids unknown keys, so the app fails to
+  start, and the pydantic error quotes the offending value. That is a
+  credential in a stack trace. Declare before adding.
+- Paste the raw values. `AKIA...`, not `<AKIA...>` — the angle brackets
+  from a placeholder become part of the string and AWS answers
+  `InvalidAccessKeyId`.
+
+Verify with the live round-trip, which skips when unconfigured so a
+green run on a bare machine is never mistaken for proof:
+
+```bash
+cd backend && python -m pytest tests/unit/reports/test_s3_storage.py -q
+```
+
+25 passed means the bucket really accepted an upload, returned it byte
+for byte, refused a cross-tenant read, and cleaned up. 24 passed with
+one skip means it never contacted AWS at all.
+
 ## What you lose on free tiers
 
 Worth knowing before relying on it:

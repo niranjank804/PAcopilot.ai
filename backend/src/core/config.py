@@ -318,6 +318,22 @@ class Settings(BaseSettings):
     S3_BUCKET: str | None = None
     S3_REGION: str = "eu-north-1"
 
+    # Declared, but still not the preferred way to supply them.
+    #
+    # boto3 resolves credentials from its own chain (process environment,
+    # shared credentials file, instance role), and on a host like Render
+    # the dashboard's env vars ARE the process environment, so nothing
+    # needs declaring. Locally they usually live in `.env`, which
+    # pydantic-settings reads into *this object* and never exports to
+    # os.environ — so boto3 would not see them, and an undeclared key
+    # here fails startup outright.
+    #
+    # Declaring them optional makes `.env` work for development while
+    # leaving the chain in charge everywhere else: an EC2/ECS deployment
+    # on an instance role sets neither and holds no long-lived key.
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+
     # ------------------------------------------------------------------
     # Error tracking (src/core/error_tracking.py)
     # ------------------------------------------------------------------

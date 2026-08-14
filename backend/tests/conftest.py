@@ -4,6 +4,8 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import rate_limit
+from src.core.config import settings
+from src.reports import storage as report_storage
 from src.knowledge.embeddings import cache as embedding_cache
 from src.database.session import engine, get_db
 from src.main import app
@@ -24,6 +26,37 @@ def _clean_embedding_cache():
     embedding_cache.clear()
     yield
     embedding_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _pinned_storage_backend(request, monkeypatch):
+    """Storage is Postgres in tests, whatever the environment says.
+
+    The backend is chosen from `S3_BUCKET`, which is real configuration a
+    developer may well have set in `.env`. Without this, the suite's
+    behaviour depends on the machine it runs on: 28 report tests upload a
+    workbook, and with a bucket configured they leave the fakes behind
+    and talk to AWS.
+
+    The failure mode with a *valid* key is the dangerous one, because it
+    is not a failure — the tests pass, having written test objects into
+    the real bucket on every run. An invalid key is what made this
+    visible at all.
+
+    Tests that genuinely want S3 opt in: `s3_configured` for the fake
+    client, the `live_aws` marker for the real bucket.
+    """
+
+    if request.node.get_closest_marker("live_aws"):
+        yield
+        return
+
+    monkeypatch.setattr(settings, "S3_BUCKET", None)
+    report_storage.reset_storage_backend()
+
+    yield
+
+    report_storage.reset_storage_backend()
 
 
 @pytest.fixture(autouse=True)

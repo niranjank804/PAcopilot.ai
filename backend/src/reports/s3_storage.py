@@ -20,11 +20,19 @@ explicit.
 the same discipline this codebase already uses for smtplib and TM1py, so
 a slow or unreachable bucket cannot block the event loop.
 
-Credentials are never read from application config. boto3 resolves them
-from the standard chain (environment, shared credentials file, instance
-role), which means an EC2/ECS deployment can use a role and never hold a
-long-lived key at all — and no key ever passes through a settings object
-that might be logged or serialized.
+**Credentials stay boto3's job wherever possible.** It resolves them
+from the standard chain — process environment, shared credentials file,
+instance role — so an EC2/ECS deployment can use a role and never hold a
+long-lived key at all. On a host like Render the dashboard's env vars
+*are* the process environment, so that path needs no configuration here
+either.
+
+Local development is the exception, and the reason `AWS_ACCESS_KEY_ID`
+and `AWS_SECRET_ACCESS_KEY` are declared in settings: a `.env` file is
+read by pydantic-settings into the settings object and never exported to
+os.environ, so boto3 cannot see it. When both are set they are passed to
+the client explicitly; when either is absent nothing is passed and the
+chain decides, which keeps the instance-role deployment key-free.
 """
 
 import asyncio
@@ -53,9 +61,22 @@ def _client():
     import boto3
     from botocore.config import Config
 
+    # Explicit only when configured. Passing None lets boto3 fall back to
+    # its own chain, which is what an instance-role deployment needs —
+    # so this supports a local .env without forcing a long-lived key in
+    # production.
+    credentials = {}
+
+    if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+        credentials = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+        }
+
     return boto3.client(
         "s3",
         region_name=settings.S3_REGION,
+        **credentials,
         config=Config(
             retries={"max_attempts": 3, "mode": "standard"},
             connect_timeout=10,
