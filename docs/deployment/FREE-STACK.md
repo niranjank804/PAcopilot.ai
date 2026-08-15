@@ -87,12 +87,21 @@ Four consecutive pushes failed this way in 6-7 seconds each while the
 alias kept serving a two-day-old build — green site, stale code, and no
 signal anywhere except the Vercel deployment list.
 
-Fix it once, in the dashboard: **Settings > Build and Deployment > Root
-Directory > `frontend`**. There is no CLI equivalent; it is a project
-setting rather than a build input.
+**Fixed.** `rootDirectory` was `null` on the project and is now
+`frontend`. There is no CLI flag for it, but it is a project field on the
+REST API, which the CLI's own token can reach:
 
-Until that is set, every deploy must be `cd frontend && npx vercel --prod`
-by hand, and a plain `git push` silently changes nothing.
+```bash
+curl -X PATCH "https://api.vercel.com/v9/projects/$PROJECT_ID?teamId=$TEAM_ID"   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"rootDirectory": "frontend"}'
+```
+
+`$PROJECT_ID` and `$TEAM_ID` are in `frontend/.vercel/project.json`; the
+token is in the CLI's `auth.json`. Verify with a GET on the same URL —
+`rootDirectory` should read `"frontend"`, not `null`.
+
+Worth knowing for next time: the dashboard is not the only way to change
+a project setting, and a setting that only exists in `.vercel/` locally
+is not a setting the platform knows about.
 
 ### Original UI instructions
 
