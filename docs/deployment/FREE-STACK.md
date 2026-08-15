@@ -71,6 +71,29 @@ Note the deployment-specific URL (`...-lsj8vjnyp-...vercel.app`) returns
 302 — Vercel's deployment protection covers those. The clean project
 alias above is the public one.
 
+### Root Directory must be set on the PROJECT, not just the CLI
+
+`vercel link` from inside `frontend/` records the directory locally in
+`.vercel/`, and `vercel --prod` from there uploads that directory, so CLI
+deploys work. **Git-triggered builds do not use it.** They clone the
+repository root and run `next build` there, which fails immediately:
+
+```
+Error: Couldn't find any `pages` or `app` directory.
+      Please create one under the project root
+```
+
+Four consecutive pushes failed this way in 6-7 seconds each while the
+alias kept serving a two-day-old build — green site, stale code, and no
+signal anywhere except the Vercel deployment list.
+
+Fix it once, in the dashboard: **Settings > Build and Deployment > Root
+Directory > `frontend`**. There is no CLI equivalent; it is a project
+setting rather than a build input.
+
+Until that is set, every deploy must be `cd frontend && npx vercel --prod`
+by hand, and a plain `git push` silently changes nothing.
+
 ### Original UI instructions
 
 Zero code changes. Next.js is Vercel's own framework.
