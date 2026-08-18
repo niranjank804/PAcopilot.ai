@@ -46,6 +46,31 @@ class CitationResponse(BaseModel):
     score: float
 
 
+class PageCitationResponse(BaseModel):
+    """A page the model was shown as an image.
+
+    Distinct from CitationResponse: that one says a passage of text was
+    in the prompt, this one says a picture of a page was. A UI that
+    conflated them would offer to highlight a quotation that was never
+    sent.
+    """
+
+    page_id: uuid.UUID
+    document_id: uuid.UUID
+    filename: str
+    page_number: int
+    score: float
+
+
+class VisualStatusResponse(BaseModel):
+    enabled: bool
+    provider: str
+    available: bool
+    # Shown to an administrator, so it has to name what is missing and
+    # what would fix it rather than just being false.
+    reason: str
+
+
 class AskResponse(BaseModel):
     conversation_id: uuid.UUID
     message_id: uuid.UUID
@@ -53,6 +78,7 @@ class AskResponse(BaseModel):
     model: str
     usage: UsageResponse
     citations: list[CitationResponse]
+    page_citations: list[PageCitationResponse] = []
 
 
 class ExplainErrorRequest(BaseModel):

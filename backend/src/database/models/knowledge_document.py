@@ -56,6 +56,21 @@ class KnowledgeDocument(BaseModel, OrganizationScoped):
         Text,
     )
 
+    # Why visual indexing did not happen, when text indexing did. Kept
+    # separate from `error_message` because the document is not failed:
+    # it is searchable by text and simply has no page images, and
+    # merging the two would make a fully-working document report as
+    # broken.
+    visual_index_error: Mapped[str | None] = mapped_column(
+        Text,
+    )
+
+    visual_pages = relationship(
+        "VisualPage",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
     chunks = relationship(
         "KnowledgeChunk",
         back_populates="document",

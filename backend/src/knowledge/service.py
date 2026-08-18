@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import logging
 import uuid
@@ -15,6 +16,9 @@ from src.knowledge.embeddings import cache as embedding_cache
 from src.knowledge.embeddings.registry import get_embedding_provider
 from src.knowledge.exceptions import KnowledgeServiceError
 from src.knowledge.loaders.registry import get_loader
+from src.knowledge.visual.providers.registry import visual_rag_availability
+from src.knowledge.visual.service import visual_service
+from src.schemas.ai import AttachmentInput
 from src.repositories.knowledge_chunk_repository import knowledge_chunk_repository
 from src.repositories.knowledge_document_repository import (
     knowledge_document_repository,
@@ -36,11 +40,42 @@ class Citation:
         self.score = score
 
 
+class PageCitation:
+    """A citation that points at a page the model actually looked at.
+
+    Separate from `Citation` because the evidence is different in kind:
+    a chunk citation says "this text was in the prompt", a page citation
+    says "this image was in the prompt". Conflating them would let the
+    UI claim a passage was quoted when what was really sent was a
+    picture of the page it sits on.
+    """
+
+    def __init__(
+        self,
+        page_id: uuid.UUID,
+        document_id: uuid.UUID,
+        filename: str,
+        page_number: int,
+        score: float,
+    ):
+        self.page_id = page_id
+        self.document_id = document_id
+        self.filename = filename
+        self.page_number = page_number
+        self.score = score
+
+
 class AskResult:
 
-    def __init__(self, chat_result: ChatResult, citations: list[Citation]):
+    def __init__(
+        self,
+        chat_result: ChatResult,
+        citations: list[Citation],
+        page_citations: list[PageCitation] | None = None,
+    ):
         self.chat_result = chat_result
         self.citations = citations
+        self.page_citations = page_citations or []
 
 
 logger = logging.getLogger(__name__)
@@ -81,6 +116,16 @@ class KnowledgeService:
     ) -> None:
 
         document = await self.get_document(db, document_id, organization_id)
+
+        # Before the row: the CASCADE removes visual_pages, but a stored
+        # page image outlives its row indefinitely and is billed for the
+        # privilege. Deleting the objects needs the references, which
+        # only exist while the rows do.
+        await visual_service.delete_for_document(
+            db,
+            organization_id=organization_id,
+            document_id=document_id,
+        )
 
         await knowledge_document_repository.delete(db, document)
 
@@ -167,6 +212,36 @@ class KnowledgeService:
             document.processing_status = "failed"
             document.error_message = str(exc)
 
+            return await knowledge_document_repository.update(db, document)
+
+        # Visual indexing is additive and deliberately non-fatal. The
+        # text index above is what the product has always relied on; if
+        # rasterizing or embedding pages fails — no GPU, an image-only
+        # PDF, an unreachable object store — the document must still be
+        # searchable by text rather than being marked failed wholesale.
+        # The reason is recorded so the gap is visible rather than
+        # guessed at.
+        if settings.VISUAL_RAG_ENABLED and content_type == "application/pdf":
+            try:
+                result = await visual_service.index_document(
+                    db,
+                    document=document,
+                    organization_id=organization_id,
+                    file_bytes=file_bytes,
+                )
+                logger.info(
+                    "Visual index for %s: %d pages, %d embedded via %s.",
+                    filename,
+                    result.pages_indexed,
+                    result.pages_embedded,
+                    result.provider,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Visual indexing skipped for %s: %s", filename, exc
+                )
+                document.visual_index_error = str(exc)
+
         return await knowledge_document_repository.update(db, document)
 
     async def search(
@@ -218,6 +293,84 @@ class KnowledgeService:
             top_k=top_k,
         )
 
+    async def _search_pages(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        query: str,
+    ) -> list:
+        """Visual matches, or none — never an error.
+
+        Visual search is an enhancement to `ask`, so every way it can be
+        unavailable (disabled, no GPU, no provider key, nothing indexed
+        yet) has to degrade to text-only rather than failing a question
+        the text index could have answered. The reason is logged, not
+        raised.
+        """
+
+        if not settings.VISUAL_RAG_ENABLED:
+            return []
+
+        availability = visual_rag_availability()
+
+        if not availability.available:
+            logger.debug("Visual search unavailable: %s", availability.reason)
+            return []
+
+        try:
+            return await visual_service.search(
+                db, organization_id=organization_id, query=query
+            )
+        except Exception as exc:
+            logger.warning("Visual search failed, answering from text: %s", exc)
+            return []
+
+    async def _page_attachments(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        page_matches: list,
+    ) -> list[AttachmentInput]:
+        """Load matched page images as chat attachments.
+
+        A page whose image cannot be fetched is dropped rather than
+        failing the question — the row and the object can diverge (a
+        restored database, a lifecycle-expired object), and the other
+        pages are still good evidence.
+        """
+
+        attachments: list[AttachmentInput] = []
+
+        for match in page_matches:
+            try:
+                image = await visual_service.load_image(
+                    db, organization_id=organization_id, page=match.page
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Page image %s unavailable, skipping: %s", match.page.id, exc
+                )
+                continue
+
+            # The extension is what `process_attachments` reads to pick
+            # a media type; the stem is what the model sees when asked
+            # to cite its source, so it names the document and page.
+            filename = (
+                f"{match.page.document.filename} p{match.page.page_number}.jpg"
+            )
+
+            attachments.append(
+                AttachmentInput(
+                    filename=filename,
+                    content_type="image/jpeg",
+                    data=base64.b64encode(image).decode("ascii"),
+                )
+            )
+
+        return attachments
+
     async def ask(
         self,
         db: AsyncSession,
@@ -237,6 +390,14 @@ class KnowledgeService:
             query=query,
         )
 
+        page_matches = await self._search_pages(
+            db, organization_id=organization_id, query=query
+        )
+
+        attachments = await self._page_attachments(
+            db, organization_id=organization_id, page_matches=page_matches
+        )
+
         system_prompt = None
 
         if matches:
@@ -254,6 +415,33 @@ class KnowledgeService:
                 f"{context}"
             )
 
+        if attachments:
+            # Without this the model receives images with no idea what
+            # they are or that it may cite them, and tends to describe
+            # them ("the image shows a table...") instead of answering
+            # from them. Naming the page number is what makes a citation
+            # checkable by the reader.
+            pages_note = "\n".join(
+                f"- Image {index}: {match.page.document.filename}, "
+                f"page {match.page.page_number}"
+                for index, match in enumerate(page_matches, start=1)
+            )
+
+            visual_context = (
+                "The attached images are pages from the organization's "
+                "documents, retrieved as relevant to this question. Read "
+                "them directly — charts, tables and figures on them are "
+                "readable as shown, and are often the only place the "
+                "answer exists. Cite the page you used.\n\n"
+                f"{pages_note}"
+            )
+
+            system_prompt = (
+                f"{system_prompt}\n\n{visual_context}"
+                if system_prompt
+                else visual_context
+            )
+
         # Passing both `system` (the retrieved document context) and
         # `agent` is what actually combines the two knowledge sources: the
         # persona brings live TM1 tool access, and _build_tool_system_prompt
@@ -268,6 +456,7 @@ class KnowledgeService:
             system=system_prompt,
             agent=agent,
             enable_tools=agent is not None,
+            attachments=attachments or None,
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -282,7 +471,18 @@ class KnowledgeService:
             for match in matches
         ]
 
-        return AskResult(chat_result, citations)
+        page_citations = [
+            PageCitation(
+                page_id=match.page.id,
+                document_id=match.page.document_id,
+                filename=match.page.document.filename,
+                page_number=match.page.page_number,
+                score=match.score,
+            )
+            for match in page_matches
+        ]
+
+        return AskResult(chat_result, citations, page_citations)
 
 
 knowledge_service = KnowledgeService()

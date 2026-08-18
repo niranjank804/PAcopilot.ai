@@ -5,6 +5,7 @@ from .ai_usage import AIUsage
 from .audit_log import AuditLog
 from .knowledge_chunk import KnowledgeChunk
 from .knowledge_document import KnowledgeDocument
+from .visual_page import VisualPage
 from .organization import Organization
 from .password_reset_token import PasswordResetToken
 from .permission import Permission
@@ -43,6 +44,7 @@ __all__ = [
     "AIToolExecution",
     "AIUsage",
     "KnowledgeDocument",
+    "VisualPage",
     "KnowledgeChunk",
     "TM1Change",
     "TM1CodingConvention",

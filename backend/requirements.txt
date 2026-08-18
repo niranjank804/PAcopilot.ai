@@ -37,7 +37,7 @@ pydantic-settings==2.14.2
 pydantic==2.13.4
 pydantic_core==2.46.4
 pypdf==6.14.2
-pypdfium2==5.12.0
+pypdfium2==5.12.1
 python-dateutil==2.9.0.post0
 python-docx==1.2.0
 python-dotenv==1.2.2
@@ -64,3 +64,13 @@ xgboost==3.3.0
 # S3 artifact/workbook storage. Sync SDK, called via asyncio.to_thread
 # (same discipline as smtplib and TM1py elsewhere in this codebase).
 boto3==1.35.99
+
+# Visual RAG (src/knowledge/visual/). numpy does the MaxSim scoring;
+# pypdfium2 rasterizes PDF pages and needs no poppler binary on PATH,
+# which is what lets the same code run on a Windows worker and a Linux
+# container. Both were already declared before this feature existed —
+# pypdfium2 was pinned to 5.12.0, which PyPI has since yanked.
+#
+# ColPali itself (torch, colpali-engine) is deliberately NOT here: ~6GB
+# of weights that cannot load in a 512MB container. See
+# docs/knowledge/VISUAL-RAG.md for installing it on a GPU machine.

@@ -67,6 +67,13 @@ services:
       # ~0.5GB and report artifacts would consume it quickly. Existing
       # rows keep resolving either way — a reference carries its own
       # scheme, so switching backends orphans nothing.
+      #
+      # Visual RAG renders every uploaded PDF page to an image, so an
+      # object store is effectively required: with Postgres storage a
+      # 100-page document is ~20MB of images in a 500MB free tier.
+      # Without AWS credentials the write fails and visual indexing is
+      # skipped non-fatally — documents stay searchable by text.
+      # GET /knowledge/visual/status reports which of those is happening.
       - key: S3_BUCKET
         value: pacopilot-s3
       - key: S3_REGION

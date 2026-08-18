@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
@@ -9,7 +9,15 @@ from src.core.exceptions import ValidationException
 from src.database.session import get_db
 from src.errors.classifier import classify_error
 from src.knowledge.loaders.registry import resolve_content_type
+from src.core.exceptions import NotFoundException
 from src.knowledge.service import knowledge_service
+from src.knowledge.visual.providers.registry import (
+    get_visual_provider,
+    visual_rag_availability,
+)
+from src.knowledge.visual.service import visual_service
+from src.repositories.visual_page_repository import visual_page_repository
+from src.core.config import settings
 from src.schemas.ai import UsageResponse
 from src.schemas.auth import UserResponse
 from src.schemas.knowledge import (
@@ -19,8 +27,10 @@ from src.schemas.knowledge import (
     DocumentResponse,
     ExplainErrorRequest,
     ExplainErrorResponse,
+    PageCitationResponse,
     SearchRequest,
     SearchResultItem,
+    VisualStatusResponse,
 )
 from src.schemas.response import ApiResponse
 
@@ -205,6 +215,16 @@ async def ask(
                 )
                 for citation in result.citations
             ],
+            page_citations=[
+                PageCitationResponse(
+                    page_id=citation.page_id,
+                    document_id=citation.document_id,
+                    filename=citation.filename,
+                    page_number=citation.page_number,
+                    score=citation.score,
+                )
+                for citation in result.page_citations
+            ],
         ),
     )
 
@@ -267,4 +287,71 @@ async def explain_error(
                 for citation in result.citations
             ],
         ),
+    )
+
+
+@router.get(
+    "/visual/status",
+    response_model=ApiResponse[VisualStatusResponse],
+)
+async def visual_status(
+    current_user: UserResponse = Depends(require_permission("knowledge.read")),
+):
+    """Whether visual search can run here, and why not if it cannot.
+
+    Visual indexing degrades silently by design — a document must stay
+    searchable by text when there is no GPU — which means without an
+    endpoint like this the degradation is invisible, and an
+    administrator has no way to tell "no relevant pages" apart from
+    "this never worked".
+    """
+
+    availability = visual_rag_availability()
+
+    return ApiResponse(
+        success=True,
+        data=VisualStatusResponse(
+            enabled=settings.VISUAL_RAG_ENABLED,
+            provider=get_visual_provider().name,
+            available=availability.available,
+            reason=availability.reason,
+        ),
+    )
+
+
+@router.get("/pages/{page_id}/image")
+async def get_page_image(
+    page_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("knowledge.read")),
+):
+    """The rendered page behind a citation, so a reader can check it.
+
+    Two independent tenancy checks, deliberately. The row is compared
+    against the caller's organization here, and the storage backend
+    re-checks the key prefix on the way to S3 — because a citation id is
+    the kind of value that ends up in a URL, and one check is one
+    forgotten `if` away from serving another tenant's page.
+    """
+
+    page = await visual_page_repository.get_by_id(db, page_id)
+
+    if page is None or page.organization_id != current_user.organization_id:
+        # 404 rather than 403: whether a page id exists is itself
+        # information about another organization's documents.
+        raise NotFoundException("Page not found.")
+
+    image = await visual_service.load_image(
+        db, organization_id=current_user.organization_id, page=page
+    )
+
+    return Response(
+        content=image,
+        media_type="image/jpeg",
+        headers={
+            # Immutable: a page image is derived from a specific upload
+            # and never rewritten in place. private, because it is
+            # tenant data and must not be held by a shared proxy.
+            "Cache-Control": "private, max-age=3600, immutable",
+        },
     )

@@ -315,6 +315,53 @@ class Settings(BaseSettings):
     # instance role), so a deployment on an instance role holds no
     # long-lived key at all, and no key passes through a settings object
     # that could be logged or serialized.
+    # ------------------------------------------------------------------
+    # Visual RAG (src/knowledge/visual/)
+    # ------------------------------------------------------------------
+    # Retrieval over page *images* rather than extracted text. A
+    # Planning Analytics pack is mostly tables, charts and pivot
+    # exports, and text extraction returns those as an unordered column
+    # of numbers with the headings that gave them meaning discarded.
+    VISUAL_RAG_ENABLED: bool = True
+
+    # Which provider produces page embeddings. "colpali" is true late
+    # interaction and needs a GPU present in this process; "text-proxy"
+    # embeds each page's extracted text with the existing text provider
+    # and runs anywhere. See src/knowledge/visual/providers/.
+    VISUAL_RAG_PROVIDER: str = "text-proxy"
+
+    # 150 renders a dense financial table legibly without producing
+    # files that dominate storage. Below ~110 small figures in pivot
+    # exports start to break up.
+    # ColPali on CPU is ~10-30s per page, which for a 30-page upload
+    # exceeds any sane request timeout. Off by default so that the
+    # failure is an explanation at upload time rather than a proxy
+    # timeout ten minutes in.
+    VISUAL_RAG_ALLOW_CPU_COLPALI: bool = False
+
+    VISUAL_RAG_RENDER_DPI: int = 150
+
+    # Claude downsamples above ~1568px before charging for it, and
+    # ColPali resizes to its own patch grid regardless, so pixels beyond
+    # this cost storage and upload time and change no result.
+    VISUAL_RAG_MAX_IMAGE_DIMENSION: int = 1400
+
+    # A bound on what one upload can cost. Rendering is CPU-bound and
+    # every page is stored and embedded, so an unbounded 900-page annual
+    # report would be a self-inflicted outage.
+    VISUAL_RAG_MAX_PAGES: int = 100
+
+    # How many page images are attached to the answering call. Each is
+    # real tokens, and Claude reads a handful of pages far better than
+    # it skims twenty.
+    VISUAL_RAG_TOP_K: int = 3
+
+    # Relevance floor, same purpose as retrieval.MINIMUM_SCORE: without
+    # one, an unanswerable question still returns the top pages and the
+    # model is handed confident-looking irrelevant evidence. Comparable
+    # across queries because MaxSim is averaged per query token.
+    VISUAL_RAG_MINIMUM_SCORE: float = 0.25
+
     S3_BUCKET: str | None = None
     S3_REGION: str = "eu-north-1"
 
