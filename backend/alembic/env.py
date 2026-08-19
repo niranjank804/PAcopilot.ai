@@ -17,17 +17,17 @@ target_metadata = Base.metadata
 
 
 def get_sync_url() -> str:
+    """Alembic runs on psycopg2, not asyncpg.
+
+    Built through src/database/url.py rather than by string-replacing
+    the driver name, because the two drivers disagree about the query
+    parameters: psycopg2 understands libpq's `sslmode` and asyncpg
+    rejects it.
     """
-    Convert asyncpg URL to psycopg2 URL for Alembic.
-    """
-    return (
-        settings.DATABASE_URL
-        .render_as_string(hide_password=False)
-        .replace(
-            "postgresql+asyncpg",
-            "postgresql+psycopg2"
-        )
-    )
+
+    from src.database.url import sync_url
+
+    return sync_url(settings.DATABASE_DSN)
 
 
 def run_migrations_offline() -> None:

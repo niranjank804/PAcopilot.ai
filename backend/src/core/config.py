@@ -2,7 +2,6 @@ from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
@@ -50,11 +49,23 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Database
     # ------------------------------------------------------------------
-    DATABASE_HOST: str
-    DATABASE_PORT: int
-    DATABASE_NAME: str
-    DATABASE_USER: str
-    DATABASE_PASSWORD: str
+    # Two accepted forms. Render supplies five discrete fields; Neon and
+    # the Vercel integration that provisions it supply one URL. Whichever
+    # is present wins, with the URL taking precedence so that a platform
+    # that injects DATABASE_URL automatically does not have to be told
+    # about the other five.
+    #
+    # Everything about translating one into something asyncpg accepts —
+    # libpq-only parameters, pooled endpoints — is in
+    # src/database/url.py, which is where the surprising parts are
+    # documented.
+    DATABASE_URL: str | None = None
+
+    DATABASE_HOST: str | None = None
+    DATABASE_PORT: int | None = None
+    DATABASE_NAME: str | None = None
+    DATABASE_USER: str | None = None
+    DATABASE_PASSWORD: str | None = None
 
     # SQLAlchemy's defaults (5 + 10) capped the whole deployment at 15
     # concurrent DB-bound requests. An AI request occupies its slot for the
@@ -437,9 +448,40 @@ class Settings(BaseSettings):
     )
 
     @property
-    def DATABASE_URL(self):
-        return URL.create(
-            drivername="postgresql+asyncpg",
+    def DATABASE_DSN(self) -> str:
+        """The connection string, from whichever form was configured.
+
+        Named separately from the DATABASE_URL *setting* so that a
+        deployment can supply one and every consumer can read the other
+        without caring which was used.
+        """
+
+        from src.database import url as database_url
+
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+
+        missing = [
+            name
+            for name in (
+                "DATABASE_HOST",
+                "DATABASE_PORT",
+                "DATABASE_NAME",
+                "DATABASE_USER",
+                "DATABASE_PASSWORD",
+            )
+            if getattr(self, name) is None
+        ]
+
+        if missing:
+            # Fail at startup with the list, rather than at the first
+            # query with a URL that has "None" in it.
+            raise ValueError(
+                "No database configured. Set DATABASE_URL, or all of the "
+                f"individual settings (missing: {', '.join(missing)})."
+            )
+
+        return database_url.from_parts(
             username=self.DATABASE_USER,
             password=self.DATABASE_PASSWORD,
             host=self.DATABASE_HOST,
