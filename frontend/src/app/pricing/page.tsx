@@ -23,6 +23,21 @@ interface Plan {
   price_label: string;
 }
 
+// How long the build is willing to wait for the pricing catalog.
+//
+// This runs during static generation, where Next gives a page 60 seconds
+// before killing the worker, retrying twice, and failing the whole
+// build. `fetch` has no default timeout, so without this an API that
+// accepts the connection and then never answers takes the deployment
+// down with it — which is exactly what a suspended service does, and
+// what a free-tier host does while spinning up from idle.
+//
+// Deliberately short. The build should not depend on a third party
+// being awake, and the empty-catalog fallback below is a designed state
+// rather than a failure: `revalidate` re-fetches within five minutes of
+// the first real visitor, by which point the API is warm.
+const PLANS_TIMEOUT_MS = 10_000;
+
 // Rendered on the server from the same catalog the backend enforces, so the
 // published entitlements and the enforced ones cannot drift. If the API is
 // unreachable the page renders its shell rather than 500-ing — a pricing page
@@ -33,6 +48,11 @@ async function loadPlans(): Promise<Plan[]> {
   try {
     const response = await fetch(`${base}/billing/plans`, {
       next: { revalidate: 300 },
+      // Turns a hang into a rejection, so the catch below can do the job
+      // it was written for. Without it the catch only handles the API
+      // being *refused*, never the API being *silent* — and silence is
+      // the more common failure.
+      signal: AbortSignal.timeout(PLANS_TIMEOUT_MS),
     });
 
     if (!response.ok) return [];
