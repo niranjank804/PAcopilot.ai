@@ -253,6 +253,14 @@ class Settings(BaseSettings):
     # TM1
     # ------------------------------------------------------------------
     TM1_CREDENTIALS_KEY: str | None = None
+
+    # The key being retired, during a rotation. Set alongside a new
+    # TM1_CREDENTIALS_KEY so stored credentials stay readable while
+    # scripts/rotate_tm1_key.py re-encrypts them; remove it once that
+    # has run. Without this a key change makes every stored TM1 password
+    # permanently undecryptable, which means the key cannot be rotated
+    # in response to a suspected exposure — the one time it must be.
+    TM1_CREDENTIALS_KEY_PREVIOUS: str | None = None
     TM1_REQUEST_TIMEOUT_SECONDS: float = 30.0
     TM1_MAX_RETRIES: int = 3
     TM1_CIRCUIT_BREAKER_THRESHOLD: int = 5
