@@ -68,3 +68,10 @@ PULL_REQUEST.md
 
 database-backup.dump
 *.dump
+
+# Any copy of a .env is still a .env. `.env` itself was ignored, but a
+# timestamped or suffixed backup beside it was not — and this repository
+# is public, so one `git add -A` would have published every secret in it.
+.env.*
+!.env.example
+*.env.backup*
