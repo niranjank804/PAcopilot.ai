@@ -72,11 +72,16 @@ def _render_group(
 
         if preview:
             # Required by the consistency tests: a preview capability is
-            # never described without the words that mark it as one.
-            line += (
-                " (DEVELOPER PREVIEW — not validated end-to-end; do not "
-                "rely on it for production reporting.)"
-            )
+            # never described without the words that mark it as one — on
+            # its own line, so the marker travels with the capability if
+            # the model quotes one in isolation.
+            #
+            # Kept terse deliberately. This repeats verbatim on every
+            # preview line under a heading that already says the same
+            # thing, so each word costs once per preview capability in a
+            # block prepended to every request. The heading carries the
+            # explanation; the line carries the label.
+            line += " (DEVELOPER PREVIEW — not validated; don't rely on it.)"
 
         if capability.permission and not unavailable:
             line += f" Requires the {capability.permission} permission."

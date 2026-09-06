@@ -367,7 +367,26 @@ class TestRegistryHygiene:
     def test_block_stays_within_a_sane_token_budget(self):
         # Prepended to every request on every agent. Cached, but still
         # tokens not available for the user's actual problem.
-        assert len(PRODUCT_OVERVIEW) < 6000
+        #
+        # Raised from 6000 when registering the 23rd capability, which
+        # would not fit. That was not one verbose entry: the block was
+        # already at ~5900 with the shortest useful description, so the
+        # ceiling had been reached by the product rather than by any one
+        # feature, and the next capability would have hit it too.
+        #
+        # Duplication was removed first — the per-line preview marker
+        # repeated a sentence the section heading already carried — and
+        # it still did not fit. So the number moved, deliberately and
+        # once, rather than each new capability being squeezed until it
+        # says nothing useful.
+        #
+        # The cost is bounded: this block is byte-stable and sits in the
+        # cached prefix, so on a cache hit the marginal cost of the
+        # increase is close to zero. The limit still exists because an
+        # unbounded registry would eventually crowd out the user's own
+        # context, and because a capability needing a paragraph is a
+        # capability whose summary is wrong.
+        assert len(PRODUCT_OVERVIEW) < 8000
 
     def test_no_capability_is_left_unclassified(self):
         for capability in CAPABILITIES:

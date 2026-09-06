@@ -114,6 +114,22 @@ CAPABILITIES: tuple[Capability, ...] = (
         permission="knowledge.write",
     ),
     Capability(
+        key="visual_document_search",
+        name="Visual document search",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Uploaded PDF pages are also read as images, so charts and "
+            "tables are answered from how they look rather than from "
+            "extracted text. Answers cite the page."
+        ),
+        implementation="backend/src/knowledge/visual/service.py",
+        permission="knowledge.read",
+        caveat=(
+            "Pages are found by their text; locating a purely visual page "
+            "needs a GPU and is off here. Check /knowledge/visual/status."
+        ),
+    ),
+    Capability(
         key="metadata_explorer",
         name="Metadata explorer",
         status=CapabilityStatus.AVAILABLE,
