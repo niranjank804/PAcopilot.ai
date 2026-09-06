@@ -65,3 +65,6 @@ backend/.coverage
 
 # PR description drafts (working notes, not shipped)
 PULL_REQUEST.md
+
+database-backup.dump
+*.dump
