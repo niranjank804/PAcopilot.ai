@@ -16,8 +16,8 @@ pytest-cov==7.1.0
 httpx2==2.7.0
 
 # Lint and static analysis
-ruff==0.16.1
-mypy==2.3.0
+ruff==0.16.6
+mypy==2.3.1
 
 # Dependency vulnerability scanning
 pip-audit==2.10.1
