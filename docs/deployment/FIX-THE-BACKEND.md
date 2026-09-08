@@ -3,6 +3,16 @@
 The backend has been unreachable since around 19 August 2026. This is
 what is wrong, what to do, and in what order.
 
+## Status — 8 September 2026
+
+| Step | State |
+|---|---|
+| 1. Does the data still exist? | **Done — it does not.** `pa-copilot-db` was deleted by Render. Data is unrecoverable. |
+| 2. Copy it | Not applicable — nothing to copy |
+| 3. Fresh database | **Done.** Neon `pa-copilot-db` (free, no expiry, us-west-2). 31 tables at revision `e9b3c7d21f45`, 5 roles, 29 permissions. 32 integration tests passed against it; the real app boots and passes `/health/ready` against it. |
+| 4. Point Render at it | **Waiting on the dashboard** — the only remaining action. |
+| 5. Stop it recurring | `render.yaml` no longer declares an expiring database; the keep-alive workflow no longer keeps the redundant Render frontend awake. Deleting that frontend service is still yours to do. |
+
 ## What is actually broken
 
 `pa-copilot-backend.onrender.com` accepts a TCP connection, completes
@@ -84,18 +94,42 @@ nothing can bring them back.
 
 Set one variable on the Render backend service and redeploy:
 
-```
-DATABASE_URL = <the Neon POOLED connection string>
+```text
+DATABASE_URL = <the Neon DIRECT connection string>
 ```
 
-The pooled one — its host contains `-pooler`. The code handles what that
-implies automatically (see `src/database/url.py`): Neon's URL carries
-libpq parameters asyncpg rejects, and its pooled endpoint is pgbouncer
-in transaction mode, where prepared statements do not survive.
+**Direct, not pooled** — in Neon's dashboard that is the value labelled
+`DATABASE_URL_UNPOOLED`, whose host does *not* contain `-pooler`. Neon's
+naming is the reverse of what you would guess: its `DATABASE_URL` is the
+pooled one.
+
+Why direct here: Render runs a persistent gunicorn process, so
+SQLAlchemy's own connection pool is the right tool. The code detects a
+`-pooler` host and switches to `NullPool` — correct for serverless, but
+on a persistent server it means a fresh TLS handshake per request. Save
+the pooled string for when the backend moves to Vercel. Either works;
+direct is simply the better fit for this host. `src/database/url.py`
+handles the rest of what a Neon URL needs (libpq parameters asyncpg
+rejects, and the pgbouncer prepared-statement problem).
 
 `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER` and
 `DATABASE_PASSWORD` can then be deleted from that service — a single
-`DATABASE_URL` supersedes all five.
+`DATABASE_URL` supersedes all five (it takes precedence in
+`src/core/config.py`, so leaving them is harmless but confusing).
+
+### Logging in afterwards
+
+The build seeds a Super Admin from `BOOTSTRAP_ADMIN_EMAIL`, which is set
+on Render. That account has a random, uncommunicated password and is
+designed to sign in via **Google Sign-In** — which the frontend only
+offers when `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is set on the Vercel project.
+It currently is not. Until it is, the admin's other route is "Forgot
+password", which without SMTP configured logs the reset link to the
+Render server log rather than emailing it.
+
+Ordinary access is not blocked by any of this: self-registration is
+open, so anyone can create an account immediately. It just won't be the
+Super Admin.
 
 Verify locally before trusting it: put the same URL in `backend/.env`
 and run `python -m pytest -q`. The suite runs against whatever is

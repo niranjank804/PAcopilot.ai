@@ -1,4 +1,4 @@
-name: Keep Render services awake
+name: Keep the Render backend awake
 
 on:
   schedule:
@@ -12,8 +12,19 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      # /health is the unauthenticated liveness probe: it touches no
+      # database and answers the instant the process is up, which is all
+      # a keep-alive needs to establish.
       - name: Ping backend
-        run: curl -sf -o /dev/null -m 30 https://pa-copilot-backend.onrender.com/database || true
+        run: curl -sf -o /dev/null -m 30 https://pa-copilot-backend.onrender.com/health || true
 
-      - name: Ping frontend
-        run: curl -sf -o /dev/null -m 30 https://pa-copilot-frontend.onrender.com/ || true
+      # Deliberately ONLY the backend. This job used to ping the Render
+      # frontend too, and that was actively harmful: a service that is
+      # pinged every 10 minutes never spins down, so it runs ~744 hours a
+      # month - the entire 750-hour free allowance for the whole
+      # workspace, on its own. When the allowance runs out Render suspends
+      # every free web service, backend included, until the next month.
+      #
+      # The frontend is served by Vercel, which does not spin down, so
+      # there is nothing there to keep awake. The Render copy should be
+      # deleted; until it is, at least nothing here keeps it burning hours.

@@ -1,7 +1,16 @@
-databases:
-  - name: pa-copilot-db
-    databaseName: enterprise_ai
-    plan: free
+# No `databases:` block, deliberately.
+#
+# There used to be one: a free-plan Postgres named pa-copilot-db. Free
+# Render databases expire 30 days after creation, get a 14-day grace
+# period, and are then deleted with all their data. That is what
+# happened in August 2026: the database was deleted, the five
+# fromDatabase env vars below resolved to nothing, Settings() failed
+# validation, and the backend was down for weeks. The data was lost.
+#
+# Re-adding the block would provision another expiring database on the
+# next Blueprint sync and set the same clock running again. The database
+# now lives on Neon (free tier, no expiry) and is supplied as a single
+# DATABASE_URL set in the dashboard — see docs/deployment/FIX-THE-BACKEND.md.
 
 services:
   - type: web
@@ -39,26 +48,18 @@ services:
         value: "10"
       - key: DATABASE_MAX_OVERFLOW
         value: "10"
-      - key: DATABASE_HOST
-        fromDatabase:
-          name: pa-copilot-db
-          property: host
-      - key: DATABASE_PORT
-        fromDatabase:
-          name: pa-copilot-db
-          property: port
-      - key: DATABASE_NAME
-        fromDatabase:
-          name: pa-copilot-db
-          property: database
-      - key: DATABASE_USER
-        fromDatabase:
-          name: pa-copilot-db
-          property: user
-      - key: DATABASE_PASSWORD
-        fromDatabase:
-          name: pa-copilot-db
-          property: password
+      # One connection string, set in the dashboard. Takes precedence over
+      # the five discrete DATABASE_* settings (src/core/config.py), so any
+      # stale copies of those left in the dashboard are inert — but delete
+      # them anyway; five variables pointing at a deleted host is a trap.
+      #
+      # Use Neon's DIRECT string here (host without "-pooler"). This is a
+      # persistent gunicorn process, so SQLAlchemy's own pool is the right
+      # tool; the pooled endpoint makes the code switch to NullPool, which
+      # is correct for serverless and a fresh TLS handshake per request
+      # here. src/database/url.py handles the rest of what a Neon URL needs.
+      - key: DATABASE_URL
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       # Set these manually in the Render dashboard after the first deploy —
