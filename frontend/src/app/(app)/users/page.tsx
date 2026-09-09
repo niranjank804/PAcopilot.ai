@@ -187,7 +187,12 @@ function MemberRow({ user, isSelf }: { user: AppUser; isSelf: boolean }) {
         {/* An admin page that cannot show who the admins are is missing
             its one essential column. Names come from the list endpoint
             in a single batched query, not a request per row. */}
-        {user.roles.length ? (
+        {/* Optional access on purpose, though the type says it is always
+            there: frontend and backend deploy separately, and for the
+            minutes between them the live API still answers without this
+            field. A page that crashes during every deploy is worse than
+            a dash. */}
+        {user.roles?.length ? (
           <div className="flex flex-wrap gap-1">
             {user.roles.map((role) => (
               <Badge key={role} variant="outline">
