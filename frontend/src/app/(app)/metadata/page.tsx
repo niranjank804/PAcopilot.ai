@@ -36,6 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tabs,
@@ -410,6 +412,23 @@ function MetadataExplorer() {
             </div>
           ) : null}
 
+          {/* A query with `enabled: false` is `isPending` forever in React
+              Query v5 — it never fetched, so it never resolves. Passing that
+              straight to a skeleton meant a user with no connection saw
+              loaders that never finished. The lists only mean something
+              once there is a connection to list from. */}
+          {connectionsQuery.isPending ? (
+            <Skeleton className="h-16 w-full" />
+          ) : activeConnectionId === null ? (
+            <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+              No TM1 connection yet.{" "}
+              <Link href="/connections" className="underline underline-offset-2">
+                Add one
+              </Link>{" "}
+              to explore its cubes, dimensions, processes and chores.
+            </p>
+          ) : (
+            <>
           <ObjectList
             type="cube"
             names={cubesQuery.data}
@@ -446,6 +465,8 @@ function MetadataExplorer() {
             selected={selected}
             onSelect={selectObject}
           />
+            </>
+          )}
         </div>
       </aside>
 

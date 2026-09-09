@@ -36,6 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiRequest } from "@/lib/api-client";
@@ -287,8 +289,17 @@ export default function DeploymentsPage() {
                 ))}
               </SelectContent>
             </Select>
-          ) : (
+          ) : connectionsQuery.isPending ? (
             <Skeleton className="h-9 w-64" />
+          ) : (
+            // Nothing to select from. A skeleton here never resolved,
+            // because there was never anything coming.
+            <Link
+              href="/connections"
+              className="text-sm underline underline-offset-2"
+            >
+              Add a TM1 connection to review changes
+            </Link>
           )}
           <Button
             size="sm"
@@ -320,6 +331,11 @@ export default function DeploymentsPage() {
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
               </div>
+            ) : !activeConnectionId ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No TM1 connection yet — add one on the Connections page to
+                see and create changes.
+              </p>
             ) : !changesQuery.data?.length ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
                 No changes for this connection yet — drafts created by the AI
@@ -373,6 +389,13 @@ export default function DeploymentsPage() {
             ) : detailQuery.isError ? (
               <p className="py-6 text-center text-sm text-destructive">
                 Failed to load: {errorMessage(detailQuery.error)}
+              </p>
+            ) : !selectedChangeId ? (
+              // With nothing selected the detail query is disabled, and a
+              // disabled query is `isPending` forever — so this used to
+              // render a skeleton that never finished.
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Select a change to see its details.
               </p>
             ) : detailQuery.isPending || !selectedDetail ? (
               <div className="space-y-2">

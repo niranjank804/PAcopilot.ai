@@ -184,6 +184,22 @@ function MemberRow({ user, isSelf }: { user: AppUser; isSelf: boolean }) {
       </TableCell>
       <TableCell className="font-mono text-xs">{user.username}</TableCell>
       <TableCell>
+        {/* An admin page that cannot show who the admins are is missing
+            its one essential column. Names come from the list endpoint
+            in a single batched query, not a request per row. */}
+        {user.roles.length ? (
+          <div className="flex flex-wrap gap-1">
+            {user.roles.map((role) => (
+              <Badge key={role} variant="outline">
+                {role}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell>
         <Badge variant={STATUS_VARIANT[user.registration_status]}>
           {user.registration_status}
         </Badge>
@@ -337,6 +353,7 @@ export default function UsersPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Username</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Active</TableHead>
                   <TableHead className="text-right">Action</TableHead>

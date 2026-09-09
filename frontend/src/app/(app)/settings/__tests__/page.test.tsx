@@ -207,6 +207,31 @@ describe("Organization settings", () => {
     );
   });
 
+  it("cannot be submitted unchanged", async () => {
+    // QA finding: Save was enabled with nothing edited, so a click wrote
+    // an identical row and an audit entry for a no-op. Same rule the
+    // profile form already applied.
+    mocks.apiRequest.mockResolvedValue(ORGANIZATION);
+
+    const user = userEvent.setup();
+
+    renderPage();
+
+    const name = await screen.findByDisplayValue("Acme Planning");
+    const buttons = screen.getAllByRole("button", { name: /^save$/i });
+    const save = buttons[buttons.length - 1];
+
+    expect(save).toBeDisabled();
+
+    // Editing enables it; reverting disables it again.
+    await user.type(name, "!");
+    expect(save).toBeEnabled();
+
+    await user.clear(name);
+    await user.type(name, "Acme Planning");
+    expect(save).toBeDisabled();
+  });
+
   it("explains a permission refusal rather than looking broken", async () => {
     // A Viewer has no organization.read. A 403 is the expected answer,
     // not a fault, and must not read as an error page.

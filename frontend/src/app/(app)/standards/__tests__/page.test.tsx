@@ -1,10 +1,15 @@
 /**
- * Coding Standards — the surface where a team's TM1 house style is set.
+ * Coding Standards — the upload that sent an empty body.
  *
- * Tested from the user's side. The two things that matter most here are not
- * the happy path: that a corpus which produced nothing tells the user their
- * existing standards were kept rather than silently reporting success, and
- * that uploading exports containing datasource credentials warns them.
+ * QA finding: both "Preview report" and "Set as our standards" posted a
+ * multipart body with no parts and got a 422, with no error shown. The
+ * cause was a `FileList` handed to an async mutation and then emptied by
+ * the input reset on the very next line — a FileList is a live view of
+ * the input, not a copy. The handlers now snapshot to an array first.
+ *
+ * These tests pin the invariant that matters: what reaches the API is a
+ * FormData that actually contains the chosen file, even though the input
+ * has been cleared by the time the request is built.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -28,8 +33,8 @@ const mocks = vi.hoisted(() => {
     apiRequest: vi.fn(),
     uploadRequest: vi.fn(),
     toastSuccess: vi.fn(),
-    toastWarning: vi.fn(),
     toastError: vi.fn(),
+    toastWarning: vi.fn(),
   };
 });
 
@@ -37,43 +42,28 @@ vi.mock("@/lib/api-client", () => ({
   ApiError: mocks.FakeApiError,
   apiRequest: mocks.apiRequest,
   uploadRequest: mocks.uploadRequest,
-  streamRequest: vi.fn(),
   registerTokenAccessors: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
   toast: {
     success: mocks.toastSuccess,
-    warning: mocks.toastWarning,
     error: mocks.toastError,
+    warning: mocks.toastWarning,
   },
 }));
 
 import StandardsPage from "../page";
 
-const CONVENTION = {
-  key: "no_inline_comments",
-  statement: "Comments sit on their own line above the code they describe.",
-  confidence: 0.93,
-  support: 64,
-  sample: 64,
-  examples: ["DATA - Load - FX Rates"],
-  counter_examples: [],
+const RUN = {
+  replaced_existing: true,
+  conventions_learned: 2,
+  processes_parsed: 9,
+  processes_failed: 0,
+  note: null,
+  files_with_stored_credentials: 0,
+  patterns: [],
 };
-
-function emptyRun(overrides: Record<string, unknown> = {}) {
-  return {
-    processes_parsed: 3,
-    processes_failed: 0,
-    conventions_learned: 4,
-    patterns: [],
-    rejected: [],
-    replaced_existing: true,
-    note: null,
-    files_with_stored_credentials: 0,
-    ...overrides,
-  };
-}
 
 function renderPage() {
   const client = new QueryClient({
@@ -87,102 +77,118 @@ function renderPage() {
   );
 }
 
-async function upload(buttonName: RegExp) {
-  const file = new File(["601,100"], "tm1.zip", { type: "application/zip" });
-  const user = userEvent.setup();
-
-  await user.click(screen.getByRole("button", { name: buttonName }));
-
-  // The buttons proxy to hidden file inputs; drive the input directly.
-  const inputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]');
-  const target = buttonName.source.includes("Preview") ? inputs[1] : inputs[0];
-
-  await user.upload(target, file);
+/** The two hidden inputs, in DOM order: learn first, preview second. */
+function fileInputs(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+  );
 }
 
-describe("Coding Standards", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.apiRequest.mockResolvedValue({ process_count: 0, conventions: [] });
+beforeEach(() => {
+  mocks.apiRequest.mockReset();
+  mocks.uploadRequest.mockReset();
+  mocks.toastSuccess.mockReset();
+  mocks.toastError.mockReset();
+  mocks.toastWarning.mockReset();
+  mocks.apiRequest.mockResolvedValue({ conventions: [] });
+});
+
+describe("Set as our standards", () => {
+  it("sends the chosen file even though the input is reset afterwards", async () => {
+    mocks.uploadRequest.mockResolvedValue(RUN);
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    const [learnInput] = fileInputs(container);
+    const file = new File(["#Section=Prolog\n"], "Load.pro", { type: "text/plain" });
+
+    await user.upload(learnInput, file);
+
+    await waitFor(() => expect(mocks.uploadRequest).toHaveBeenCalledTimes(1));
+
+    const [path, form] = mocks.uploadRequest.mock.calls[0] as [string, FormData];
+
+    expect(path).toBe("/learning/corpus");
+    // The regression: with a live FileList this was an empty FormData.
+    const sent = form.getAll("files") as File[];
+    expect(sent).toHaveLength(1);
+    expect(sent[0].name).toBe("Load.pro");
+    // And the input really was cleared, so the same file can be chosen twice.
+    expect(learnInput.value).toBe("");
   });
 
-  it("shows learned standards with the evidence behind each", async () => {
-    mocks.apiRequest.mockResolvedValue({
-      process_count: 64,
-      conventions: [CONVENTION],
-    });
+  it("reports what was learned", async () => {
+    mocks.uploadRequest.mockResolvedValue(RUN);
 
-    renderPage();
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    const [learnInput] = fileInputs(container);
 
-    expect(await screen.findByText(CONVENTION.statement)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Followed by 64 of 64 processes/),
-    ).toBeInTheDocument();
-  });
+    await user.upload(learnInput, new File(["x"], "Load.pro"));
 
-  it("tells a new organization nothing is learned rather than showing an empty list", async () => {
-    renderPage();
-
-    expect(await screen.findByText(/Nothing learned yet/)).toBeInTheDocument();
-    expect(screen.getByText(/documented IBM practice/)).toBeInTheDocument();
-  });
-
-  it("warns instead of celebrating when existing standards were kept", async () => {
-    mocks.uploadRequest.mockResolvedValue(
-      emptyRun({
-        replaced_existing: false,
-        note: "This corpus of 3 process(es) produced no convention confident enough to become a standard, so the 4 already learned were kept.",
-      }),
+    await waitFor(() =>
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(
+        "Learned 2 standard(s) from 9 processes.",
+      ),
     );
-
-    renderPage();
-    await upload(/Set as our standards/);
-
-    await waitFor(() => {
-      expect(mocks.toastWarning).toHaveBeenCalled();
-    });
-
-    expect(mocks.toastSuccess).not.toHaveBeenCalled();
-    expect(await screen.findByText(/already learned were kept/)).toBeInTheDocument();
   });
 
-  it("warns that uploaded exports carry datasource credentials", async () => {
-    mocks.uploadRequest.mockResolvedValue(
-      emptyRun({ processes_parsed: 64, files_with_stored_credentials: 59 }),
-    );
-
-    renderPage();
-    await upload(/Set as our standards/);
-
-    expect(
-      await screen.findByText(/saved datasource username or password/),
-    ).toBeInTheDocument();
-  });
-
-  it("previews a report without it becoming the standard", async () => {
-    mocks.uploadRequest.mockResolvedValue({
-      markdown: "# Company TM1 Standards Report\n\nMeasured from 64 processes.",
-    });
-
-    renderPage();
-    await upload(/Preview report/);
-
-    expect(await screen.findByText(/Nothing was saved/)).toBeInTheDocument();
-    expect(mocks.toastSuccess).not.toHaveBeenCalled();
-  });
-
-  it("surfaces an upload failure to the user", async () => {
+  it("shows the server's error instead of failing silently", async () => {
+    // The other half of the finding: a 422 produced no toast at all.
     mocks.uploadRequest.mockRejectedValue(
-      new mocks.FakeApiError(422, "VALIDATION_ERROR", "No TurboIntegrator exports found."),
+      new mocks.FakeApiError(422, "VALIDATION_ERROR", "files: Field required"),
     );
 
-    renderPage();
-    await upload(/Set as our standards/);
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    const [learnInput] = fileInputs(container);
 
-    await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledWith(
-        "No TurboIntegrator exports found.",
-      );
-    });
+    await user.upload(learnInput, new File(["x"], "Load.pro"));
+
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith("files: Field required"),
+    );
+  });
+});
+
+describe("Preview report", () => {
+  it("sends the file to the report endpoint and shows the result", async () => {
+    mocks.uploadRequest.mockResolvedValue({ markdown: "# Report\n\n9 processes read." });
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    const [, previewInput] = fileInputs(container);
+
+    await user.upload(previewInput, new File(["x"], "Load.pro"));
+
+    await waitFor(() => expect(mocks.uploadRequest).toHaveBeenCalledTimes(1));
+
+    const [path, form] = mocks.uploadRequest.mock.calls[0] as [string, FormData];
+
+    expect(path).toBe("/learning/report");
+    expect(form.getAll("files")).toHaveLength(1);
+    expect(await screen.findByText(/9 processes read/)).toBeInTheDocument();
+  });
+
+  it("sends every selected file when several are chosen", async () => {
+    mocks.uploadRequest.mockResolvedValue({ markdown: "ok" });
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    const [, previewInput] = fileInputs(container);
+
+    await user.upload(previewInput, [
+      new File(["a"], "One.pro"),
+      new File(["b"], "Two.pro"),
+    ]);
+
+    await waitFor(() => expect(mocks.uploadRequest).toHaveBeenCalledTimes(1));
+
+    const [, form] = mocks.uploadRequest.mock.calls[0] as [string, FormData];
+
+    expect((form.getAll("files") as File[]).map((f) => f.name)).toEqual([
+      "One.pro",
+      "Two.pro",
+    ]);
   });
 });

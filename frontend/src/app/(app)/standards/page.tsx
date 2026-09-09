@@ -40,10 +40,18 @@ function strength(confidence: number): { label: string; tone: "default" | "secon
   return { label: "Moderate", tone: "secondary" };
 }
 
-function buildFormData(files: FileList): FormData {
+// Takes File[], never a FileList. A FileList is a *live view* of the
+// input's current selection, and the handlers below clear the input
+// immediately after handing the selection to a mutation that runs
+// asynchronously — so by the time this ran, the list was already empty
+// and the request went out as a multipart body with no parts. The
+// backend answered 422 to both buttons and the feature looked broken.
+// Snapshotting to an array at the moment of selection is what makes the
+// files survive the reset.
+function buildFormData(files: File[]): FormData {
   const form = new FormData();
 
-  for (const file of Array.from(files)) {
+  for (const file of files) {
     form.append("files", file);
   }
 
@@ -63,7 +71,7 @@ export default function StandardsPage() {
   });
 
   const learn = useMutation({
-    mutationFn: (files: FileList) =>
+    mutationFn: (files: File[]) =>
       uploadRequest<LearningRun>("/learning/corpus", buildFormData(files)),
     onSuccess: (run) => {
       setLastRun(run);
@@ -82,7 +90,7 @@ export default function StandardsPage() {
   });
 
   const previewReport = useMutation({
-    mutationFn: (files: FileList) =>
+    mutationFn: (files: File[]) =>
       uploadRequest<StandardsReport>("/learning/report", buildFormData(files)),
     onSuccess: (report) => setPreview(report.markdown),
     onError: (error) => toast.error(errorMessage(error)),
@@ -109,7 +117,9 @@ export default function StandardsPage() {
         accept=".pro,.txt,.zip"
         className="hidden"
         onChange={(event) => {
-          if (event.target.files?.length) learn.mutate(event.target.files);
+          // Copy before the reset on the next line empties the live list.
+          const files = Array.from(event.target.files ?? []);
+          if (files.length) learn.mutate(files);
           event.target.value = "";
         }}
       />
@@ -120,7 +130,8 @@ export default function StandardsPage() {
         accept=".pro,.txt,.zip"
         className="hidden"
         onChange={(event) => {
-          if (event.target.files?.length) previewReport.mutate(event.target.files);
+          const files = Array.from(event.target.files ?? []);
+          if (files.length) previewReport.mutate(files);
           event.target.value = "";
         }}
       />

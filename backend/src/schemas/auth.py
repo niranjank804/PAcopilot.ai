@@ -58,6 +58,11 @@ class UserResponse(BaseModel):
     organization_id: UUID
     registration_status: str
 
+    # Role names, so a list of users can show who is an admin without a
+    # request per row. Defaults empty: most places construct this from a
+    # User row alone, and only the list endpoint fills it in.
+    roles: list[str] = []
+
     # Needed by the auth dependency to reject tokens predating a bulk
     # revocation. Excluded from serialization: it is effectively a
     # last-password-change timestamp and clients have no use for it.

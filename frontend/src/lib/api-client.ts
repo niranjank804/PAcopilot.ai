@@ -197,7 +197,19 @@ async function unwrap<T>(response: Response): Promise<T> {
   }
 
   if (!payload.success) {
-    throw new ApiError(response.status, payload.error.code, payload.error.message);
+    // Every app response carries `error` when `success` is false, but a
+    // body from something *in front of* the app — a gateway 502 page
+    // that happens to be JSON, a framework default the handler did not
+    // cover — may not. Reading `.code` off undefined there threw a
+    // TypeError, which surfaced as "Something went wrong" with the real
+    // status lost. Keep the status; it is the only fact we have.
+    const error = payload.error;
+
+    throw new ApiError(
+      response.status,
+      error?.code ?? "REQUEST_FAILED",
+      error?.message ?? `The request failed (HTTP ${response.status}).`,
+    );
   }
 
   return payload.data;

@@ -27,6 +27,8 @@ export interface AppUser {
   is_active: boolean;
   organization_id: string;
   registration_status: RegistrationStatus;
+  /** Role names, filled by the list endpoint in one batched query. */
+  roles: string[];
 }
 
 export interface RoleInfo {

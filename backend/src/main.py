@@ -99,6 +99,27 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+def _describe_validation_errors(exc: RequestValidationError) -> str:
+    """A 422 message a person can act on.
+
+    `str(exc.errors())` is a Python repr of a list of dicts —
+    `[{'type': 'missing', 'loc': ('body', 'files'), ...}]` — and the
+    frontend shows this field verbatim in a toast. What the user needs
+    is which field and what is wrong with it: "files: field required".
+    """
+
+    parts = []
+
+    for error in exc.errors():
+        # Drop the leading "body"/"query" so the name matches what the
+        # caller actually sent.
+        location = ".".join(str(item) for item in error.get("loc", ()) if item not in ("body", "query", "path"))
+        message = error.get("msg", "invalid value")
+        parts.append(f"{location}: {message}" if location else message)
+
+    return "; ".join(parts) or "Invalid request."
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     request: Request,
@@ -110,7 +131,7 @@ async def validation_exception_handler(
             "success": False,
             "error": {
                 "code": "VALIDATION_ERROR",
-                "message": str(exc.errors()),
+                "message": _describe_validation_errors(exc),
             },
         },
     )

@@ -300,7 +300,15 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={saveOrganization.isPending || !orgName.trim()}
+                  disabled={
+                    saveOrganization.isPending ||
+                    !orgName.trim() ||
+                    // Same rule as the profile form above: nothing changed,
+                    // nothing to save. Otherwise this wrote an identical row
+                    // and an audit entry for a no-op every time it was clicked.
+                    (orgName === (organization.data?.name ?? "") &&
+                      orgDomain === (organization.data?.domain ?? ""))
+                  }
                 >
                   {saveOrganization.isPending && (
                     <Loader2 className="mr-2 h-3 w-3 animate-spin" />

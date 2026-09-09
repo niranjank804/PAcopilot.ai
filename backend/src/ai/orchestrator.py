@@ -166,6 +166,35 @@ def _resolve_max_tool_rounds(persona: AgentPersona | None) -> int:
     return MAX_TOOL_ROUNDS
 
 
+def _summarise_result(result: str, limit: int = 500) -> str:
+    """The first part of a tool result, as a person would read it.
+
+    Tools return `json.dumps(...)` output, and json.dumps escapes every
+    non-ASCII character by default — so an em dash in a cube's
+    description arrives as the six characters `\\u2014`. The model
+    decodes that without noticing. The tool timeline in the UI shows
+    this summary verbatim, and there it was printed literally.
+
+    Re-serialising with the escapes turned off fixes the display without
+    touching what the model sees (the full `result` is what goes back
+    into the conversation, unchanged) and without editing a dozen tool
+    modules. Truncation happens *after* re-serialising, so a short
+    result stays valid JSON exactly as before — the chat page parses
+    `draft_change_id` out of this field for draft-change tools and that
+    must keep working. Anything that is not JSON passes through as it
+    always did.
+    """
+
+    import json
+
+    try:
+        readable = json.dumps(json.loads(result), ensure_ascii=False)
+    except (ValueError, TypeError):
+        readable = result
+
+    return readable[:limit]
+
+
 class ChatResult:
 
     def __init__(
@@ -529,7 +558,7 @@ class AIOrchestrator:
             tool_name=tool_call.name,
             arguments=tool_call.input,
             status="success",
-            result_summary=result[:500],
+            result_summary=_summarise_result(result),
             duration_ms=int((time.monotonic() - start) * 1000),
             error_message=None,
         )

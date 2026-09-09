@@ -5,6 +5,8 @@ import { FileText, Loader2, Send, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { Markdown } from "@/components/markdown";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -336,7 +338,12 @@ export default function KnowledgePage() {
 
           {answer ? (
             <div className="space-y-3 rounded-md border p-4">
-              <p className="whitespace-pre-wrap text-sm">{answer.content}</p>
+              {/* Same renderer as Chat. The model writes Markdown for
+                  both; showing it as plain text here printed **bold**
+                  literally while the identical output rendered next door. */}
+              <div className="text-sm">
+                <Markdown>{answer.content}</Markdown>
+              </div>
               <div className="text-xs text-muted-foreground">
                 {answer.model} · {answer.usage.total_tokens} tokens
               </div>
@@ -439,7 +446,9 @@ export default function KnowledgePage() {
                   </span>
                 </div>
               )}
-              <p className="whitespace-pre-wrap text-sm">{errorAnswer.content}</p>
+              <div className="text-sm">
+                <Markdown>{errorAnswer.content}</Markdown>
+              </div>
               <div className="text-xs text-muted-foreground">
                 {errorAnswer.model} · {errorAnswer.usage.total_tokens} tokens
               </div>

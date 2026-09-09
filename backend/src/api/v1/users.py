@@ -44,9 +44,23 @@ async def list_users(
         registration_status,
     )
 
+    # One extra query for every user's roles, rather than one per row —
+    # the Users page needs to show who is an admin, and the per-user
+    # /users/{id}/roles endpoint used from a list is an N+1.
+    from src.repositories.user_role_repository import user_role_repository
+
+    role_names = await user_role_repository.role_names_by_user(
+        db, [u.id for u in users]
+    )
+
     return ApiResponse(
         success=True,
-        data=[UserResponse.model_validate(u) for u in users],
+        data=[
+            UserResponse.model_validate(u).model_copy(
+                update={"roles": role_names.get(u.id, [])}
+            )
+            for u in users
+        ],
     )
 
 

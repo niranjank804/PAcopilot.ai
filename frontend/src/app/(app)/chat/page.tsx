@@ -22,8 +22,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
 import { ChangeActionCard } from "@/components/change-action-card";
@@ -125,56 +124,10 @@ function toolPrompt(tool: string): string {
   return TOOL_PROMPTS[tool] ?? `Use ${tool} to `;
 }
 
-// AI responses are Markdown (headers, bold, lists) — this maps each
-// element to chat-bubble-appropriate sizing rather than pulling in the
-// full @tailwindcss/typography plugin for a handful of small bubbles.
-const markdownComponents: Components = {
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-  ul: ({ children }) => (
-    <ul className="mb-2 list-disc space-y-0.5 pl-4 last:mb-0">{children}</ul>
-  ),
-  ol: ({ children }) => (
-    <ol className="mb-2 list-decimal space-y-0.5 pl-4 last:mb-0">{children}</ol>
-  ),
-  li: ({ children }) => <li>{children}</li>,
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-  h1: ({ children }) => (
-    <h3 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h3>
-  ),
-  h2: ({ children }) => (
-    <h3 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h3>
-  ),
-  h3: ({ children }) => (
-    <h4 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h4>
-  ),
-  code: ({ children, className }) =>
-    className ? (
-      <pre className="mb-2 overflow-x-auto rounded bg-black/10 p-2 text-xs last:mb-0">
-        <code>{children}</code>
-      </pre>
-    ) : (
-      <code className="rounded bg-black/10 px-1 py-0.5 text-xs">{children}</code>
-    ),
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="underline underline-offset-2"
-    >
-      {children}
-    </a>
-  ),
-  table: ({ children }) => (
-    <div className="mb-2 overflow-x-auto last:mb-0">
-      <table className="text-xs">{children}</table>
-    </div>
-  ),
-  th: ({ children }) => (
-    <th className="border-b px-2 py-1 text-left font-semibold">{children}</th>
-  ),
-  td: ({ children }) => <td className="border-b px-2 py-1">{children}</td>,
-};
+// AI responses are Markdown. The renderer lives in @/components/markdown
+// so that Chat and the Knowledge Base show the same model output the
+// same way — the map used to be defined here, and the Knowledge page,
+// lacking it, printed **bold** literally.
 
 function bucketLabel(isoDate: string): string {
   const date = new Date(isoDate);
@@ -831,12 +784,7 @@ export default function ChatPage() {
                       )}
                     >
                       {message.content ? (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={markdownComponents}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
+                        <Markdown>{message.content}</Markdown>
                       ) : message.role === "assistant" &&
                         isStreaming &&
                         index === messages.length - 1 ? (
