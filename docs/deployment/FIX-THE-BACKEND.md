@@ -10,8 +10,12 @@ what is wrong, what to do, and in what order.
 | 1. Does the data still exist? | **Done — it does not.** `pa-copilot-db` was deleted by Render. Data is unrecoverable. |
 | 2. Copy it | Not applicable — nothing to copy |
 | 3. Fresh database | **Done.** Neon `pa-copilot-db` (free, no expiry, us-west-2). 31 tables at revision `e9b3c7d21f45`, 5 roles, 29 permissions. 32 integration tests passed against it; the real app boots and passes `/health/ready` against it. |
-| 4. Point Render at it | **Waiting on the dashboard** — the only remaining action. |
-| 5. Stop it recurring | `render.yaml` no longer declares an expiring database; the keep-alive workflow no longer keeps the redundant Render frontend awake. Deleting that frontend service is still yours to do. |
+| 4. Point Render at it | **Done — 9 September.** Deploy green; live `/health/ready` 200 (database ok, 16 ms). `/billing/plans` serving. Super Admin seeded by the build. CORS updated to the Vercel origin and verified by preflight. |
+| 5. Stop it recurring | **Done.** `render.yaml` declares no database; keep-alive pings only the backend; the redundant Render frontend service is deleted. Vercel holds only its two `NEXT_PUBLIC_*` variables and has the Google client ID, verified in the live bundle with the sign-in section rendering on `/login`. |
+
+End-to-end proof: the Vercel frontend's `/pricing` page fetches
+`/billing/plans` at build time, and the 9 September build rendered all
+three plans — frontend → Render backend → Neon, live.
 
 ## What is actually broken
 
@@ -123,9 +127,15 @@ The build seeds a Super Admin from `BOOTSTRAP_ADMIN_EMAIL`, which is set
 on Render. That account has a random, uncommunicated password and is
 designed to sign in via **Google Sign-In** — which the frontend only
 offers when `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is set on the Vercel project.
-It currently is not. Until it is, the admin's other route is "Forgot
-password", which without SMTP configured logs the reset link to the
-Render server log rather than emailing it.
+It is, as of 9 September, verified in the live bundle. The admin's
+fallback route is "Forgot password", which without SMTP configured logs
+the reset link to the Render server log rather than emailing it.
+
+One trap encountered while setting it: `NEXT_PUBLIC_*` values are
+inlined at build time, and the project briefly had an `ignoreCommand`
+that skipped builds when nothing under `frontend/` changed. An env-var
+change touches no files, so no build could ever pick it up — dashboard
+redeploys included. The ignore step was removed for exactly that reason.
 
 Ordinary access is not blocked by any of this: self-registration is
 open, so anyone can create an account immediately. It just won't be the
