@@ -38,16 +38,16 @@ export default function SettingsPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  // null means "not edited here", so the server value shows through until
+  // the user actually types. Derived during render rather than copied in
+  // with an effect: an effect that mirrors server state into local state
+  // renders twice on every load, and would overwrite a half-typed value
+  // whenever the profile was refetched.
+  const [firstNameEdit, setFirstNameEdit] = useState<string | null>(null);
+  const [lastNameEdit, setLastNameEdit] = useState<string | null>(null);
 
-  // Seeded from the signed-in user once it arrives. Keyed on the values
-  // themselves rather than a mount effect so a refreshed profile does not
-  // silently overwrite something the user is part-way through typing.
-  useEffect(() => {
-    setFirstName(user?.first_name ?? "");
-    setLastName(user?.last_name ?? "");
-  }, [user?.first_name, user?.last_name]);
+  const firstName = firstNameEdit ?? user?.first_name ?? "";
+  const lastName = lastNameEdit ?? user?.last_name ?? "";
 
   const saveProfile = useMutation({
     mutationFn: () =>
@@ -57,6 +57,8 @@ export default function SettingsPage() {
       }),
     onSuccess: () => {
       toast.success("Profile updated");
+      setFirstNameEdit(null);
+      setLastNameEdit(null);
       // The header and sidebar read the name from the auth context.
       queryClient.invalidateQueries();
     },
@@ -79,13 +81,12 @@ export default function SettingsPage() {
     retry: false,
   });
 
-  const [orgName, setOrgName] = useState("");
-  const [orgDomain, setOrgDomain] = useState("");
+  // Same derivation as the profile fields above.
+  const [orgNameEdit, setOrgNameEdit] = useState<string | null>(null);
+  const [orgDomainEdit, setOrgDomainEdit] = useState<string | null>(null);
 
-  useEffect(() => {
-    setOrgName(organization.data?.name ?? "");
-    setOrgDomain(organization.data?.domain ?? "");
-  }, [organization.data?.name, organization.data?.domain]);
+  const orgName = orgNameEdit ?? organization.data?.name ?? "";
+  const orgDomain = orgDomainEdit ?? organization.data?.domain ?? "";
 
   const saveOrganization = useMutation({
     mutationFn: () =>
@@ -98,6 +99,8 @@ export default function SettingsPage() {
       }),
     onSuccess: () => {
       toast.success("Organization updated");
+      setOrgNameEdit(null);
+      setOrgDomainEdit(null);
       queryClient.invalidateQueries({ queryKey: ["organization"] });
     },
     onError: (error: ApiError) => toast.error(error.message),
@@ -165,7 +168,7 @@ export default function SettingsPage() {
               <Input
                 id="first-name"
                 value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
+                onChange={(event) => setFirstNameEdit(event.target.value)}
                 className="w-44"
               />
             </div>
@@ -176,7 +179,7 @@ export default function SettingsPage() {
               <Input
                 id="last-name"
                 value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
+                onChange={(event) => setLastNameEdit(event.target.value)}
                 className="w-44"
               />
             </div>
@@ -281,7 +284,7 @@ export default function SettingsPage() {
                   <Input
                     id="org-name"
                     value={orgName}
-                    onChange={(event) => setOrgName(event.target.value)}
+                    onChange={(event) => setOrgNameEdit(event.target.value)}
                     className="w-64"
                   />
                 </div>
@@ -292,7 +295,7 @@ export default function SettingsPage() {
                   <Input
                     id="org-domain"
                     value={orgDomain}
-                    onChange={(event) => setOrgDomain(event.target.value)}
+                    onChange={(event) => setOrgDomainEdit(event.target.value)}
                     placeholder="acme.example"
                     className="w-64"
                   />
