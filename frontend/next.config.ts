@@ -36,8 +36,70 @@ if (process.env.VERCEL && !process.env.NEXT_PUBLIC_API_URL) {
   );
 }
 
+/**
+ * Security response headers.
+ *
+ * Access and refresh tokens live in localStorage, which means any script
+ * that executes on this origin can read them. A Content-Security-Policy
+ * is therefore not decoration here — it is the control that limits which
+ * scripts can run at all, and where anything they collect could be sent.
+ *
+ * connect-src is derived from NEXT_PUBLIC_API_URL rather than hardcoded:
+ * the API lives on a different origin to this app, so a policy that
+ * omitted it would block every request the product makes. Only the
+ * origin is taken, since CSP matches on origin and a path would be
+ * ignored.
+ */
+function apiOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!raw) return '';
+
+  try {
+    return new URL(raw).origin;
+  } catch {
+    // A malformed value is the build guard above's problem, not this
+    // function's — degrade to an empty entry rather than failing here.
+    return '';
+  }
+}
+
+const securityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Permissions-Policy',
+    // The chat page uses the Web Speech API for dictation, which needs
+    // the microphone; camera and geolocation are never used.
+    value: 'camera=(), geolocation=(), microphone=(self)',
+  },
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      // Next.js injects inline bootstrap scripts and, in development,
+      // relies on eval for fast refresh.
+      process.env.NODE_ENV === 'development'
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'",
+      // Tailwind and the component library emit inline styles.
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      ["connect-src 'self'", apiOrigin()].filter(Boolean).join(' '),
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join('; '),
+  },
+];
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }];
+  },
 };
 
 export default nextConfig;

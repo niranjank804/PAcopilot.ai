@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the examples. A blanket .env* also swallowed
+# .env.local.example, so a fresh clone had nothing documenting which
+# NEXT_PUBLIC_ variables the app needs — and NEXT_PUBLIC_API_URL being
+# unset is a silent, hard-to-diagnose failure rather than a loud one.
+!.env*.example
 
 # vercel
 .vercel
