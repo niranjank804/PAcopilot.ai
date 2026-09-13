@@ -1,0 +1,38 @@
+# Local development dependencies only — not a deployment artefact.
+#
+# The application itself is NOT containerised here: there are no
+# Dockerfiles in this repo, and production runs the backend under gunicorn
+# and the frontend under `next start` (see docs/production-deployment.md).
+# What this file provides is the one dependency that is tedious to install
+# by hand and that the test suite genuinely requires: PostgreSQL.
+#
+#   docker compose up -d
+#   cd backend && PYTHONPATH=. python -m alembic upgrade head
+#
+# The credentials below match the defaults in .env.example, so a fresh
+# clone works with no further configuration.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pa-copilot-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: enterprise_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Compose reports the service healthy only once Postgres actually
+    # accepts connections, rather than when the container starts — the
+    # gap between those two is long enough for `alembic upgrade` to fail
+    # if you run it immediately after `up`.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprise_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

@@ -42,7 +42,7 @@ _HSTS = "max-age=63072000; includeSubDomains; preload"
 # Swagger UI and ReDoc load their bundles from a CDN and run inline
 # scripts, so `default-src 'none'` renders them blank. These paths get
 # every other header but not the CSP. They only exist when
-# ENABLE_API_DOCS is on, which is off in production.
+# EXPOSE_API_DOCS is on, which is off in production.
 _CSP_EXEMPT_PATHS = frozenset({"/docs", "/redoc", "/docs/oauth2-redirect"})
 
 
