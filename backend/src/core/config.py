@@ -37,11 +37,6 @@ class Settings(BaseSettings):
     # hardcoding, so the value set in render.yaml actually takes effect.
     DEBUG: bool = False
 
-    # Interactive docs (/docs, /redoc, /openapi.json) enumerate every route
-    # and schema in the product. Off in production unless deliberately
-    # switched back on.
-    ENABLE_API_DOCS: bool = False
-
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
@@ -242,6 +237,15 @@ class Settings(BaseSettings):
     # work, at higher cost. Lower this before lowering model quality when
     # trimming spend.
     AI_EFFORT: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+
+    # max_tokens is a ceiling on thinking PLUS the visible answer, not on
+    # the answer alone. The previous 4096 was sized for a no-thinking
+    # deployment; leaving it there once adaptive thinking is on lets a
+    # long reasoning pass consume the budget and truncate the reply
+    # mid-sentence (stop_reason "max_tokens"). 16k leaves room for both
+    # while staying under the SDK's non-streaming HTTP timeout, which is
+    # the constraint that stops this being set far higher.
+    AI_MAX_TOKENS: int = 16000
 
     OPENAI_API_KEY: str | None = None
     EMBEDDING_MODEL: str = "text-embedding-3-small"

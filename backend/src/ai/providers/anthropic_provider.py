@@ -55,6 +55,33 @@ _MAX_MESSAGE_BREAKPOINTS = 3
 _LOOKBACK_BLOCKS = 15
 
 
+def _reasoning_kwargs() -> dict:
+    """Thinking and effort settings for a request.
+
+    Omitting `thinking` does NOT give adaptive thinking — it gives no
+    thinking at all. This provider omitted it, so every agent turn ran
+    with reasoning switched off: the model planned a multi-step TM1 task,
+    chose tools and wrote TI in a single forward pass. Turning it on is
+    the largest single quality lever available here.
+
+    `effort` is the cost dial that comes with it. It is nested inside
+    output_config, not a top-level argument.
+    """
+
+    if not settings.AI_THINKING_ENABLED:
+        # Still send effort: it governs overall token spend, not just
+        # reasoning depth, so it remains meaningful with thinking off.
+        return {"output_config": {"effort": settings.AI_EFFORT}}
+
+    return {
+        "thinking": {
+            "type": "adaptive",
+            "display": settings.AI_THINKING_DISPLAY,
+        },
+        "output_config": {"effort": settings.AI_EFFORT},
+    }
+
+
 class AnthropicProvider(AIProvider):
 
     def __init__(self):
@@ -228,6 +255,7 @@ class AnthropicProvider(AIProvider):
                 system=self._system_payload(request),
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
+                **_reasoning_kwargs(),
             )
         except anthropic.RateLimitError as exc:
             raise AIProviderRateLimitError(str(exc)) from exc
@@ -266,6 +294,7 @@ class AnthropicProvider(AIProvider):
                 system=self._system_payload(request),
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
+                **_reasoning_kwargs(),
             ) as stream:
                 async for text in stream.text_stream:
                     yield StreamEvent(type="text_delta", text=text)
@@ -301,6 +330,12 @@ class AnthropicProvider(AIProvider):
                 model=request.model,
                 system=self._system_payload(request),
                 messages=self._messages_payload(request),
+                # Tools render *before* system in the prompt, so leaving
+                # them out undercounted every estimate by the size of the
+                # whole tool schema block — with 20+ registered tools that
+                # is thousands of tokens, and it is exactly the figure the
+                # budget pre-check relies on.
+                tools=self._tools_payload(request.tools),
             )
         except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
             raise AIProviderError(str(exc)) from exc

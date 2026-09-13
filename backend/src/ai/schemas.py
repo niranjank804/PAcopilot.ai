@@ -1,7 +1,9 @@
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from src.core.config import settings
 
 
 class ToolDefinition(BaseModel):
@@ -57,7 +59,10 @@ class ChatRequest(BaseModel):
     system_context: str | None = None
 
     model: str
-    max_tokens: int = 4096
+    # Defaults to the configured budget rather than a literal so the
+    # ceiling moves with AI_MAX_TOKENS — see the note there on why it
+    # must account for thinking tokens too.
+    max_tokens: int = Field(default_factory=lambda: settings.AI_MAX_TOKENS)
     tools: list[ToolDefinition] | None = None
 
 

@@ -3,16 +3,31 @@ from decimal import Decimal
 from src.ai.schemas import Usage
 
 # USD per 1M tokens: (input, output). Standard published rates.
-# NOTE: claude-sonnet-5 has an introductory rate of $2.00 / $10.00 per 1M
-# tokens through 2026-08-31; this table uses the standard post-intro rate
-# to avoid a time-based pricing table, so cost estimates are slightly high
-# for claude-sonnet-5 until that date.
+#
+# Every model this deployment can select must appear here. A model that is
+# missing does not fail — it silently falls through to DEFAULT_PRICING,
+# which produces a plausible-looking but wrong number in the usage ledger
+# and in every per-organization cost total derived from it. The unit test
+# asserting AI_DEFAULT_MODEL is a key of this dict exists to stop that
+# pairing drifting apart again.
+#
+# claude-sonnet-5's introductory $2.00 / $10.00 rate ended 2026-08-31, so
+# the standard rate below is now the rate actually billed.
 PRICING: dict[str, tuple[Decimal, Decimal]] = {
+    "claude-opus-5": (Decimal("5.00"), Decimal("25.00")),
     "claude-opus-4-8": (Decimal("5.00"), Decimal("25.00")),
+    "claude-opus-4-7": (Decimal("5.00"), Decimal("25.00")),
     "claude-sonnet-5": (Decimal("3.00"), Decimal("15.00")),
+    "claude-sonnet-4-6": (Decimal("3.00"), Decimal("15.00")),
     "claude-haiku-4-5": (Decimal("1.00"), Decimal("5.00")),
+    # Priced above the Opus tier — the one model where falling through to
+    # DEFAULT_PRICING would under-bill by half rather than round slightly.
+    "claude-fable-5": (Decimal("10.00"), Decimal("50.00")),
 }
 
+# Opus-tier rates. Chosen as the default because under-estimating cost is
+# worse than over-estimating it: a low guess quietly overspends a budget,
+# a high guess only makes the ledger conservative.
 DEFAULT_PRICING = (Decimal("5.00"), Decimal("25.00"))
 
 # Cached input is billed against the same per-model input rate, scaled:

@@ -195,6 +195,44 @@ def _summarise_result(result: str, limit: int = 500) -> str:
     return readable[:limit]
 
 
+
+# A turn can end for reasons other than "the model finished answering",
+# and two of them produce output that reads like a normal reply:
+#
+#   max_tokens - the budget ran out mid-sentence. Now that adaptive
+#     thinking shares that budget with the visible answer this is more
+#     reachable than it was, and a truncated reply is indistinguishable
+#     from a complete one to the reader.
+#   refusal    - safety classifiers declined the request, so content is
+#     empty or partial and the user sees a blank assistant bubble with
+#     no explanation at all.
+#
+# Neither is an exception - the HTTP call succeeded. Saying plainly what
+# happened is the difference between a user retrying usefully and a user
+# concluding the product is broken.
+_STOP_REASON_NOTICES = {
+    "max_tokens": (
+        "\n\n_This reply was cut off because it reached the response "
+        "size limit. Ask for the remainder, or narrow the question._"
+    ),
+    "refusal": (
+        "_This request was declined by the model's safety system. "
+        "Rephrasing it, or splitting it into smaller steps, usually helps._"
+    ),
+}
+
+
+def _annotate_incomplete(content: str, stop_reason: str | None) -> str:
+    """Append a plain-language note when a turn ended abnormally."""
+
+    notice = _STOP_REASON_NOTICES.get(stop_reason or "")
+
+    if notice is None:
+        return content
+
+    return (content or "").rstrip() + notice
+
+
 class ChatResult:
 
     def __init__(
@@ -616,6 +654,10 @@ class AIOrchestrator:
             total_cache_read += response.usage.cache_read_input_tokens
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
+                response.content = _annotate_incomplete(
+                    response.content,
+                    response.stop_reason,
+                )
                 break
 
             history.append(
