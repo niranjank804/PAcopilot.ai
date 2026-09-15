@@ -29,6 +29,7 @@ from src.schemas.knowledge import (
     ExplainErrorResponse,
     PageCitationResponse,
     SearchRequest,
+    SearchResponse,
     SearchResultItem,
     VisualStatusResponse,
 )
@@ -135,7 +136,7 @@ async def delete_document(
 
 @router.post(
     "/search",
-    response_model=ApiResponse[list[SearchResultItem]],
+    response_model=ApiResponse[SearchResponse],
 )
 async def search(
     request: SearchRequest,
@@ -151,16 +152,22 @@ async def search(
 
     return ApiResponse(
         success=True,
-        data=[
-            SearchResultItem(
-                document_id=match.chunk.document_id,
-                filename=match.chunk.document.filename,
-                chunk_index=match.chunk.chunk_index,
-                content=match.chunk.content,
-                score=match.score,
-            )
-            for match in matches
-        ],
+        data=SearchResponse(
+            results=[
+                SearchResultItem(
+                    document_id=match.chunk.document_id,
+                    filename=match.chunk.document.filename,
+                    chunk_index=match.chunk.chunk_index,
+                    content=match.chunk.content,
+                    score=match.score,
+                )
+                for match in matches
+            ],
+            # `score` means different things per mode — cosine similarity
+            # for semantic, ts_rank for keyword — so a client cannot
+            # interpret it without this.
+            retrieval_mode=getattr(matches, "mode", "semantic"),
+        ),
     )
 
 
@@ -225,6 +232,7 @@ async def ask(
                 )
                 for citation in result.page_citations
             ],
+            retrieval_mode=result.retrieval_mode,
         ),
     )
 

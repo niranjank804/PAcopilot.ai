@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -28,6 +29,18 @@ class SearchResultItem(BaseModel):
     chunk_index: int
     content: str
     score: float
+
+
+#: Which retrieval path answered. "keyword" means the embedding
+#: provider was unreachable and Postgres full-text search stood in —
+#: still useful, but it matches words rather than meaning, so a client
+#: should say so rather than present the answer as equally grounded.
+RetrievalMode = Literal["semantic", "keyword"]
+
+
+class SearchResponse(BaseModel):
+    results: list[SearchResultItem]
+    retrieval_mode: RetrievalMode = "semantic"
 
 
 class AskRequest(BaseModel):
@@ -79,6 +92,7 @@ class AskResponse(BaseModel):
     usage: UsageResponse
     citations: list[CitationResponse]
     page_citations: list[PageCitationResponse] = []
+    retrieval_mode: RetrievalMode = "semantic"
 
 
 class ExplainErrorRequest(BaseModel):

@@ -144,9 +144,16 @@ async def test_search_endpoint_returns_matches(client, db_session, fake_embeddin
     )
 
     assert resp.status_code == 200
-    results = resp.json()["data"]
-    assert len(results) == 1
-    assert results[0]["filename"] == "notes.txt"
+
+    body = resp.json()["data"]
+
+    # `data` is an object rather than a bare list since the keyword
+    # fallback landed: the mode has to travel with the results, because
+    # `score` means cosine similarity in one mode and ts_rank in the
+    # other and is not comparable across them.
+    assert body["retrieval_mode"] == "semantic"
+    assert len(body["results"]) == 1
+    assert body["results"][0]["filename"] == "notes.txt"
 
 
 @pytest.mark.asyncio
@@ -175,37 +182,64 @@ async def test_cross_org_search_does_not_return_other_orgs_chunks(
     )
 
     assert resp.status_code == 200
-    results = resp.json()["data"]
+
+    results = resp.json()["data"]["results"]
+
     assert all(r["filename"] != "org_a_notes.txt" for r in results)
 
 
 @pytest.mark.asyncio
-async def test_search_returns_clean_error_when_embedding_provider_fails(
-    client, db_session, monkeypatch,
+async def test_search_falls_back_to_keywords_when_embeddings_fail(
+    client, db_session, fake_embeddings,
 ):
+    """Deliberate behaviour change: this used to be a clean 500.
+
+    A clean error was the right answer while embeddings were the only
+    route to a chunk. They are not any more, and the old behaviour meant
+    an exhausted OpenAI balance took the whole Knowledge Base down while
+    Chat kept working — which happened twice in production, silently,
+    because nothing distinguished "no results" from "search is dead".
+
+    Degrading to keyword search is worse at understanding a question and
+    unaffected by anyone's billing. The mode is reported so the answer
+    can say which one it used.
+    """
+
     from src.knowledge.embeddings.registry import EMBEDDING_PROVIDERS
+
+    org, admin = await create_org_admin(db_session)
+
+    # Indexed while embeddings still work, as in real life: the outage
+    # arrives after the corpus exists.
+    upload = await client.post(
+        "/knowledge/documents",
+        files={"file": ("standards.txt", b"EMEA quarterly variance commentary", "text/plain")},
+        headers=auth_headers(admin),
+    )
+    assert upload.status_code == 201
 
     class BrokenEmbeddingProvider(EmbeddingProvider):
         async def embed(self, texts):
-            raise RuntimeError("Missing credentials.")
+            raise RuntimeError("You have no credits remaining.")
 
     original = EMBEDDING_PROVIDERS.get("openai")
     EMBEDDING_PROVIDERS["openai"] = BrokenEmbeddingProvider()
 
     try:
-        org, admin = await create_org_admin(db_session)
-
         resp = await client.post(
             "/knowledge/search",
-            json={"query": "hello", "top_k": 5},
+            json={"query": "EMEA variance", "top_k": 5},
             headers=auth_headers(admin),
         )
 
-        assert resp.status_code == 500
+        assert resp.status_code == 200
+
         body = resp.json()
-        assert body["success"] is False
-        assert body["error"]["code"] == "KNOWLEDGE_SERVICE_ERROR"
-        assert "unavailable" in body["error"]["message"]
+
+        assert body["success"] is True
+        assert body["data"]["retrieval_mode"] == "keyword"
+        # The point of the fallback: it still finds the passage.
+        assert body["data"]["results"], "keyword fallback returned nothing"
     finally:
         if original is not None:
             EMBEDDING_PROVIDERS["openai"] = original

@@ -1,7 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, Send, Trash2, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  Loader2,
+  Send,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -338,6 +345,21 @@ export default function KnowledgePage() {
 
           {answer ? (
             <div className="space-y-3 rounded-md border p-4">
+              {/* Said before the answer, not after it. A reader who has
+                  already absorbed a confident paragraph will not
+                  re-weigh it on the strength of a footnote. */}
+              {answer.retrieval_mode === "keyword" ? (
+                <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <p className="text-xs">
+                    <strong>Keyword search was used.</strong> The semantic
+                    search provider is unavailable, so the passages below were
+                    matched on shared <em>words</em> rather than meaning —
+                    relevant material phrased differently may have been missed.
+                  </p>
+                </div>
+              ) : null}
+
               {/* Same renderer as Chat. The model writes Markdown for
                   both; showing it as plain text here printed **bold**
                   literally while the identical output rendered next door. */}

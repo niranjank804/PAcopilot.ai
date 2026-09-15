@@ -1,7 +1,7 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Computed, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import BaseModel
@@ -49,6 +49,20 @@ class KnowledgeChunk(BaseModel, OrganizationScoped):
     embedding_model: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
+    )
+
+    # Maintained by Postgres, never assigned in Python. Backs the keyword
+    # fallback used when the embedding provider is unreachable — which
+    # until now made the whole Knowledge Base fail on one external
+    # dependency.
+    #
+    # The two-argument `to_tsvector` is required: a generated column
+    # needs an IMMUTABLE expression, and the one-argument form is only
+    # STABLE because it reads default_text_search_config at runtime.
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', content)", persisted=True),
+        nullable=True,
     )
 
     document = relationship(

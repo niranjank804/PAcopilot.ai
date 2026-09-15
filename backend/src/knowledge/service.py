@@ -14,7 +14,6 @@ from src.knowledge import quality, retrieval
 from src.knowledge.chunking import chunk_text
 from src.knowledge.embeddings import cache as embedding_cache
 from src.knowledge.embeddings.registry import get_embedding_provider
-from src.knowledge.exceptions import KnowledgeServiceError
 from src.knowledge.loaders.registry import get_loader
 from src.knowledge.visual.providers.registry import visual_rag_availability
 from src.knowledge.visual.service import visual_service
@@ -72,10 +71,15 @@ class AskResult:
         chat_result: ChatResult,
         citations: list[Citation],
         page_citations: list[PageCitation] | None = None,
+        retrieval_mode: str = retrieval.SEMANTIC,
     ):
         self.chat_result = chat_result
         self.citations = citations
         self.page_citations = page_citations or []
+        # Reported so the UI can say the answer rests on keyword matches
+        # rather than semantic ones. Silently degrading would make a
+        # weaker answer indistinguishable from a strong one.
+        self.retrieval_mode = retrieval_mode
 
 
 logger = logging.getLogger(__name__)
@@ -276,15 +280,28 @@ class KnowledgeService:
                 settings.EMBEDDING_MODEL, query, query_embedding
             )
         except Exception as exc:
-            # Mirrors upload_document's own broad catch around the same
-            # embedding call — any failure here (missing API key, rate
-            # limit, network) means "knowledge search isn't available right
-            # now," not a 500 with no explanation.
-            raise KnowledgeServiceError(
-                "Knowledge base search is unavailable — the embedding "
-                "provider isn't configured or reachable. Contact your "
-                "administrator.",
-            ) from exc
+            # Embeddings were once the only route to a chunk, so any
+            # failure here — missing key, rate limit, exhausted credits,
+            # network — took the entire Knowledge Base down while Chat
+            # carried on, because Chat needs only Anthropic. Nothing in
+            # the product said half of it had stopped.
+            #
+            # Keyword search is worse at understanding a question and
+            # completely indifferent to someone else's billing, so it is
+            # the right thing to degrade to rather than raise. The mode
+            # travels with the results so the answer can admit it.
+            logger.warning(
+                "Embedding provider unavailable (%s); falling back to "
+                "keyword search.",
+                exc,
+            )
+
+            return await retrieval.keyword_search(
+                db,
+                organization_id=organization_id,
+                query=query,
+                top_k=top_k,
+            )
 
         return await retrieval.search(
             db,
@@ -482,7 +499,12 @@ class KnowledgeService:
             for match in page_matches
         ]
 
-        return AskResult(chat_result, citations, page_citations)
+        return AskResult(
+            chat_result,
+            citations,
+            page_citations,
+            retrieval_mode=getattr(matches, "mode", retrieval.SEMANTIC),
+        )
 
 
 knowledge_service = KnowledgeService()

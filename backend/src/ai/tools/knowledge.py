@@ -55,6 +55,7 @@ class SearchKnowledgeBaseTool(Tool):
         # Imported lazily: src.knowledge.service imports the AI orchestrator,
         # which imports this tool registry at module load — a top-level import
         # here would create a circular import.
+        from src.knowledge import retrieval
         from src.knowledge.exceptions import KnowledgeServiceError
         from src.knowledge.service import knowledge_service
 
@@ -69,9 +70,12 @@ class SearchKnowledgeBaseTool(Tool):
                 db, organization_id=organization_id, query=query, top_k=10
             )
         except KnowledgeServiceError as exc:
-            # Retrieval being unavailable (e.g. embeddings not configured)
-            # must not abort a code-generation request — report it and let
-            # the agent fall back to sensible TM1 defaults.
+            # No longer the embeddings path — an unavailable embedding
+            # provider now degrades to keyword search instead of raising,
+            # and that case is handled below via `degraded`. Kept for any
+            # other way retrieval can fail outright, because a
+            # code-generation request must not abort over a failed
+            # standards lookup.
             return json.dumps(
                 {
                     "query": query,
@@ -84,13 +88,27 @@ class SearchKnowledgeBaseTool(Tool):
                 }
             )
 
+        # Degraded retrieval has to reach the agent, not just the UI.
+        # This tool answers "what are our standards?" for a model about
+        # to draft production TurboIntegrator, so the difference between
+        # "nothing matched" and "nothing matched, using word search" is
+        # the difference between a safe default and a false negative the
+        # agent states with confidence.
+        degraded = getattr(matches, "mode", retrieval.SEMANTIC) == retrieval.KEYWORD
+
         if not matches:
             return json.dumps(
                 {
                     "query": query,
                     "results": [],
                     "note": (
-                        "No matching standards were found in the knowledge "
+                        "No matching standards were found by keyword search, "
+                        "and semantic search is currently unavailable — a "
+                        "standard phrased differently would not have matched. "
+                        "Tell the user this could not be checked properly, "
+                        "then apply sensible TM1 defaults."
+                        if degraded
+                        else "No matching standards were found in the knowledge "
                         "base. Tell the user that no organizational standard "
                         "was found for this, then apply sensible TM1 defaults."
                     ),
@@ -106,4 +124,14 @@ class SearchKnowledgeBaseTool(Tool):
             for match in matches
         ]
 
-        return json.dumps({"query": query, "results": results})
+        payload = {"query": query, "results": results}
+
+        if degraded:
+            payload["note"] = (
+                "Found by keyword search — semantic search is unavailable, so "
+                "these share words with the query rather than meaning, and "
+                "other relevant standards may have been missed. Treat as "
+                "incomplete and say so."
+            )
+
+        return json.dumps(payload)

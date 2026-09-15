@@ -129,6 +129,17 @@ export interface AskResponseBody {
   model: string;
   usage: ChatUsage;
   citations: Citation[];
+  /** How the cited passages were found.
+   *
+   * "keyword" means the embedding provider was unreachable and Postgres
+   * full-text search stood in — the answer is grounded in passages that
+   * share *words* with the question rather than meaning, so the UI says
+   * so instead of presenting it as equally reliable.
+   *
+   * Optional because the frontend and backend deploy independently: a
+   * browser holding the new bundle can still be talking to an API that
+   * predates the field. */
+  retrieval_mode?: "semantic" | "keyword";
 }
 
 export interface ExplainErrorResponseBody {
