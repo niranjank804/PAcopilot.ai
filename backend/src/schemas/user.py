@@ -6,6 +6,7 @@ organization admin) is allowed to change about themselves.
 """
 
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +25,19 @@ class ProfileUpdate(BaseModel):
 
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
+
+
+class OnboardingUpdate(BaseModel):
+    """What the client is allowed to say about the tour.
+
+    A verb, not a timestamp. Letting the client send the time would mean
+    trusting a clock it controls for a value the audit trail reads;
+    `func.now()` on the server is the only honest source. "dismissed" is
+    kept distinct from "completed" because they permit different things
+    next — see the User model.
+    """
+
+    action: Literal["completed", "dismissed", "restart"]
 
 
 class OrganizationUpdate(BaseModel):

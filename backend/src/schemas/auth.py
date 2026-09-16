@@ -63,6 +63,12 @@ class UserResponse(BaseModel):
     # User row alone, and only the list endpoint fills it in.
     roles: list[str] = []
 
+    # Null until the tour has been finished or dismissed. The frontend
+    # decides whether to offer onboarding from these rather than from a
+    # browser flag, so a second device does not replay it.
+    onboarding_completed_at: datetime | None = None
+    onboarding_dismissed_at: datetime | None = None
+
     # Needed by the auth dependency to reject tokens predating a bulk
     # revocation. Excluded from serialization: it is effectively a
     # last-password-change timestamp and clients have no use for it.

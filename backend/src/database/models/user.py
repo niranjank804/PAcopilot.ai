@@ -70,6 +70,29 @@ class User(BaseModel, OrganizationScoped):
         server_default=text("'1970-01-01 00:00:00+00'"),
     )
 
+    # When the product tour was finished or dismissed. Nullable means
+    # "never seen it", which is what a first login looks like.
+    #
+    # Server-side rather than localStorage because it is a property of
+    # the person, not the browser: signing in on a second machine should
+    # not replay an introduction they have already sat through, and
+    # clearing site data should not either.
+    #
+    # Two columns rather than one status string. "Finished" and
+    # "dismissed" differ in what they permit next — a dismissal is a
+    # "not now" that may be offered again, a completion is not — and a
+    # single enum would have to be re-parsed at every call site to
+    # recover that distinction.
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    onboarding_dismissed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     registration_status: Mapped[str] = mapped_column(
         String(20),
         default="approved",

@@ -19,6 +19,15 @@ export interface AuthUser {
   last_name: string;
   is_active: boolean;
   organization_id: string;
+
+  /** Null until the product tour is finished or dismissed.
+   *
+   * Server-side so a second device does not replay an introduction the
+   * person has already sat through. Optional here because the frontend
+   * and backend deploy independently — a browser holding the new bundle
+   * can still be talking to an API that predates these fields. */
+  onboarding_completed_at?: string | null;
+  onboarding_dismissed_at?: string | null;
 }
 
 interface Tokens {
@@ -39,6 +48,11 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<void>;
   loginWithGoogle: (googleIdToken: string) => Promise<void>;
   logout: () => void;
+  /** Re-read /auth/me. The user object is state here rather than a
+   * React Query cache, so callers that change something about the
+   * signed-in user — onboarding, profile — need a way to pull the new
+   * value rather than invalidating a key that does not exist. */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -120,6 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      setUser(await apiRequest<AuthUser>("/auth/me"));
+    } catch {
+      // A failed refresh is not a reason to sign someone out — the
+      // token may simply be mid-rotation. The stale user stays until
+      // something authoritative says otherwise.
+    }
+  }, []);
+
   const login = useCallback(
     async (username: string, password: string) => {
       const data = await apiRequest<TokenResponseBody>("/auth/login", {
@@ -172,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         loginWithGoogle,
         logout,
+        refreshUser,
       }}
     >
       {children}

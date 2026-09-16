@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { HelpCircle, LogOut, PlayCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useRestartTour } from "@/components/onboarding";
 import { useAuth } from "@/lib/auth-context";
 
 function initialsFor(firstName: string, lastName: string): string {
@@ -22,6 +23,7 @@ function initialsFor(firstName: string, lastName: string): string {
 
 export function AppHeader() {
   const { user, logout } = useAuth();
+  const restartTour = useRestartTour();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -35,6 +37,34 @@ export function AppHeader() {
         {user ? `${user.first_name} ${user.last_name}` : ""}
       </div>
       <div className="flex items-center gap-2">
+        {/* Help. Also the last stop on the product tour, which is how
+            someone learns the tour can be replayed from here. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            data-tour="help-menu"
+            aria-label="Help"
+            className="rounded-md p-2 outline-none ring-offset-background hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Help</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => restartTour.mutate()}
+                disabled={restartTour.isPending}
+              >
+                <PlayCircle className="mr-2 h-4 w-4" />
+                Take product tour
+              </DropdownMenuItem>
+              {/* No Documentation entry: there is no user-facing
+                  documentation site yet, and pointing this at a
+                  repository README would be a link that looks like help
+                  and is not. It belongs here the day docs exist. */}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">

@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
+import { Onboarding } from "@/components/onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
 
@@ -47,6 +48,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
         </main>
       </div>
+
+      {/* Mounted in the shell rather than on the dashboard: the tour
+          walks across several routes, so it has to outlive any one
+          page. It renders nothing once the user has finished or
+          dismissed it. */}
+      <Onboarding />
     </div>
   );
 }

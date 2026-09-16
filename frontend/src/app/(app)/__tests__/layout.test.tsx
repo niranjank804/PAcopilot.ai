@@ -26,6 +26,13 @@ vi.mock("@/components/app-sidebar", () => ({
 vi.mock("@/components/app-header", () => ({
   AppHeader: () => <header data-testid="header">header</header>,
 }));
+// Stubbed like the sidebar and header: this file is about route
+// protection and shell persistence, and the real Onboarding pulls in
+// React Query and the auth context. Its own behaviour is covered in
+// components/__tests__/onboarding.test.tsx.
+vi.mock("@/components/onboarding", () => ({
+  Onboarding: () => null,
+}));
 
 import AppLayout from "../layout";
 

@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.auth import get_current_active_user
@@ -11,6 +12,7 @@ from src.schemas.auth import ApproveUserRequest, UserResponse
 from src.schemas.response import ApiResponse
 from src.schemas.role import RoleResponse, UserRoleAssign
 from src.schemas.user import (
+    OnboardingUpdate,
     OrganizationResponse,
     OrganizationUpdate,
     ProfileUpdate,
@@ -287,6 +289,54 @@ def _client_context(http_request: Request) -> tuple[str | None, str | None]:
     user_agent = http_request.headers.get("user-agent")
 
     return ip_address, user_agent
+
+
+@router.post(
+    "/me/onboarding",
+    response_model=ApiResponse[UserResponse],
+)
+async def update_my_onboarding(
+    payload: OnboardingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_active_user),
+):
+    """Record that the signed-in user finished, dismissed or restarted
+    the product tour.
+
+    Like the profile endpoint, the subject is the session and there is
+    no id to substitute. No permission beyond being signed in: a user
+    owns whether they have been shown an introduction.
+
+    Timestamps come from `func.now()`, never from the request. The
+    client knows *what* happened; the server decides *when*, because a
+    client clock is not something an audit trail should inherit.
+
+    Deliberately not audit-logged. The audit trail records actions
+    taken on the organization's data — connections, deploys, approvals
+    — and "watched a tour" would be noise in the log an auditor reads,
+    while telling them nothing about the TM1 estate.
+    """
+
+    user = await user_repository.get_by_id(db, current_user.id)
+
+    if user is None:
+        raise NotFoundException("User not found.")
+
+    if payload.action == "completed":
+        user.onboarding_completed_at = func.now()
+        user.onboarding_dismissed_at = None
+    elif payload.action == "dismissed":
+        user.onboarding_dismissed_at = func.now()
+    else:
+        # "restart" from Help clears both, which is what makes the tour
+        # offerable again without deleting anything else about the user.
+        user.onboarding_completed_at = None
+        user.onboarding_dismissed_at = None
+
+    await user_repository.update(db, user)
+    await db.refresh(user)
+
+    return ApiResponse(success=True, data=UserResponse.model_validate(user))
 
 
 @router.patch(
