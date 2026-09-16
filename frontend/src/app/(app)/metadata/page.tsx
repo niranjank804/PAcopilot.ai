@@ -354,7 +354,7 @@ function MetadataExplorer() {
               setSelected(null);
             }}
           >
-            <SelectTrigger aria-label="Connection">
+            <SelectTrigger aria-label="Connection" data-tour="metadata-connection">
               <SelectValue placeholder="Select connection">
                 {(value: string) =>
                   connectionsQuery.data?.find((c) => c.id === value)?.name ??
@@ -379,6 +379,7 @@ function MetadataExplorer() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            data-tour="metadata-search"
             placeholder="Search objects"
             className="pl-7"
           />

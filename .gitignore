@@ -75,3 +75,9 @@ database-backup.dump
 .env.*
 !.env.example
 *.env.backup*
+
+# Playwright: downloaded browsers live outside the repo, but its run
+# artifacts do not.
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/

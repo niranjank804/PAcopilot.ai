@@ -84,6 +84,12 @@ export default function LoginPage() {
     <div className="flex flex-1 items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
+          {/* CardTitle renders a div, so without this the page has no
+              heading at all and a screen reader announces no title on
+              arrival. Visually hidden rather than restyled: the design
+              is deliberate, the missing semantics are not. Found by a
+              real-browser check; happy-dom never looked. */}
+          <h1 className="sr-only">Sign in to PA-Copilot</h1>
           <CardTitle className="text-xl">PA-Copilot Console</CardTitle>
           <CardDescription>
             Sign in with your organization credentials.

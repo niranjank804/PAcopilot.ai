@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { FeatureTourButton } from "@/components/feature-tour-button";
 import { useRestartTour } from "@/components/onboarding";
 import { useAuth } from "@/lib/auth-context";
 
@@ -37,6 +38,10 @@ export function AppHeader() {
         {user ? `${user.first_name} ${user.last_name}` : ""}
       </div>
       <div className="flex items-center gap-2">
+        {/* Page-specific help, where a tour exists for the current
+            route. Renders nothing elsewhere, so it needs no per-page
+            wiring. */}
+        <FeatureTourButton />
         {/* Help. Also the last stop on the product tour, which is how
             someone learns the tour can be replayed from here. */}
         <DropdownMenu>

@@ -273,7 +273,7 @@ export default function DeploymentsPage() {
                 setSelectedChangeId(null);
               }}
             >
-              <SelectTrigger className="w-64" aria-label="Connection">
+              <SelectTrigger className="w-64" aria-label="Connection" data-tour="governance-connection">
                 <SelectValue placeholder="Select connection">
                   {(value: string) =>
                     connectionsQuery.data?.find((c) => c.id === value)?.name ??
@@ -315,7 +315,7 @@ export default function DeploymentsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Change log</CardTitle>
+            <CardTitle data-tour="governance-changes">Change log</CardTitle>
             <CardDescription>
               Drafts wait for human review; every execute and rollback is
               audited.
@@ -376,7 +376,7 @@ export default function DeploymentsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Review</CardTitle>
+            <CardTitle data-tour="governance-review">Review</CardTitle>
             <CardDescription>
               Current vs. proposed content, impact, and deploy actions.
             </CardDescription>

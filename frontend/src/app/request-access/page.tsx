@@ -62,6 +62,7 @@ export default function RequestAccessPage() {
     <div className="flex flex-1 items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
+          <h1 className="sr-only">Create a PA-Copilot account</h1>
           <CardTitle className="text-xl">Create account</CardTitle>
           <CardDescription>Sign up to start using PA-Copilot.</CardDescription>
         </CardHeader>

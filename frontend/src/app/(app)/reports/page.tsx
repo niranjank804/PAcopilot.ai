@@ -165,7 +165,7 @@ export default function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>PAfE workbook reports</CardTitle>
+          <CardTitle data-tour="reports-definitions">PAfE workbook reports</CardTitle>
           <CardDescription>
             Each run is executed by a registered Windows worker with Excel and
             PAfE installed.

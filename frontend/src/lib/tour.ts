@@ -174,3 +174,79 @@ export function useTour(steps: TourStep[] = PRODUCT_TOUR) {
 
   return { isRunning, index, step, steps, spotlight, start, stop, next, back };
 }
+
+/**
+ * Per-feature tours, keyed by the route they belong to.
+ *
+ * Same engine, same skip-if-absent rule — so a step whose element a
+ * given role or state does not render simply drops out. That is why
+ * these can name the Review panel on Deployments without checking
+ * whether a change is selected: with nothing selected the panel is not
+ * in the DOM, and the step is not shown.
+ *
+ * Deliberately short. A feature tour that runs longer than the task it
+ * explains gets skipped, and then explains nothing.
+ */
+export const FEATURE_TOURS: Record<string, TourStep[]> = {
+  "/chat": [
+    {
+      target: "chat-agent",
+      title: "Pick a specialist",
+      body: "Each agent brings a different set of live TM1 tools — one drafts TurboIntegrator, another explains errors, another reviews model design.",
+    },
+    {
+      target: "chat-input",
+      title: "Ask in plain English",
+      body: "Questions about cubes, rules, processes or an error message. The assistant reads your model rather than guessing from generic TM1 documentation.",
+    },
+    {
+      target: "voice-input",
+      title: "Or dictate it",
+      body: "Speech fills this same box for you to check before sending, and the answer is read back. Voice takes exactly the same permission and approval path as typing.",
+    },
+    {
+      target: "chat-history",
+      title: "Earlier conversations",
+      body: "Threads are kept, so you can return to what an agent proposed last week and carry on from it.",
+    },
+  ],
+
+  "/metadata": [
+    {
+      target: "metadata-connection",
+      title: "Choose a server",
+      body: "Everything below is read from this connection. Nothing is written — this whole screen is read-only.",
+    },
+    {
+      target: "metadata-search",
+      title: "Find an object",
+      body: "Search across cubes, dimensions, processes and chores at once, rather than knowing in advance which kind of thing you are looking for.",
+    },
+  ],
+
+  "/deployments": [
+    {
+      target: "governance-connection",
+      title: "Changes are per connection",
+      body: "Drafts belong to the server they were written against, so a change reviewed for Dev cannot be executed against Production by accident.",
+    },
+    {
+      target: "governance-changes",
+      title: "What the assistant proposed",
+      body: "AI-drafted rule and process changes arrive here as drafts. Nothing on this list has touched TM1 yet.",
+    },
+    {
+      target: "governance-review",
+      title: "You decide",
+      body: "Read the change and its impact analysis, then execute it yourself. The assistant can draft; only a person with deploy rights writes to the server.",
+    },
+  ],
+
+  "/reports": [
+    {
+      target: "reports-definitions",
+      title: "Workbook refreshes",
+      body: "A report pairs a PAfE workbook with the output formats you want. A customer-operated Windows worker runs Excel; this service never does.",
+    },
+  ],
+};

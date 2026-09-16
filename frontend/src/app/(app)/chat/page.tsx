@@ -563,6 +563,7 @@ export default function ChatPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            data-tour="chat-history"
             placeholder="Search conversations"
             className="pl-7"
           />
@@ -688,7 +689,7 @@ export default function ChatPage() {
             value={agent}
             onValueChange={(value) => setAgent(value ?? NO_AGENT)}
           >
-            <SelectTrigger className="w-44" aria-label="Agent">
+            <SelectTrigger className="w-44" aria-label="Agent" data-tour="chat-agent">
               <SelectValue>
                 {(value: string) =>
                   value === NO_AGENT ? "No agent (plain chat)" : titleCase(value)
@@ -897,6 +898,7 @@ export default function ChatPage() {
               placeholder="Ask about cubes, processes, dependencies..."
               className="min-h-[44px] flex-1 resize-none"
               aria-label="Message"
+              data-tour="chat-input"
               disabled={isStreaming}
             />
             {voice.isSupported ? (
