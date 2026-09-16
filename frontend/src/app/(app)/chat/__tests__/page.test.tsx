@@ -7,7 +7,7 @@
  * machine is exercised for real.
  */
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -269,5 +269,239 @@ describe("agent selection", () => {
 
     expect(body.agent).toBeUndefined();
     expect(body.enable_tools).toBe(false);
+  });
+});
+
+// ======================================================================
+// Voice
+//
+// The property worth testing is not that audio works — it is that voice
+// is not a second, less-governed way into the assistant. The transcript
+// lands in the same composer and goes out through the same
+// `streamRequest`, so RBAC, tool permissions, approval gates and audit
+// logging are inherited. These tests pin that, plus the state machine
+// and the browser-support gate.
+// ======================================================================
+
+/** A controllable stand-in for the Web Speech API. */
+function installSpeech({ supported = true } = {}) {
+  const instances: Record<string, unknown>[] = [];
+
+  class FakeRecognition {
+    lang = "";
+    continuous = false;
+    interimResults = false;
+    onresult: ((event: unknown) => void) | null = null;
+    onerror: ((event: unknown) => void) | null = null;
+    onend: (() => void) | null = null;
+    started = false;
+
+    constructor() {
+      instances.push(this as unknown as Record<string, unknown>);
+    }
+
+    start() {
+      this.started = true;
+    }
+
+    stop() {
+      this.started = false;
+      this.onend?.();
+    }
+  }
+
+  const utterances: string[] = [];
+  const synthesis = {
+    speak: vi.fn((utterance: { text: string }) => {
+      utterances.push(utterance.text);
+    }),
+    cancel: vi.fn(),
+  };
+
+  vi.stubGlobal("SpeechRecognition", supported ? FakeRecognition : undefined);
+  vi.stubGlobal("webkitSpeechRecognition", undefined);
+  vi.stubGlobal("speechSynthesis", synthesis);
+  vi.stubGlobal(
+    "SpeechSynthesisUtterance",
+    class {
+      text: string;
+      lang = "";
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    },
+  );
+
+  return {
+    /** The recognition object the page constructed. */
+    get recognition() {
+      return instances[instances.length - 1] as unknown as FakeRecognition;
+    },
+    utterances,
+    synthesis,
+  };
+}
+
+describe("voice", () => {
+  it("hides the mic where the browser has no recognition", async () => {
+    // Firefox and Safari. Offering a dead button is worse than offering
+    // nothing.
+    installSpeech({ supported: false });
+
+    renderChat();
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/ask about cubes/i)).toBeInTheDocument(),
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /voice input/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers the mic where recognition exists", async () => {
+    installSpeech();
+
+    renderChat();
+
+    expect(
+      await screen.findByRole("button", { name: /start voice input/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts the transcript in the composer for review rather than sending it", async () => {
+    // Auto-sending what a speech recogniser *thought* it heard would
+    // put an unreviewed instruction into a governed system.
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    renderChat();
+
+    await user.click(
+      await screen.findByRole("button", { name: /start voice input/i }),
+    );
+
+    speech.recognition.onresult?.({
+      results: { length: 1, 0: { 0: { transcript: "list the sales cubes" } } },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(
+        "list the sales cubes",
+      ),
+    );
+
+    expect(streamRequest).not.toHaveBeenCalled();
+  });
+
+  it("sends a spoken question through the same path as a typed one", async () => {
+    // The governance claim, asserted rather than asserted-in-prose: one
+    // transport, so one set of permission and audit checks.
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    streamRequest.mockReturnValue(
+      streamOf([{ type: "text_delta", text: "Four cubes." }, DONE]),
+    );
+
+    renderChat();
+
+    await user.click(
+      await screen.findByRole("button", { name: /start voice input/i }),
+    );
+
+    speech.recognition.onresult?.({
+      results: { length: 1, 0: { 0: { transcript: "how many cubes" } } },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(
+        "how many cubes",
+      ),
+    );
+
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(1));
+
+    const [path, body] = streamRequest.mock.calls[0];
+
+    expect(path).toBe("/ai/chat/stream");
+    expect((body as { message: string }).message).toBe("how many cubes");
+    // No voice flag, no alternate endpoint, nothing the backend could
+    // treat differently.
+    expect(body).not.toHaveProperty("voice");
+  });
+
+  it("speaks the answer to a spoken question", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    streamRequest.mockReturnValue(
+      streamOf([{ type: "text_delta", text: "The **Sales** cube." }, DONE]),
+    );
+
+    renderChat();
+
+    await user.click(
+      await screen.findByRole("button", { name: /start voice input/i }),
+    );
+    speech.recognition.onresult?.({
+      results: { length: 1, 0: { 0: { transcript: "which cube" } } },
+    });
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(
+        "which cube",
+      ),
+    );
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(speech.synthesis.speak).toHaveBeenCalled());
+
+    // Markdown is stripped before speaking — "star star Sales star star"
+    // is what happens otherwise.
+    expect(speech.utterances[0]).toBe("The Sales cube.");
+  });
+
+  it("stays silent for a typed question", async () => {
+    // Audio nobody asked for is worse than no audio.
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    streamRequest.mockReturnValue(
+      streamOf([{ type: "text_delta", text: "Four cubes." }, DONE]),
+    );
+
+    renderChat();
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/ask about cubes/i)).toBeInTheDocument(),
+    );
+    await sendMessage(user, "how many cubes");
+
+    await waitFor(() => expect(streamRequest).toHaveBeenCalled());
+
+    expect(speech.synthesis.speak).not.toHaveBeenCalled();
+  });
+
+  it("explains a blocked microphone instead of saying to try again", async () => {
+    // "Try again" sends someone in a loop when the browser is the thing
+    // refusing.
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    renderChat();
+
+    await user.click(
+      await screen.findByRole("button", { name: /start voice input/i }),
+    );
+
+    speech.recognition.onerror?.({ error: "not-allowed" });
+
+    await waitFor(() =>
+      expect(screen.getByText(/microphone access is blocked/i)).toBeInTheDocument(),
+    );
   });
 });

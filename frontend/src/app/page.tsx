@@ -175,8 +175,15 @@ export default function LandingPage() {
 
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-6 pt-20 pb-16 text-center">
+          {/* Says what the product is for, rather than what stage its
+              development is at. "Now in beta testing" told a visitor
+              about our roadmap; this tells them whether they are the
+              intended reader. Per-feature maturity is still stated
+              honestly where it applies — the capability registry marks
+              report automation a Developer Preview, and the pricing
+              matrix reflects that. */}
           <Badge variant="secondary" className="mb-6">
-            Now in beta testing
+            Built for TM1 and Planning Analytics teams
           </Badge>
           <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-balance sm:text-5xl">
             An AI engineering copilot for{" "}
@@ -304,8 +311,12 @@ export default function LandingPage() {
             <h2 className="text-3xl font-bold tracking-tight">
               Ready to try it on your environment?
             </h2>
+            {/* The fact worth stating is that there is no approval
+                queue, which is a property of how access works — not of
+                a beta that will one day end. Framing it as temporary
+                also implied a deadline nobody had set. */}
             <p className="mt-3 text-muted-foreground">
-              Sign up and you&apos;re in — no approval wait during the beta.
+              Sign up and you&apos;re in — no approval wait, no sales call.
             </p>
             <div className="mt-8 flex items-center justify-center gap-3">
               <Link

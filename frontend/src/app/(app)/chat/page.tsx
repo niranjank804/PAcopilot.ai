@@ -15,13 +15,16 @@ import {
   Search,
   Send,
   ShieldAlert,
+  Square,
   Trash2,
   User,
+  Volume2,
+  VolumeX,
   Wrench,
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
@@ -52,6 +55,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { useVoice } from "@/lib/voice";
 import type {
   AgentInfo,
   ChatAttachmentInput,
@@ -216,47 +220,33 @@ export default function ChatPage() {
   const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(
     null,
   );
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
+  // True when the pending request came from the microphone. Answers to
+  // typed questions are not spoken: audio nobody asked for is worse
+  // than no audio.
+  const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachmentInput[]>(
     [],
   );
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Feature-detect once on mount — SpeechRecognition is only ever touched
-  // client-side (SSR has no `window`), same reason the theme toggle in
-  // settings/page.tsx waits for a mount effect before rendering anything
-  // that depends on browser-only APIs.
-  useEffect(() => {
-    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+  // Voice is not a separate assistant: the transcript lands in this
+  // same composer and is sent through the same `send` path as typed
+  // text, so RBAC, tool permissions, approval gates, audit logging and
+  // usage accounting are inherited rather than reimplemented. See
+  // src/lib/voice.ts.
+  const voice = useVoice({
+    onTranscript: (transcript) => {
+      setLastInputWasVoice(true);
+      setInput((previous) =>
+        previous ? `${previous} ${transcript}` : transcript,
+      );
+      inputRef.current?.focus();
+    },
+  });
 
-    if (!Ctor) return;
-
-    const recognition = new Ctor();
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      setInput((previous) => (previous ? `${previous} ${transcript}` : transcript));
-    };
-    recognition.onerror = () => {
-      toast.error("Couldn't hear that — try again.");
-      setIsListening(false);
-    };
-    recognition.onend = () => setIsListening(false);
-
-    recognitionRef.current = recognition;
-    // Support isn't known until after mount (window.SpeechRecognition is
-    // browser-only) — same pattern as settings/page.tsx's theme toggle.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSpeechSupported(true);
-  }, []);
 
   const insertToolPrompt = (tool: string) => {
     setInput(toolPrompt(tool));
@@ -282,18 +272,16 @@ export default function ChatPage() {
     }
   };
 
+  const isListening =
+    voice.state === "listening" || voice.state === "requesting-permission";
+
   const toggleListening = () => {
-    const recognition = recognitionRef.current;
-
-    if (!recognition) return;
-
     if (isListening) {
-      recognition.stop();
-      setIsListening(false);
-    } else {
-      recognition.start();
-      setIsListening(true);
+      voice.stop();
+      return;
     }
+
+    voice.start();
   };
 
   const readFileAsBase64 = (file: File): Promise<string> =>
@@ -502,6 +490,22 @@ export default function ChatPage() {
 
           if (isNewConversation) {
             queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
+          }
+
+          // Spoken only when the question was spoken. Read from the
+          // message list rather than accumulating a second copy of the
+          // deltas, so what is heard is exactly what is displayed.
+          if (lastInputWasVoice) {
+            setMessages((current) => {
+              const answer = current[current.length - 1];
+
+              if (answer?.role === "assistant" && answer.content) {
+                voice.speak(answer.content);
+              }
+
+              return current;
+            });
+            setLastInputWasVoice(false);
           }
         } else if (event.type === "error") {
           setMessages((previous) => {
@@ -836,6 +840,28 @@ export default function ChatPage() {
                 ))}
               </div>
             ) : null}
+            {/* Voice status, above the composer. The hook tracks these
+                states; without rendering them a blocked microphone was
+                silent — the button simply did nothing and the user had
+                no way to learn why. Caught by a test, not by reading. */}
+            {voice.errorMessage ? (
+              <p role="alert" className="mb-2 text-xs text-destructive">
+                {voice.errorMessage}
+              </p>
+            ) : voice.state === "listening" ? (
+              <p aria-live="polite" className="text-muted-foreground mb-2 text-xs">
+                Listening…
+              </p>
+            ) : voice.state === "requesting-permission" ? (
+              <p aria-live="polite" className="text-muted-foreground mb-2 text-xs">
+                Waiting for microphone permission…
+              </p>
+            ) : voice.state === "speaking" ? (
+              <p aria-live="polite" className="text-muted-foreground mb-2 text-xs">
+                Speaking — press stop to interrupt.
+              </p>
+            ) : null}
+
             <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
@@ -873,19 +899,63 @@ export default function ChatPage() {
               aria-label="Message"
               disabled={isStreaming}
             />
-            {speechSupported ? (
+            {voice.isSupported ? (
               <Button
                 type="button"
                 variant={isListening ? "destructive" : "outline"}
                 onClick={toggleListening}
                 disabled={isStreaming}
+                data-tour="voice-input"
                 aria-label={isListening ? "Stop voice input" : "Start voice input"}
-                title={isListening ? "Stop voice input" : "Ask by voice"}
+                title={
+                  voice.state === "requesting-permission"
+                    ? "Waiting for microphone permission"
+                    : isListening
+                      ? "Stop voice input"
+                      : "Ask by voice"
+                }
               >
                 {isListening ? (
                   <MicOff className="h-4 w-4 animate-pulse" />
                 ) : (
                   <Mic className="h-4 w-4" />
+                )}
+              </Button>
+            ) : null}
+
+            {/* Only while there is something to interrupt. A permanently
+                visible stop button is a control that does nothing most
+                of the time. */}
+            {voice.state === "speaking" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={voice.stopSpeaking}
+                aria-label="Stop speaking"
+                title="Stop speaking"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            ) : null}
+
+            {voice.canSpeak ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={voice.toggleMuted}
+                aria-label={
+                  voice.isMuted ? "Unmute spoken answers" : "Mute spoken answers"
+                }
+                aria-pressed={voice.isMuted}
+                title={
+                  voice.isMuted ? "Spoken answers muted" : "Mute spoken answers"
+                }
+              >
+                {voice.isMuted ? (
+                  <VolumeX className="h-4 w-4" />
+                ) : (
+                  <Volume2 className="h-4 w-4" />
                 )}
               </Button>
             ) : null}
