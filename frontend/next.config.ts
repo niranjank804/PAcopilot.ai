@@ -64,6 +64,15 @@ function apiOrigin(): string {
   }
 }
 
+/**
+ * Google Identity Services, as listed in Google's own CSP guidance for
+ * Sign In With Google. Kept to the /gsi/ paths rather than the whole of
+ * accounts.google.com, so the exception is no wider than the feature.
+ */
+const GOOGLE_GSI_SCRIPT = 'https://accounts.google.com/gsi/client';
+const GOOGLE_GSI_STYLE = 'https://accounts.google.com/gsi/style';
+const GOOGLE_GSI_ORIGIN = 'https://accounts.google.com/gsi/';
+
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -80,14 +89,26 @@ const securityHeaders = [
       "default-src 'self'",
       // Next.js injects inline bootstrap scripts and, in development,
       // relies on eval for fast refresh.
+      //
+      // Sign In With Google needs four entries, exactly as Google
+      // documents them. Omitting them does not raise an error the user
+      // sees: the login page renders the button's empty placeholder and
+      // waits for a script the browser refuses to fetch, so the button
+      // is simply missing. That is how this policy first shipped.
       process.env.NODE_ENV === 'development'
-        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-        : "script-src 'self' 'unsafe-inline'",
+        ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${GOOGLE_GSI_SCRIPT}`
+        : `script-src 'self' 'unsafe-inline' ${GOOGLE_GSI_SCRIPT}`,
       // Tailwind and the component library emit inline styles.
-      "style-src 'self' 'unsafe-inline'",
+      `style-src 'self' 'unsafe-inline' ${GOOGLE_GSI_STYLE}`,
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      ["connect-src 'self'", apiOrigin()].filter(Boolean).join(' '),
+      ["connect-src 'self'", apiOrigin(), GOOGLE_GSI_ORIGIN]
+        .filter(Boolean)
+        .join(' '),
+      // The button and its account chooser are iframes served from
+      // Google. Without frame-src this falls back to default-src
+      // 'self' and they are blocked.
+      `frame-src ${GOOGLE_GSI_ORIGIN}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

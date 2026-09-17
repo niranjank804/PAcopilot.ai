@@ -45,6 +45,9 @@ export default defineConfig({
     env: {
       // The build guard refuses to run without this, by design.
       NEXT_PUBLIC_API_URL: "http://127.0.0.1:3101",
+      // Renders the Google branch of the login page so the CSP can be
+      // checked against the script it loads. Not a real client.
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: "e2e-placeholder.apps.googleusercontent.com",
     },
   },
 });
