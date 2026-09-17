@@ -2,9 +2,15 @@ name: Keep the Render backend awake
 
 on:
   schedule:
-    # Every 10 minutes - safely under Render free tier's ~15 minute idle
-    # spin-down threshold. GitHub may delay scheduled runs slightly under
-    # load, so 10 minutes leaves margin rather than cutting it at 14-15.
+    # Asks for every 10 minutes, under Render's ~15 minute idle spin-down.
+    #
+    # Do not rely on it. GitHub treats schedules as best-effort, and in
+    # practice this ran every 2-7 hours: the 20 runs before 2026-09-17
+    # were 2h01m to 6h54m apart. The backend was therefore asleep most of
+    # the time and the first request after a gap waited a minute or more.
+    # A dedicated uptime monitor (UptimeRobot, cron-job.org) pinging
+    # /health every 5 minutes, or a paid Render instance that never
+    # sleeps, is what actually keeps it warm. This stays as a backstop.
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
 

@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { BackendWarmup } from "@/components/backend-warmup";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -134,6 +135,7 @@ const SECURITY = [
 export default function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <BackendWarmup />
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2 font-semibold tracking-tight">

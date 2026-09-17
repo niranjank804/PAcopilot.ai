@@ -24,9 +24,15 @@ services:
       PYTHONPATH=. python scripts/seed_roles.py &&
       PYTHONPATH=. python scripts/seed_permissions.py &&
       PYTHONPATH=. python scripts/seed_admin.py
+    # One worker, on purpose. The free instance has 0.1 CPU and 512 MB,
+    # and one worker process is ~210 MB once the app is imported; two sat
+    # at the memory ceiling before serving a request and doubled the CPU
+    # work of every cold start, which is when the app is slowest. A second
+    # process adds no CPU to share, and uvicorn already serves concurrent
+    # requests from one. Revisit together with a paid plan.
     startCommand: >-
       gunicorn src.main:app -k uvicorn.workers.UvicornWorker
-      --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+      --bind 0.0.0.0:$PORT --workers 1 --timeout 300
     # Fails the deploy if the new build cannot reach its database, instead
     # of promoting it and serving errors. Saturation deliberately does not
     # fail this probe — see src/api/v1/health.py.
@@ -40,9 +46,9 @@ services:
       # could quietly change.
       - key: TENANCY_ENFORCEMENT_ENABLED
         value: "True"
-      # Sized per *worker*: --workers 2 means two processes, each with its
-      # own pool, so the real connection count against Postgres is twice
-      # these numbers (2 x (10 + 10) = 40). Raise only alongside the
+      # Sized per *worker*: each gunicorn worker has its own pool, so the
+      # real connection count against Postgres is workers x (10 + 10) —
+      # 20 with the single worker above. Raise only alongside the
       # database plan's own connection limit.
       - key: DATABASE_POOL_SIZE
         value: "10"

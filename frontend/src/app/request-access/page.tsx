@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { useBackendWarmup } from "@/lib/backend-warmup";
 
 const requestAccessSchema = z.object({
   first_name: z.string().min(1, "Required"),
@@ -32,6 +33,8 @@ type RequestAccessValues = z.infer<typeof requestAccessSchema>;
 export default function RequestAccessPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useBackendWarmup();
 
   const {
     register,
