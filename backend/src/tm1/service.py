@@ -1,13 +1,19 @@
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import NotFoundException, ValidationException
 from src.database.models.tm1_connection import TM1Connection
 from src.repositories.tm1_connection_repository import tm1_connection_repository
+from src.tm1.addressing import SAAS_NEEDS_SAAS_TYPE, is_saas_host, parse_address
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.crypto import encrypt_password
-from src.tm1.exceptions import TM1AuthenticationError, TM1ConnectionError
+from src.tm1.exceptions import (
+    TM1AuthenticationError,
+    TM1ConnectionError,
+    TM1NotFoundError,
+)
 from src.tm1.resilience import call_with_resilience
 from src.tm1.services import (
     cell_service,
@@ -23,6 +29,51 @@ from src.tm1.services.cube_service import CubeInfo
 from src.tm1.services.dimension_service import DimensionInfo
 from src.tm1.services.process_service import ProcessInfo
 from src.tm1.services.security_service import GroupInfo
+
+
+CREDENTIALS_REJECTED = "credentials_rejected"
+NOT_FOUND = "not_found"
+UNREACHABLE = "unreachable"
+
+
+@dataclass(frozen=True)
+class ConnectionDiagnosis:
+    connected: bool
+    problem: str | None = None
+    message: str | None = None
+
+
+def _explain(problem: str, connection: TM1Connection) -> str:
+    saas = connection.authentication_type == "v12_saas"
+
+    if problem == CREDENTIALS_REJECTED:
+        if saas:
+            return (
+                f"IBM rejected the API key for tenant '{connection.tenant}'. "
+                "Check the tenant ID, and that the API key was created in "
+                "that tenant."
+            )
+        return "The server rejected the username or password."
+
+    if problem == NOT_FOUND:
+        if saas:
+            return (
+                f"The API key was accepted but database "
+                f"'{connection.database}' was not found. Check the database "
+                "name; it is case-sensitive."
+            )
+        return (
+            "The server answered, but no TM1 REST API was found at this "
+            "address and port."
+        )
+
+    if saas:
+        return f"Could not reach {connection.address}. Check the hostname."
+    return (
+        f"Could not reach {connection.address}:{connection.port}. Check the "
+        "address, port and SSL setting, and that the server accepts "
+        "connections from the internet."
+    )
 
 
 class TM1IntegrationService:
@@ -43,6 +94,17 @@ class TM1IntegrationService:
         tenant: str | None = None,
         database: str | None = None,
     ) -> TM1Connection:
+
+        parsed = parse_address(address)
+        address = parsed.host
+        tenant = tenant or parsed.tenant
+        database = database or parsed.database
+
+        if not address:
+            raise ValidationException("Address is required.")
+
+        if is_saas_host(address) and authentication_type != "v12_saas":
+            raise ValidationException(SAAS_NEEDS_SAAS_TYPE)
 
         if authentication_type == "v12_saas" and not (tenant and database):
             raise ValidationException(
@@ -122,9 +184,22 @@ class TM1IntegrationService:
 
         connection = await self.get_connection(db, connection_id, organization_id)
 
+        if address is not None:
+            parsed = parse_address(address)
+            address = parsed.host
+            tenant = tenant or parsed.tenant
+            database = database or parsed.database
+
+            if not address:
+                raise ValidationException("Address is required.")
+
+        next_address = address if address is not None else connection.address
         next_auth_type = authentication_type or connection.authentication_type
         next_tenant = tenant if tenant is not None else connection.tenant
         next_database = database if database is not None else connection.database
+
+        if is_saas_host(next_address) and next_auth_type != "v12_saas":
+            raise ValidationException(SAAS_NEEDS_SAAS_TYPE)
 
         if next_auth_type == "v12_saas" and not (next_tenant and next_database):
             raise ValidationException(
@@ -163,6 +238,23 @@ class TM1IntegrationService:
         organization_id: uuid.UUID,
     ) -> bool:
 
+        diagnosis = await self.diagnose_connection(db, connection_id, organization_id)
+
+        return diagnosis.connected
+
+    async def diagnose_connection(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+    ) -> ConnectionDiagnosis:
+        """Try the connection and say which part is wrong if it fails.
+
+        "Could not connect" alone sent a user round in circles: a wrong
+        tenant, a wrong database name and an unreachable host all looked
+        identical. The status TM1 answers with tells them apart.
+        """
+
         connection = await self.get_connection(db, connection_id, organization_id)
 
         try:
@@ -172,12 +264,22 @@ class TM1IntegrationService:
                 connection.id,
                 client.server.get_server_name,
             )
-        except (TM1ConnectionError, TM1AuthenticationError):
-            tm1_connection_manager.invalidate(connection.id)
+        except TM1AuthenticationError:
+            problem = CREDENTIALS_REJECTED
+        except TM1NotFoundError:
+            problem = NOT_FOUND
+        except TM1ConnectionError:
+            problem = UNREACHABLE
+        else:
+            return ConnectionDiagnosis(connected=True)
 
-            return False
+        tm1_connection_manager.invalidate(connection.id)
 
-        return True
+        return ConnectionDiagnosis(
+            connected=False,
+            problem=problem,
+            message=_explain(problem, connection),
+        )
 
     async def list_cubes(
         self,

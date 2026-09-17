@@ -202,7 +202,7 @@ export default function ConnectionsPage() {
 
   const testMutation = useMutation({
     mutationFn: (connection: TM1Connection) =>
-      apiRequest<{ connected: boolean }>(
+      apiRequest<{ connected: boolean; message?: string | null }>(
         `/tm1/connections/${connection.id}/test`,
         { method: "POST" },
       ),
@@ -211,9 +211,18 @@ export default function ConnectionsPage() {
     onSuccess: (result, connection) => {
       if (result.connected) {
         toast.success(`"${connection.name}" is reachable.`);
+      } else if (result.message) {
+        // The backend names the part that is wrong — a rejected key, a
+        // missing database, an unreachable host — which a generic line
+        // cannot. Kept on screen long enough to act on.
+        toast.error(`Could not connect to "${connection.name}". ${result.message}`, {
+          duration: 12_000,
+        });
       } else {
         toast.error(
-          `Could not connect to "${connection.name}" — check address, port, and credentials.`,
+          connection.authentication_type === "v12_saas"
+            ? `Could not connect to "${connection.name}" — check the tenant ID, database name, and API key.`
+            : `Could not connect to "${connection.name}" — check address, port, and credentials.`,
         );
       }
     },
@@ -279,8 +288,17 @@ export default function ConnectionsPage() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  {connection.address}:{connection.port}
-                  {connection.ssl ? " · SSL" : ""} · {connection.username}
+                  {connection.authentication_type === "v12_saas" ? (
+                    <>
+                      {connection.address} · tenant {connection.tenant} ·{" "}
+                      {connection.database}
+                    </>
+                  ) : (
+                    <>
+                      {connection.address}:{connection.port}
+                      {connection.ssl ? " · SSL" : ""} · {connection.username}
+                    </>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex gap-2">

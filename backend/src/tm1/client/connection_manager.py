@@ -3,6 +3,7 @@ import uuid
 from TM1py import TM1Service
 
 from src.database.models.tm1_connection import TM1Connection
+from src.tm1.addressing import parse_address
 from src.tm1.crypto import decrypt_password
 from src.tm1.resilience import call_with_resilience, remove_circuit_breaker
 
@@ -21,9 +22,14 @@ def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
         # demands cpd_url — the BASIC_API_KEY branch requires none of
         # (auth_url, instance, database, api_key, iam_url, pa_url, tenant)
         # to be set. Found live against a real PA SaaS trial (defect #002).
+        # Parsed rather than used raw: rows saved before normalisation still
+        # carry a pasted "https://" or trailing slash, which would put "//"
+        # into the URL and fail every call.
+        host = parse_address(connection.address).host
+
         return {
             "base_url": (
-                f"https://{connection.address}/api/{connection.tenant}"
+                f"https://{host}/api/{connection.tenant}"
                 f"/v0/tm1/{connection.database}/"
             ),
             "user": "apikey",

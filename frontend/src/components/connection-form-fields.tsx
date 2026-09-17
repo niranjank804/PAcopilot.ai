@@ -2,6 +2,7 @@
 
 import {
   Controller,
+  useWatch,
   type Control,
   type FieldErrors,
   type FieldValues,
@@ -18,6 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+// Every PA as a Service region is a subdomain of this. Mirrors
+// backend/src/tm1/addressing.py, which refuses the same mistake on save.
+const SAAS_HOST = /\.planninganalytics\.saas\.ibm\.com(?:[:/]|$)/i;
+
+export function looksLikeSaasAddress(address: string | undefined): boolean {
+  return SAAS_HOST.test((address ?? "").trim());
+}
 
 const AUTH_TYPE_LABEL: Record<string, string> = {
   native: "Native (on-prem / self-hosted TM1)",
@@ -58,6 +67,12 @@ export function ConnectionFormFields<T extends FieldValues>({
   passwordLabel,
   passwordPlaceholder,
 }: ConnectionFormFieldsProps<T>) {
+  const address = useWatch({ control, name: "address" as Path<T> }) as
+    | string
+    | undefined;
+  const saasAddressOnNativeType =
+    authType === "native" && looksLikeSaasAddress(address);
+
   return (
     <>
       <div className="space-y-2">
@@ -121,16 +136,29 @@ export function ConnectionFormFields<T extends FieldValues>({
         ) : null}
         {authType === "v12_saas" ? (
           <p className="text-xs text-muted-foreground">
-            Hostname only — no https:// prefix. Found in your PA workspace
-            URL.
+            Hostname from your Planning Analytics URL. A pasted https:// or
+            trailing slash is removed for you.
+          </p>
+        ) : null}
+        {saasAddressOnNativeType ? (
+          <p role="alert" className="text-sm text-destructive">
+            This is a Planning Analytics as a Service address. Set Connection
+            type to &ldquo;Planning Analytics as a Service&rdquo; and enter
+            your tenant ID and database name — a port and username will not
+            connect.
           </p>
         ) : null}
       </div>
 
       {authType === "v12_saas" ? (
         <div className="grid grid-cols-2 gap-4">
+          <p className="col-span-2 text-xs text-muted-foreground">
+            Tenant is your IBM tenant ID, a code like 2CX4TZWY5PSX — not the
+            connection name. Database is the Planning Analytics database
+            name — not a port number.
+          </p>
           <div className="space-y-2">
-            <Label htmlFor="tenant">Tenant</Label>
+            <Label htmlFor="tenant">Tenant ID</Label>
             <Input
               id="tenant"
               placeholder="2CX4TZWY5PSX"

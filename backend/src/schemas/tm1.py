@@ -49,6 +49,9 @@ class ConnectionResponse(BaseModel):
 
 class TestConnectionResponse(BaseModel):
     connected: bool
+    # Set only on failure: which part is wrong, and what to check.
+    problem: Literal["credentials_rejected", "not_found", "unreachable"] | None = None
+    message: str | None = None
 
 
 class CubeResponse(BaseModel):

@@ -150,3 +150,20 @@ def test_build_tm1_kwargs_v12_saas_mode():
         "ssl": True,
         "verify": True,
     }
+
+
+def test_build_tm1_kwargs_v12_saas_tolerates_a_pasted_trailing_slash():
+    """The production row that never connected was saved with one."""
+    from src.tm1.client.connection_manager import build_tm1_kwargs
+
+    connection = MagicMock()
+    connection.authentication_type = "v12_saas"
+    connection.address = "https://us-east-1.planninganalytics.saas.ibm.com/"
+    connection.tenant = "TENANT123"
+    connection.database = "fpa"
+
+    kwargs = build_tm1_kwargs(connection, "api-key-value")
+
+    assert kwargs["base_url"] == (
+        "https://us-east-1.planninganalytics.saas.ibm.com/api/TENANT123/v0/tm1/fpa/"
+    )

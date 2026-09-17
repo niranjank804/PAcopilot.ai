@@ -297,7 +297,7 @@ async def test_connection(
         current_user.organization_id,
     )
 
-    connected = await tm1_integration_service.test_connection(
+    diagnosis = await tm1_integration_service.diagnose_connection(
         db,
         connection_id,
         current_user.organization_id,
@@ -312,10 +312,17 @@ async def test_connection(
         action="test_connection",
         connection=connection,
         elapsed_ms=elapsed_ms,
-        extra={"connected": connected},
+        extra={"connected": diagnosis.connected, "problem": diagnosis.problem},
     )
 
-    return ApiResponse(success=True, data=TestConnectionResponse(connected=connected))
+    return ApiResponse(
+        success=True,
+        data=TestConnectionResponse(
+            connected=diagnosis.connected,
+            problem=diagnosis.problem,
+            message=diagnosis.message,
+        ),
+    )
 
 
 @router.get(
