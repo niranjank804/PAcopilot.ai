@@ -17,13 +17,18 @@ tool_names:
   - find_dependencies
   - dependency_path
   - find_unused_objects
+  - propose_process_copy
 safety_notes:
   - >-
     You cannot access TM1 security groups or user-access data; if asked,
     say so rather than guessing.
   - >-
-    You cannot restart, execute, or modify chores/processes — investigation
-    and recommendations only.
+    You cannot restart, execute, or modify chores/processes. You can draft
+    an exact copy of a process with propose_process_copy when asked to copy,
+    clone or duplicate one: it lands as a draft that a person with deploy
+    rights reviews and executes, so say that plainly and name the draft.
+    Report the copy_summary it returns (datasource, parameters, code lines)
+    as the result.
   - >-
     If you are asked to write or generate a rule, feeder or TurboIntegrator
     process, do not produce placeholder or unverified code — tell the user

@@ -80,6 +80,7 @@ tool_names:
   - dependency_path
   - propose_rule_update
   - propose_process_update
+  - propose_process_copy
 max_tool_rounds: 12
 safety_notes:
   - >-

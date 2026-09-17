@@ -4,9 +4,12 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.tools.base import Tool
-from src.core.exceptions import PermissionDeniedException
+from src.core.exceptions import PermissionDeniedException, ValidationException
 from src.repositories.auth_repository import auth_repository
+from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment.change_service import change_service
+from src.tm1.service import tm1_integration_service
+from src.tm1.services import process_service
 
 _HUMAN_REVIEW_NOTE = (
     "This is a DRAFT only — it has NOT been applied to the TM1 server. "
@@ -245,3 +248,138 @@ class ProposeProcessUpdateTool(Tool):
             target_name=str(kwargs["process_name"]),
             new_content=new_content,
         )
+
+
+def copy_content(source_name: str, body: dict) -> dict:
+    """Draft content for an exact copy of a process body.
+
+    `source_body` is what gets built and deployed. The code tabs, datasource
+    type, variables and parameters are repeated in the ordinary draft format
+    so the review screen shows the code and static analysis can check it —
+    without them every source variable would read as undefined.
+    """
+
+    datasource = body.get("DataSource") or {}
+
+    return {
+        "copy_of": source_name,
+        "prolog": body.get("PrologProcedure") or "",
+        "metadata": body.get("MetadataProcedure") or "",
+        "data": body.get("DataProcedure") or "",
+        "epilog": body.get("EpilogProcedure") or "",
+        "datasource_type": datasource.get("Type") or "None",
+        "variables": [
+            {"name": variable["Name"], "type": variable.get("Type") or "String"}
+            for variable in body.get("Variables") or []
+        ],
+        "parameters": [
+            {
+                "name": parameter["Name"],
+                "type": parameter.get("Type") or "String",
+                "value": (
+                    "" if parameter.get("Value") is None else str(parameter["Value"])
+                ),
+                "prompt": parameter.get("Prompt") or "",
+            }
+            for parameter in body.get("Parameters") or []
+        ],
+        "source_body": body,
+    }
+
+
+class ProposeProcessCopyTool(Tool):
+
+    name = "propose_process_copy"
+    description = (
+        "Propose an exact copy of an existing TurboIntegrator process under a "
+        "new name, as a DRAFT change for human review. The copy is taken "
+        "from the server, not retyped, so code, datasource, variables and "
+        "parameters match the original. Use this whenever the user asks to "
+        "copy, clone or duplicate a process; to change the copy afterwards, "
+        "use propose_process_update on the new name. You cannot execute "
+        "changes — a human administrator deploys drafts."
+    )
+    required_permission = "tm1.write"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": {
+                "type": "string",
+                "description": "The ID of the TM1 connection.",
+            },
+            "source_process": {
+                "type": "string",
+                "description": "The existing process to copy.",
+            },
+            "new_process_name": {
+                "type": "string",
+                "description": (
+                    "Name for the copy. Must not already exist. If the user "
+                    "gave none, use the original name followed by ' - Copy'."
+                ),
+            },
+        },
+        "required": ["connection_id", "source_process", "new_process_name"],
+    }
+
+    async def execute(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        **kwargs,
+    ) -> str:
+
+        if not await auth_repository.user_has_permission(
+            db, user_id, self.required_permission
+        ):
+            raise PermissionDeniedException(
+                "You do not have permission to draft TM1 changes."
+            )
+
+        source = str(kwargs["source_process"]).strip()
+        new_name = str(kwargs["new_process_name"]).strip()
+
+        # TM1 object names are case-insensitive, so 'it_load data' is the
+        # original, not a copy of it.
+        if not new_name or new_name.lower() == source.lower():
+            raise ValidationException(
+                "The copy needs a name different from the original process."
+            )
+
+        connection = await tm1_integration_service.get_connection(
+            db, uuid.UUID(str(kwargs["connection_id"])), organization_id
+        )
+        client = await tm1_connection_manager.get_client(connection)
+        body = await process_service.get_process_body(client, connection.id, source)
+
+        content = copy_content(source, body)
+
+        draft = json.loads(
+            await _create_draft(
+                db,
+                organization_id=organization_id,
+                user_id=user_id,
+                connection_id=str(connection.id),
+                change_type="create_process",
+                target_name=new_name,
+                new_content=content,
+            )
+        )
+
+        datasource = body.get("DataSource") or {}
+        draft["copied_from"] = source
+        draft["new_process_name"] = new_name
+        draft["copy_summary"] = {
+            "datasource_type": content["datasource_type"],
+            "datasource_name": datasource.get("dataSourceNameForServer"),
+            "parameters": [parameter["name"] for parameter in content["parameters"]],
+            "variables": [variable["name"] for variable in content["variables"]],
+            "code_lines": {
+                tab: len((content[tab] or "").splitlines())
+                for tab in ("prolog", "metadata", "data", "epilog")
+            },
+        }
+
+        return json.dumps(draft)

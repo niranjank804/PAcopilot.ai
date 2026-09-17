@@ -142,6 +142,7 @@ tool_names:
   - get_cube
   - get_object_relationships
   - propose_process_update
+  - propose_process_copy
 max_tool_rounds: 12
 safety_notes:
   - >-

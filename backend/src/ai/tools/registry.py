@@ -8,6 +8,7 @@ from src.ai.tools.tm1.analysis import (
 )
 from src.ai.tools.tm1.cells import ExecuteMDXTool
 from src.ai.tools.tm1.changes import (
+    ProposeProcessCopyTool,
     ProposeProcessUpdateTool,
     ProposeRuleUpdateTool,
 )
@@ -53,6 +54,7 @@ TOOLS: dict[str, Tool] = {
         FindUnusedObjectsTool(),
         ProposeRuleUpdateTool(),
         ProposeProcessUpdateTool(),
+        ProposeProcessCopyTool(),
         SearchKnowledgeBaseTool(),
         LookupTM1FunctionTool(),
         CheckTM1CodeTool(),

@@ -122,8 +122,17 @@ def _fingerprint(
 
 
 def _build_process(name: str, content: dict, base: dict | None = None) -> Process:
+    # A copy starts from the source process exactly as the server returned
+    # it. Rebuilding it field by field would drop what the draft format has
+    # no slot for — the ASCII quote character, variable positions, UI data —
+    # and the copy would quietly differ from the original.
+    source_body = content.get("source_body")
+
     if base:
         process = Process.from_dict(base)
+        process.name = name
+    elif source_body:
+        process = Process.from_dict(source_body)
         process.name = name
     else:
         process = Process(name=name)
@@ -134,6 +143,11 @@ def _build_process(name: str, content: dict, base: dict | None = None) -> Proces
 
     if "has_security_access" in content:
         process.has_security_access = bool(content["has_security_access"])
+
+    if source_body and not base:
+        # The simplified datasource, variables and parameters on a copy are
+        # there for static analysis only; the body above is already exact.
+        return process
 
     _apply_datasource(process, content)
     _apply_variables(process, content)
