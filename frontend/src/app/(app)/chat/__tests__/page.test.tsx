@@ -505,3 +505,101 @@ describe("voice", () => {
     );
   });
 });
+
+describe("long, tool-using answers", () => {
+  // Reported: an answer showed "I'll read the process definition.Let me
+  // trace how it's wired into the model." and nothing more, while the
+  // full explanation had been saved on the server.
+
+  it("says what it is doing while the answer is still coming", async () => {
+    const user = userEvent.setup();
+
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    streamRequest.mockReturnValue(
+      (async function* () {
+        yield { type: "start", conversation_id: "c1" };
+        yield { type: "text_delta", text: "Let me trace it." };
+        yield { type: "tool_call", tool_name: "find_dependents", tool_status: "error" };
+        await gate;
+        yield DONE;
+      })(),
+    );
+
+    renderChat();
+    await sendMessage(user, "explain IT_Load Data");
+
+    expect(
+      await screen.findByText(/find_dependents could not run — continuing/),
+    ).toBeInTheDocument();
+
+    release();
+
+    await waitFor(() =>
+      expect(screen.queryByText(/continuing/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it("separates the narration of one tool round from the next", async () => {
+    const user = userEvent.setup();
+
+    streamRequest.mockReturnValue(
+      streamOf([
+        { type: "text_delta", text: "I'll read the process definition." },
+        { type: "tool_call", tool_name: "get_process", tool_status: "success" },
+        { type: "text_delta", text: "Let me trace how it's wired." },
+        DONE,
+      ]),
+    );
+
+    renderChat();
+    await sendMessage(user, "explain");
+
+    // Two paragraphs, not "definition.Let me".
+    expect(
+      await screen.findByText("I'll read the process definition."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Let me trace how it's wired.")).toBeInTheDocument();
+    expect(screen.queryByText(/definition\.Let/)).not.toBeInTheDocument();
+  });
+
+  it("says so when the connection drops, and can reload the saved answer", async () => {
+    const user = userEvent.setup();
+
+    streamRequest.mockReturnValue(
+      streamOf([
+        { type: "start", conversation_id: "c42" },
+        { type: "text_delta", text: "Let me trace it." },
+        // No "done": the connection ended here.
+      ]),
+    );
+
+    renderChat();
+    await sendMessage(user, "explain IT_Load Data");
+
+    expect(
+      await screen.findByText(/connection dropped before this answer finished/),
+    ).toBeInTheDocument();
+    expect(toastError).toHaveBeenCalledWith(
+      "The connection dropped before the answer finished.",
+    );
+
+    apiRequest.mockImplementation(async (path: string) =>
+      path === "/ai/conversations/c42/messages"
+        ? [
+            { id: "u1", role: "user", content: "explain IT_Load Data" },
+            { id: "a1", role: "assistant", content: "IT_Load Data loads Project.csv." },
+          ]
+        : [],
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reload conversation" }));
+
+    expect(
+      await screen.findByText("IT_Load Data loads Project.csv."),
+    ).toBeInTheDocument();
+  });
+});

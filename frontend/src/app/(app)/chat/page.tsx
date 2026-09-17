@@ -85,6 +85,10 @@ interface ThreadMessage {
   estimatedCostUsd?: number;
   toolCalls?: ToolCallEvent[];
   isError?: boolean;
+  // The stream ended without "done" or "error": the connection dropped.
+  // A server writing into a connection that died silently can still finish
+  // and save the answer, so the thread offers a reload rather than a retry.
+  interrupted?: boolean;
   attachmentNames?: string[];
 }
 
@@ -214,6 +218,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  // What the assistant is doing right now. Without it, a pause while the
+  // model thinks or a TM1 call runs looks identical to a stalled page.
+  const [streamActivity, setStreamActivity] = useState("Thinking…");
   const [search, setSearch] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -414,6 +421,21 @@ export default function ChatPage() {
     }
   };
 
+  const markInterrupted = (id: string | null) => {
+    if (id) {
+      setConversationId(id);
+    }
+
+    setMessages((previous) => {
+      const next = [...previous];
+      const last = next[next.length - 1];
+      next[next.length - 1] = { ...last, interrupted: true };
+      return next;
+    });
+
+    toast.error("The connection dropped before the answer finished.");
+  };
+
   const send = async () => {
     const message = input.trim();
 
@@ -433,7 +455,14 @@ export default function ChatPage() {
     setInput("");
     setPendingAttachments([]);
     setIsStreaming(true);
+    setStreamActivity("Thinking…");
     scrollToBottom();
+
+    // Whether the stream reached a real ending. If it did not, the
+    // connection dropped — say so instead of leaving half an answer that
+    // looks finished.
+    let finished = false;
+    let streamConversationId = conversationId;
 
     try {
       const stream = streamRequest<StreamEvent>("/ai/chat/stream", {
@@ -454,15 +483,29 @@ export default function ChatPage() {
       // which silently disabled streaming speech until a test caught
       // the doubled full stop it produced.
       let assistantText = "";
+      let lastEventWasTool = false;
 
       for await (const event of stream) {
-        if (event.type === "text_delta") {
-          assistantText += event.text;
+        if (event.type === "start") {
+          streamConversationId = event.conversation_id;
+        } else if (event.type === "text_delta") {
+          // Each tool round's narration arrives as its own run of text.
+          // Joined directly they read "definition.Let me trace", so a
+          // paragraph break goes between them.
+          const separator =
+            lastEventWasTool && assistantText && !/\s$/.test(assistantText)
+              ? "\n\n"
+              : "";
+          const text = separator + event.text;
+
+          lastEventWasTool = false;
+          assistantText += text;
+          setStreamActivity("Writing…");
 
           setMessages((previous) => {
             const next = [...previous];
             const last = next[next.length - 1];
-            next[next.length - 1] = { ...last, content: last.content + event.text };
+            next[next.length - 1] = { ...last, content: last.content + text };
             return next;
           });
 
@@ -476,6 +519,13 @@ export default function ChatPage() {
 
           scrollToBottom();
         } else if (event.type === "tool_call") {
+          lastEventWasTool = true;
+          setStreamActivity(
+            event.tool_status === "error"
+              ? `${event.tool_name} could not run — continuing…`
+              : `Ran ${event.tool_name} — continuing…`,
+          );
+
           setMessages((previous) => {
             const next = [...previous];
             const last = next[next.length - 1];
@@ -489,6 +539,7 @@ export default function ChatPage() {
             return next;
           });
         } else if (event.type === "done") {
+          finished = true;
           const isNewConversation = conversationId === null;
           setConversationId(event.conversation_id);
 
@@ -520,6 +571,7 @@ export default function ChatPage() {
             setLastInputWasVoice(false);
           }
         } else if (event.type === "error") {
+          finished = true;
           setMessages((previous) => {
             const next = [...previous];
             const last = next[next.length - 1];
@@ -533,14 +585,24 @@ export default function ChatPage() {
           toast.error(event.message);
         }
       }
+
+      if (!finished) {
+        markInterrupted(streamConversationId);
+      }
     } catch (error) {
-      toast.error(errorMessage(error));
-      setMessages((previous) => {
-        const next = [...previous];
-        const last = next[next.length - 1];
-        next[next.length - 1] = { ...last, isError: true };
-        return next;
-      });
+      if (streamConversationId) {
+        // Failed mid-answer rather than before it started: the answer may
+        // still be completing on the server.
+        markInterrupted(streamConversationId);
+      } else {
+        toast.error(errorMessage(error));
+        setMessages((previous) => {
+          const next = [...previous];
+          const last = next[next.length - 1];
+          next[next.length - 1] = { ...last, isError: true };
+          return next;
+        });
+      }
     } finally {
       setIsStreaming(false);
       scrollToBottom();
@@ -806,6 +868,36 @@ export default function ChatPage() {
                         isStreaming &&
                         index === messages.length - 1 ? (
                         "…"
+                      ) : null}
+                      {message.role === "assistant" &&
+                      isStreaming &&
+                      index === messages.length - 1 &&
+                      message.content ? (
+                        <p
+                          role="status"
+                          className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {streamActivity}
+                        </p>
+                      ) : null}
+                      {message.interrupted ? (
+                        <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2 text-xs">
+                          <p className="text-muted-foreground">
+                            The connection dropped before this answer finished.
+                            The server may still have completed and saved it.
+                          </p>
+                          {conversationId ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => openConversation(conversationId)}
+                            >
+                              Reload conversation
+                            </Button>
+                          ) : null}
+                        </div>
                       ) : null}
                       {message.totalTokens ? (
                         <div className="mt-2 text-xs text-muted-foreground">

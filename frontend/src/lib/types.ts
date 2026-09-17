@@ -256,6 +256,12 @@ export interface ToolExecutionResponse {
 
 export type StreamEvent =
   | {
+      // Sent before any text: the conversation the answer is being saved
+      // to, so a dropped connection can still find it.
+      type: "start";
+      conversation_id: string;
+    }
+  | {
       type: "text_delta";
       text: string;
       conversation_id: string | null;

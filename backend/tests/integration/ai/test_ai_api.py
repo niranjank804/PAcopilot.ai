@@ -100,13 +100,18 @@ async def test_chat_stream_endpoint_streams_and_persists(client, db_session, fak
         for line in resp.text.splitlines()
         if line.startswith("data: ")
     ]
-    assert len(events) == 2
+    assert len(events) == 3
 
     import json
 
-    first = json.loads(events[0])
-    last = json.loads(events[1])
+    start = json.loads(events[0])
+    first = json.loads(events[1])
+    last = json.loads(events[2])
 
+    # The conversation id arrives before any text, so a client whose
+    # connection drops mid-answer can still find the saved reply.
+    assert start["type"] == "start"
+    assert start["conversation_id"] == last["conversation_id"]
     assert first["type"] == "text_delta"
     assert first["text"] == "fake reply"
     assert last["type"] == "done"

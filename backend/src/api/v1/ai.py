@@ -15,6 +15,7 @@ from src.core.exceptions import (
     QuotaExceededException,
     ValidationException,
 )
+from src.core.sse import with_heartbeat
 from src.database.models.ai_conversation import AIConversation
 from src.database.session import get_db
 from src.repositories.ai_conversation_repository import ai_conversation_repository
@@ -39,6 +40,10 @@ router = APIRouter(
     prefix="/ai",
     tags=["AI"],
 )
+
+# Well inside the idle limits proxies commonly apply, and rare enough to be
+# free: a streamed answer that is producing text never sends one.
+STREAM_HEARTBEAT_SECONDS = 15.0
 
 
 async def _get_owned_conversation(
@@ -260,6 +265,12 @@ async def chat_stream(
             yield f"data: {payload}\n\n"
 
     return StreamingResponse(
-        event_source(),
+        with_heartbeat(event_source(), STREAM_HEARTBEAT_SECONDS),
         media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # Asks any buffering proxy in front of the app to pass events
+            # through as they are written instead of holding them back.
+            "X-Accel-Buffering": "no",
+        },
     )

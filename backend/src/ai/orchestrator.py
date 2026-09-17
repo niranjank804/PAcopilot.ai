@@ -982,6 +982,8 @@ class AIOrchestrator:
             ),
         )
 
+        yield OrchestratedStreamEvent(type="start", conversation_id=conversation.id)
+
         resolved_model = model or settings.AI_DEFAULT_MODEL
         provider = get_provider("anthropic")
 

@@ -94,7 +94,9 @@ class StreamEvent(BaseModel):
 
 
 class OrchestratedStreamEvent(BaseModel):
-    type: Literal["text_delta", "tool_call", "done"]
+    # "start" carries the conversation id before any text, so a client
+    # whose connection drops mid-answer can still find the saved reply.
+    type: Literal["start", "text_delta", "tool_call", "done"]
     text: str | None = None
     conversation_id: uuid.UUID | None = None
     message_id: uuid.UUID | None = None
