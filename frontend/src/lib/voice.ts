@@ -78,6 +78,57 @@ export function speakableText(markdown: string): string {
   );
 }
 
+
+/**
+ * The next whole sentence that is safe to speak, given how much of the
+ * stream has already been spoken.
+ *
+ * Audio used to wait for the entire answer. With a tool-using model an
+ * answer takes seconds, while its first sentence is ready almost
+ * immediately — so the user sat in silence watching text appear. This
+ * lets speech follow the stream instead, which is the one real latency
+ * win available without changing provider: `speechSynthesis` queues
+ * utterances natively, so successive sentences play back to back.
+ *
+ * Only *completed* sentences are returned. Speaking a half-sentence
+ * would force a pause mid-clause, which sounds worse than waiting.
+ *
+ * An unterminated code fence holds everything back: mid-fence text
+ * would otherwise be spoken as prose before the stripper could see the
+ * closing marks and skip it.
+ */
+export function nextSpeakableChunk(
+  fullText: string,
+  alreadyConsumed: number,
+): { text: string; consumedTo: number } | null {
+  const pending = fullText.slice(alreadyConsumed);
+
+  if (!pending.trim()) return null;
+
+  // An odd number of fences means one is still open.
+  if ((fullText.slice(0, alreadyConsumed + pending.length).match(/```/g) ?? []).length % 2 === 1) {
+    return null;
+  }
+
+  // Last sentence-ending punctuation followed by a space or the end of
+  // what has arrived. Anything after it is still being written.
+  const boundary = /[.!?](?=\s|$)/g;
+  let end = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = boundary.exec(pending)) !== null) {
+    end = match.index + 1;
+  }
+
+  if (end === -1) return null;
+
+  const text = speakableText(pending.slice(0, end));
+
+  // The slice may have been pure markup — a heading, a table row.
+  // Consume it regardless so it is not re-examined forever.
+  return { text, consumedTo: alreadyConsumed + end };
+}
+
 /** Longest utterance we will start. */
 const MAX_SPEAK_CHARS = 4000;
 
@@ -101,6 +152,9 @@ export function useVoice(options: {
   // once on mount and would otherwise close over the first `isMuted`
   // forever.
   const mutedRef = useRef(false);
+  // How much of the streaming answer has already been queued for
+  // speech. Reset per answer, so a new reply never re-speaks the old.
+  const spokenUpToRef = useRef(0);
   const onTranscriptRef = useRef(onTranscript);
 
   useEffect(() => {
@@ -170,6 +224,9 @@ export function useVoice(options: {
 
   const stopSpeaking = useCallback(() => {
     window.speechSynthesis?.cancel();
+    // Interrupting abandons the rest of this answer rather than
+    // resuming it on the next delta.
+    spokenUpToRef.current = Number.MAX_SAFE_INTEGER;
     setState((current) => (current === "speaking" ? "idle" : current));
   }, []);
 
@@ -229,6 +286,69 @@ export function useVoice(options: {
     [],
   );
 
+  /** Speak whole sentences as a streamed answer arrives.
+   *
+   * Deliberately does NOT cancel first, unlike `speak`: cancelling
+   * between sentences would cut off the one currently playing. The
+   * browser queues utterances, which is what makes following a stream
+   * possible without a streaming-capable provider.
+   */
+  const speakStreaming = useCallback(
+    (fullText: string, options?: { final?: boolean }) => {
+    const synthesis = window.speechSynthesis;
+
+    if (!synthesis || mutedRef.current) return;
+
+    for (;;) {
+      const chunk = nextSpeakableChunk(fullText, spokenUpToRef.current);
+
+      if (!chunk) break;
+
+      spokenUpToRef.current = chunk.consumedTo;
+
+      if (!chunk.text) continue;
+
+      const utterance = new SpeechSynthesisUtterance(
+        chunk.text.slice(0, MAX_SPEAK_CHARS),
+      );
+      utterance.lang = "en-US";
+      utterance.onend = () =>
+        setState((current) => (current === "speaking" ? "idle" : current));
+
+      setState("speaking");
+      synthesis.speak(utterance);
+    }
+
+    // The last sentence of an answer often has no trailing space, and
+    // a model may end without punctuation at all — so on the final
+    // call whatever is left is spoken regardless of a boundary. Without
+    // this the closing words are silently dropped.
+    if (options?.final) {
+      const remainder = speakableText(fullText.slice(spokenUpToRef.current));
+
+      spokenUpToRef.current = fullText.length;
+
+      if (remainder) {
+        const utterance = new SpeechSynthesisUtterance(
+          remainder.slice(0, MAX_SPEAK_CHARS),
+        );
+        utterance.lang = "en-US";
+        utterance.onend = () =>
+          setState((current) => (current === "speaking" ? "idle" : current));
+
+        setState("speaking");
+        synthesis.speak(utterance);
+      }
+    }
+  },
+    [],
+  );
+
+  /** Start of a new answer: forget what was spoken for the last one. */
+  const resetStream = useCallback(() => {
+    spokenUpToRef.current = 0;
+  }, []);
+
   const toggleMuted = useCallback(() => {
     setIsMuted((previous) => {
       if (!previous) window.speechSynthesis?.cancel();
@@ -245,6 +365,8 @@ export function useVoice(options: {
     start,
     stop,
     speak,
+    speakStreaming,
+    resetStream,
     stopSpeaking,
     toggleMuted,
   };

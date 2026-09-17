@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { speakableText } from "../voice";
+import { nextSpeakableChunk, speakableText } from "../voice";
 
 describe("speakableText", () => {
   it("does not read emphasis markers aloud", () => {
@@ -97,5 +97,108 @@ describe("speakableText", () => {
       "The EMEA shortfall was driven by currency movement, not volume.";
 
     expect(speakableText(prose)).toBe(prose);
+  });
+});
+
+describe("nextSpeakableChunk — following a stream", () => {
+  it("returns nothing until a sentence is complete", () => {
+    // Speaking a half-sentence forces a pause mid-clause, which sounds
+    // worse than waiting a moment.
+    expect(nextSpeakableChunk("Revenue fell in", 0)).toBeNull();
+  });
+
+  it("returns the first sentence as soon as it lands", () => {
+    const chunk = nextSpeakableChunk("Revenue fell in EMEA. It was FX", 0);
+
+    expect(chunk?.text).toBe("Revenue fell in EMEA.");
+  });
+
+  it("never re-speaks what it already spoke", () => {
+    const text = "One. Two. Three.";
+    const first = nextSpeakableChunk(text, 0);
+    const second = nextSpeakableChunk(text, first!.consumedTo);
+
+    expect(first!.text).toBe("One. Two. Three.");
+    expect(second).toBeNull();
+  });
+
+  it("advances the cursor across a growing stream", () => {
+    let consumed = 0;
+    const spoken: string[] = [];
+
+    for (const snapshot of ["First point.", "First point. Second", "First point. Second point."]) {
+      const chunk = nextSpeakableChunk(snapshot, consumed);
+      if (chunk) {
+        spoken.push(chunk.text);
+        consumed = chunk.consumedTo;
+      }
+    }
+
+    // Trimmed, not " Second point." — each utterance is spoken on its
+    // own, so leading whitespace from the join is noise.
+    expect(spoken).toEqual(["First point.", "Second point."]);
+  });
+
+  it("holds everything back while a code fence is open", () => {
+    // Mid-fence text would be spoken as prose before the stripper could
+    // see the closing marks and skip it.
+    expect(nextSpeakableChunk("Use this. ```\nCellPutN(0);", 0)).toBeNull();
+  });
+
+  it("resumes once the fence closes", () => {
+    const chunk = nextSpeakableChunk("Use this. ```\nCellPutN(0);\n``` Done.", 0);
+
+    expect(chunk).not.toBeNull();
+    expect(chunk!.text).not.toContain("CellPutN");
+  });
+
+  it("strips markdown from each sentence it emits", () => {
+    expect(nextSpeakableChunk("The **EMEA** variance grew. More", 0)?.text).toBe(
+      "The EMEA variance grew.",
+    );
+  });
+
+  it("consumes a markup-only slice rather than re-examining it forever", () => {
+    // A table row yields no speech but must still advance the cursor,
+    // or the loop would never reach the prose after it.
+    const chunk = nextSpeakableChunk("| a | b |\n\nReal sentence.", 0);
+
+    expect(chunk?.consumedTo).toBeGreaterThan(0);
+  });
+});
+
+describe("how much sooner speech starts", () => {
+  /** Deltas that must arrive before any audio can begin. */
+  function deltasBeforeFirstAudio(deltas: string[], streaming: boolean): number {
+    if (!streaming) return deltas.length; // old behaviour: wait for `done`
+
+    let text = "";
+    for (let i = 0; i < deltas.length; i += 1) {
+      text += deltas[i];
+      if (nextSpeakableChunk(text, 0)) return i + 1;
+    }
+    return deltas.length;
+  }
+
+  it("starts on the first sentence instead of the last", () => {
+    // A realistic tool-using answer: the first sentence is ready long
+    // before the model finishes.
+    const deltas = [
+      "Revenue fell 4% in EMEA.",
+      " The driver was currency,",
+      " not volume.",
+      " Pricing held flat across",
+      " all three regions.",
+      " I checked the variance cube",
+      " and the rate table.",
+    ];
+
+    const before = deltasBeforeFirstAudio(deltas, false);
+    const after = deltasBeforeFirstAudio(deltas, true);
+
+    expect(before).toBe(7);
+    expect(after).toBe(1);
+    // Audio now begins after 1/7th of the stream rather than all of it.
+    expect(after).toBeLessThan(before);
   });
 });

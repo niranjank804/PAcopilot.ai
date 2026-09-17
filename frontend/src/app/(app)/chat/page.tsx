@@ -446,14 +446,34 @@ export default function ChatPage() {
           : undefined,
       });
 
+      voice.resetStream();
+
+      // Accumulated here rather than read back out of `messages`.
+      // `setMessages` does not run its updater synchronously, so a
+      // value computed inside one is still empty on the next line —
+      // which silently disabled streaming speech until a test caught
+      // the doubled full stop it produced.
+      let assistantText = "";
+
       for await (const event of stream) {
         if (event.type === "text_delta") {
+          assistantText += event.text;
+
           setMessages((previous) => {
             const next = [...previous];
             const last = next[next.length - 1];
             next[next.length - 1] = { ...last, content: last.content + event.text };
             return next;
           });
+
+          // Speech follows the stream instead of waiting for the whole
+          // answer. With a tool-using model the first sentence is ready
+          // seconds before the last one, and the user previously sat in
+          // silence for all of it.
+          if (lastInputWasVoice) {
+            voice.speakStreaming(assistantText);
+          }
+
           scrollToBottom();
         } else if (event.type === "tool_call") {
           setMessages((previous) => {
@@ -492,19 +512,11 @@ export default function ChatPage() {
             queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
           }
 
-          // Spoken only when the question was spoken. Read from the
-          // message list rather than accumulating a second copy of the
-          // deltas, so what is heard is exactly what is displayed.
+          // Most of the answer has already been spoken while it
+          // streamed; this flushes a trailing fragment with no closing
+          // punctuation so the last words are not dropped.
           if (lastInputWasVoice) {
-            setMessages((current) => {
-              const answer = current[current.length - 1];
-
-              if (answer?.role === "assistant" && answer.content) {
-                voice.speak(answer.content);
-              }
-
-              return current;
-            });
+            voice.speakStreaming(assistantText, { final: true });
             setLastInputWasVoice(false);
           }
         } else if (event.type === "error") {
