@@ -20,6 +20,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { BackendWarmup } from "@/components/backend-warmup";
+import { ProductDemo } from "@/components/landing/product-demo";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,9 @@ export default function LandingPage() {
             PA <span className="text-primary">Copilot</span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+            <a href="#demo" className="hover:text-foreground">
+              Demo
+            </a>
             <a href="#platform" className="hover:text-foreground">
               Platform
             </a>
@@ -209,6 +213,32 @@ export default function LandingPage() {
             >
               Sign in
             </Link>
+          </div>
+          <a
+            href="#demo"
+            className="mt-5 inline-block text-sm font-medium text-primary hover:underline"
+          >
+            See a demo ↓
+          </a>
+        </section>
+
+        <section
+          id="demo"
+          aria-labelledby="demo-heading"
+          className="scroll-mt-20 border-t border-border/60 py-20"
+        >
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="mx-auto mb-10 max-w-2xl text-center">
+              <h2 id="demo-heading" className="text-3xl font-bold tracking-tight">
+                See it work
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                From a wrong total to a reviewed fix, and from a question to a
+                chart — the way it runs inside{" "}
+                <span className="whitespace-nowrap">PA-Copilot</span>.
+              </p>
+            </div>
+            <ProductDemo />
           </div>
         </section>
 
