@@ -32,11 +32,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // the 1-3s bootstrap blanked the sidebar and header on every hard load for
   // no reason. Only the page body waits now.
   return (
-    <div className="flex flex-1">
+    <div className="flex h-dvh overflow-hidden">
       <AppSidebar />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader />
-        <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
+        <main className="mx-auto min-h-0 w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
           {isLoading ? (
             <div className="space-y-4" aria-busy="true">
               <Skeleton className="h-8 w-64" />

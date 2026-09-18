@@ -1,11 +1,16 @@
 "use client";
 
 import {
+  BookOpen,
   CheckCircle2,
+  Copy,
   GitPullRequestDraft,
   LineChart,
   Lock,
+  Mic,
+  Network,
   RotateCcw,
+  ScrollText,
   Stethoscope,
   Wrench,
 } from "lucide-react";
@@ -26,7 +31,7 @@ import { cn } from "@/lib/utils";
  */
 
 type Step =
-  | { kind: "user"; text: string }
+  | { kind: "user"; text: string; spoken?: boolean }
   | { kind: "tool"; tool: string; target: string }
   | { kind: "assistant"; text: string; code?: string }
   | { kind: "draft"; object: string; diff: string[] }
@@ -109,6 +114,85 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       {
         kind: "assistant",
         text: "Americas leads on 2026 actual revenue, with EMEA about a quarter lower and APAC under half.",
+      },
+    ],
+  },
+  {
+    key: "error",
+    label: "Explain an error",
+    icon: ScrollText,
+    window: "Knowledge Base · Explain error",
+    steps: [
+      {
+        kind: "user",
+        text: "Error: TI process 'Load Sales' failed — CellPutN: Cube 'Sales' element 'Q5' not found in dimension 'Period'.",
+      },
+      {
+        kind: "assistant",
+        text: "The Data tab writes to a Period element that does not exist: the source file has a quarter 'Q5', almost certainly a total row. Skip rows whose Period is not a leaf before the CellPutN, or map 'Q5' to the year total in the Metadata tab.",
+        code: "IF( DIMIX('Period', vPeriod) = 0 );\n  ItemSkip;\nENDIF;",
+      },
+    ],
+  },
+  {
+    key: "dependencies",
+    label: "Trace dependencies",
+    icon: Network,
+    window: "Chat · architect agent",
+    steps: [
+      { kind: "user", text: "What breaks if I rename the Region dimension?" },
+      { kind: "tool", tool: "find_dependents", target: "Region" },
+      {
+        kind: "assistant",
+        text: "Region is used by 4 cubes (Sales, Forecast, Headcount, Allocations), referenced in 2 rules and rebuilt by the process Update Region dimension. The Metadata Explorer shows the same graph interactively.",
+      },
+    ],
+  },
+  {
+    key: "documents",
+    label: "Ask your documents",
+    icon: BookOpen,
+    window: "Chat · developer agent",
+    steps: [
+      { kind: "user", text: "How do we name TI parameters?" },
+      { kind: "tool", tool: "search_knowledge_base", target: "TI naming" },
+      {
+        kind: "assistant",
+        text: "Your standard is a 'p' prefix in camel case — pSourceFile, pYear — with a String type unless the value is used in arithmetic. Source: TI Standards v3, section 2.1, in your Knowledge Base.",
+      },
+    ],
+  },
+  {
+    key: "copy",
+    label: "Copy a process",
+    icon: Copy,
+    window: "Chat · administrator agent",
+    steps: [
+      { kind: "user", text: "Create a copy of IT_Load Data." },
+      { kind: "tool", tool: "get_process", target: "IT_Load Data" },
+      { kind: "tool", tool: "propose_process_copy", target: "IT_Load Data - Copy" },
+      {
+        kind: "draft",
+        object: "IT_Load Data - Copy",
+        diff: ["  Datasource: ASCII Project.csv", "  6 variables, 15 lines of Data code", "+ new process, exact copy"],
+      },
+      {
+        kind: "assistant",
+        text: "An exact copy is drafted, read from the server rather than retyped. It is not in TM1 yet — someone with deploy rights executes it from Deployments.",
+      },
+    ],
+  },
+  {
+    key: "voice",
+    label: "Ask by voice",
+    icon: Mic,
+    window: "Chat · analyst agent · voice",
+    steps: [
+      { kind: "user", text: "Which cubes do we have?", spoken: true },
+      { kind: "tool", tool: "list_cubes", target: "Sales model" },
+      {
+        kind: "assistant",
+        text: "Twenty-four cubes. The largest are Sales, Forecast and Headcount; the rest are lookups and control cubes. Read back aloud, sentence by sentence, while the answer streams in.",
       },
     ],
   },
@@ -288,9 +372,10 @@ export function ProductDemo() {
       </div>
 
       <p className="mt-3 text-center text-xs text-muted-foreground">
-        A scripted replay on a sample Sales model — not live data or a
+        Eight scripted replays on a sample Sales model — not live data or a
         customer environment. The agents and tool calls are the ones the
-        product really uses.
+        product really uses; every draft shown waits for a person to
+        deploy it.
       </p>
     </div>
   );
@@ -301,8 +386,11 @@ function DemoStep({ step }: { step: Step }) {
     case "user":
       return (
         <div className="flex justify-end">
-          <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-            {step.text}
+          <p className="flex max-w-[85%] items-start gap-2 rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+            {step.spoken ? (
+              <Mic className="mt-0.5 size-3.5 shrink-0" aria-label="Spoken" />
+            ) : null}
+            <span>{step.text}</span>
           </p>
         </div>
       );

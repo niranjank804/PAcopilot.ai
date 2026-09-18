@@ -81,8 +81,11 @@ export function AppHeader() {
     router.push("/login");
   };
 
+  // Solid, not translucent-with-blur: backdrop-filter turns the element
+  // into the positioning root for any fixed descendant, and the page tour
+  // is rendered from the button below.
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-sm md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 md:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <MobileNav />
         {/* Says where you are, which the sidebar cannot do once it is a

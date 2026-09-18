@@ -89,7 +89,8 @@ export const PRODUCT_TOUR: TourStep[] = [
   },
 ];
 
-/** Where the highlighted element sits, in page coordinates. */
+/** Where the highlighted element sits, in viewport coordinates — the
+ * overlay that draws it is `position: fixed`. */
 export interface Spotlight {
   top: number;
   left: number;
@@ -109,9 +110,14 @@ export function measure(target: string): Spotlight | null {
   // Highlighting it would draw a marker over nothing.
   if (rect.width === 0 && rect.height === 0) return null;
 
+  // Viewport coordinates, exactly as getBoundingClientRect gives them.
+  // Adding window.scrollY here put the spotlight 22px below the
+  // microphone whenever the document scrolled by 22px: the overlay is
+  // fixed, so it already moves with the viewport, and the scroll offset
+  // was being applied twice.
   return {
-    top: rect.top + window.scrollY,
-    left: rect.left + window.scrollX,
+    top: rect.top,
+    left: rect.left,
     width: rect.width,
     height: rect.height,
   };

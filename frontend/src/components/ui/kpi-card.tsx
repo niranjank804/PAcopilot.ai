@@ -1,6 +1,8 @@
+import { Info } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,6 +21,7 @@ export function KpiCard({
   isError,
   errorText = "Unavailable",
   icon,
+  help,
   className,
 }: {
   label: string;
@@ -28,6 +31,9 @@ export function KpiCard({
   isError?: boolean;
   errorText?: string;
   icon?: ReactNode;
+  /** How this number is computed and what to do about it. A focusable
+   * info button, so it reaches keyboard users as well as the cursor. */
+  help?: string;
   className?: string;
 }) {
   return (
@@ -38,8 +44,19 @@ export function KpiCard({
       )}
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[0.8125rem] font-medium text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium text-muted-foreground">
           {label}
+          {help ? (
+            <Tip content={help}>
+              <button
+                type="button"
+                aria-label={`About ${label}`}
+                className="rounded-full text-tertiary-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Info className="size-3.5" aria-hidden />
+              </button>
+            </Tip>
+          ) : null}
         </p>
         {icon ? (
           <span className="text-tertiary-foreground" aria-hidden>

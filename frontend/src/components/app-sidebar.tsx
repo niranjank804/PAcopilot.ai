@@ -20,12 +20,17 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  /** What this screen is for and how it works, shown on hover and on
+   * keyboard focus. Written from what the code does today — the
+   * capability registry is the source — not from a roadmap. */
+  help: string;
   /** Stable handle for the product tour. Deliberately not a class name
    * or a position: both change when someone restyles this list, and a
    * tour pinned to either points at nothing while still looking like it
@@ -61,25 +66,39 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/dashboard",
         icon: LayoutDashboard,
         tour: "nav-dashboard",
+        help: "AI runs, tool success rate, tokens and connection health for the last 30 days, plus your recent assistant sessions.",
       },
     ],
   },
   {
     label: "AI engineering",
     items: [
-      { label: "AI Assistant", href: "/chat", icon: MessageSquare, tour: "nav-chat" },
-      { label: "Visualize", href: "/visualize", icon: BarChart3 },
+      {
+        label: "AI Assistant",
+        href: "/chat",
+        icon: MessageSquare,
+        tour: "nav-chat",
+        help: "Ask about cubes, rules, TurboIntegrator and errors in plain English or by voice. Pick a specialist agent and it reads your live model with TM1 tools; any change it drafts waits for a person to deploy.",
+      },
+      {
+        label: "Visualize",
+        href: "/visualize",
+        icon: BarChart3,
+        help: "Turn a question into an MDX query and a chart from live cube data. Read-only.",
+      },
       {
         label: "Knowledge Base",
         href: "/knowledge",
         icon: BookOpen,
         tour: "nav-knowledge",
+        help: "Upload your own documentation so answers cite your material. Includes Explain Error: paste a TM1 error and get the cause and the fix.",
       },
       {
         label: "Coding Standards",
         href: "/standards",
         icon: Ruler,
         tour: "nav-standards",
+        help: "Upload exported TI processes; PA-Copilot measures how your team writes TM1 and the agents follow it when they draft code.",
       },
     ],
   },
@@ -91,39 +110,70 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/connections",
         icon: Database,
         tour: "nav-connections",
+        help: "Register TM1 or Planning Analytics as a Service servers. Credentials are encrypted at rest; Test tells you which part is wrong if it cannot connect.",
       },
       {
         label: "Metadata Explorer",
         href: "/metadata",
         icon: Network,
         tour: "nav-metadata",
+        help: "Browse cubes, dimensions, processes and chores, and trace what depends on what. Run Extract metadata once per connection to build the dependency graph.",
       },
       {
         label: "Deployments",
         href: "/deployments",
         icon: Rocket,
         tour: "nav-deployments",
+        help: "Every rule or process change the assistant drafts lands here with impact analysis. Nothing reaches TM1 until someone with deploy rights executes it; the previous version is kept for rollback.",
       },
       {
         label: "Reports",
         href: "/reports",
         icon: FileSpreadsheet,
+        help: "Developer preview. Refresh PAfE workbooks on a schedule through a Windows worker you run; outputs are stored as artifacts.",
         children: [
-          { label: "Workers", href: "/reports/workers", icon: Server },
-          { label: "Executions", href: "/reports/executions", icon: History },
+          {
+            label: "Workers",
+            href: "/reports/workers",
+            icon: Server,
+            help: "The Windows machines enrolled to run Excel refreshes, and whether each is online.",
+          },
+          {
+            label: "Executions",
+            href: "/reports/executions",
+            icon: History,
+            help: "Each report run, its status and its output files.",
+          },
         ],
       },
     ],
   },
   {
     label: "Intelligence",
-    items: [{ label: "Monitoring", href: "/monitoring", icon: Activity }],
+    items: [
+      {
+        label: "Monitoring",
+        href: "/monitoring",
+        icon: Activity,
+        help: "AI usage by model, every TM1 tool call with its error rate, and the circuit-breaker state of each connection.",
+      },
+    ],
   },
   {
     label: "Admin",
     items: [
-      { label: "Users", href: "/users", icon: Users },
-      { label: "Settings", href: "/settings", icon: Settings },
+      {
+        label: "Users",
+        href: "/users",
+        icon: Users,
+        help: "Everyone in your organization, their role, and whether they are active. Roles decide who can deploy changes.",
+      },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: Settings,
+        help: "Your organization's name and plan.",
+      },
     ],
   },
 ];
@@ -159,6 +209,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
             return (
               <div key={item.href}>
+                <Tip content={item.help} side="right">
                 <Link
                   href={item.href}
                   data-tour={item.tour}
@@ -181,12 +232,13 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   />
                   <span className="truncate">{item.label}</span>
                 </Link>
+                </Tip>
 
                 {item.children && active ? (
                   <div className="mt-1 space-y-1 border-l border-border pl-3 ml-5">
                     {item.children.map((child) => (
+                      <Tip key={child.href} content={child.help} side="right">
                       <Link
-                        key={child.href}
                         href={child.href}
                         onClick={onNavigate}
                         aria-current={
@@ -202,6 +254,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                       >
                         {child.label}
                       </Link>
+                      </Tip>
                     ))}
                   </div>
                 ) : null}

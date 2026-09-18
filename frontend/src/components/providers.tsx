@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api-client";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -26,6 +27,10 @@ export function Providers({ children }: { children: ReactNode }) {
                 error.code === "NETWORK_ERROR" ||
                 error.code === "TIMEOUT"),
             staleTime: 30_000,
+            // Switching back to the tab re-ran every query on the page
+            // and put skeletons over data that was seconds old. The 30s
+            // staleTime above already bounds how old a screen can get.
+            refetchOnWindowFocus: false,
             // The API is same-host; the default "online" networkMode pauses
             // queries whenever the browser *thinks* it's offline (embedded
             // browsers misreport this), leaving queries stuck in "pending".
@@ -56,7 +61,7 @@ export function Providers({ children }: { children: ReactNode }) {
     >
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          {children}
+          <TooltipProvider>{children}</TooltipProvider>
           <Toaster />
         </AuthProvider>
       </QueryClientProvider>

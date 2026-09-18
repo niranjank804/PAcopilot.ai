@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import type { Spotlight, TourStep } from "@/lib/tour";
@@ -19,7 +20,15 @@ import { cn } from "@/lib/utils";
 const GAP = 8;
 const POPOVER_WIDTH = 320;
 
-function popoverPosition(spotlight: Spotlight | null) {
+/** Where the card goes. `bottom` is set instead of `top` when the card
+ * sits above its target: the card's height is whatever its text needs,
+ * and positioning by an assumed height let a long step overlap the very
+ * control it was describing. */
+function popoverPosition(spotlight: Spotlight | null): {
+  top?: number;
+  bottom?: number;
+  left: number;
+} {
   if (typeof window === "undefined") return { top: 0, left: 0 };
 
   const viewportWidth = window.innerWidth;
@@ -28,17 +37,18 @@ function popoverPosition(spotlight: Spotlight | null) {
   // No target — centre it and explain in prose instead of pointing.
   if (!spotlight) {
     return {
-      top: window.scrollY + viewportHeight / 2 - 80,
+      top: viewportHeight / 2 - 80,
       left: Math.max(GAP, viewportWidth / 2 - POPOVER_WIDTH / 2),
     };
   }
 
   const below = spotlight.top + spotlight.height + GAP;
-  const wouldOverflowBottom =
-    below + 200 > window.scrollY + viewportHeight && spotlight.top > 220;
+  const wouldOverflowBottom = below + 200 > viewportHeight && spotlight.top > 220;
 
   return {
-    top: wouldOverflowBottom ? spotlight.top - 200 - GAP : below,
+    ...(wouldOverflowBottom
+      ? { bottom: viewportHeight - spotlight.top + GAP }
+      : { top: below }),
     // Clamped to the viewport so a target near the right edge — or a
     // narrow phone, where the element may be wider than the popover —
     // does not push the card off-screen.
@@ -91,7 +101,15 @@ export function ProductTour({
 
   const position = popoverPosition(spotlight);
 
-  return (
+  // Rendered into <body>, never in place. A `position: fixed` element is
+  // positioned against the viewport only until some ancestor gains a
+  // transform, filter or backdrop-filter — then it is positioned against
+  // that ancestor instead. The per-page tour lives inside the header,
+  // and a backdrop blur on the header shifted every spotlight right by
+  // the width of the sidebar. The portal removes the ancestors.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[60]">
       {spotlight ? (
         <>
@@ -159,6 +177,7 @@ export function ProductTour({
         )}
         style={{
           top: position.top,
+          bottom: position.bottom,
           left: position.left,
           width: POPOVER_WIDTH,
           maxWidth: "calc(100vw - 16px)",
@@ -190,6 +209,7 @@ export function ProductTour({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

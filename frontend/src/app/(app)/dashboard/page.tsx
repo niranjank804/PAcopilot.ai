@@ -147,6 +147,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="AI runs"
+          help="Every assistant request answered in the last 30 days, across all users in your organization. Read from the same usage log that bills tokens."
           icon={<Activity className="size-4" />}
           value={number.format(usageQuery.data?.total_requests ?? 0)}
           hint={
@@ -163,6 +164,7 @@ export default function DashboardPage() {
 
         <KpiCard
           label="Tool success rate"
+          help="Of every TM1 tool call the agents made in 30 days, the share that returned a result. A low rate usually means a connection is down or metadata has not been extracted."
           icon={<ShieldCheck className="size-4" />}
           value={successRate === null ? "—" : percent.format(successRate)}
           hint={
@@ -177,6 +179,7 @@ export default function DashboardPage() {
 
         <KpiCard
           label="Tool errors"
+          help="Tool calls that failed in the last 30 days. Monitoring breaks these down per tool, so you can see whether it is one tool or one server."
           icon={<TriangleAlert className="size-4" />}
           value={number.format(toolErrorTotal)}
           hint={
@@ -191,6 +194,7 @@ export default function DashboardPage() {
 
         <KpiCard
           label="Tokens"
+          help="Input and output tokens sent to the model in 30 days. The cost is estimated from list prices; cached prompt tokens are billed at a tenth, which is what the cached share shows."
           icon={<Coins className="size-4" />}
           value={number.format(usageQuery.data?.total_tokens ?? 0)}
           hint={

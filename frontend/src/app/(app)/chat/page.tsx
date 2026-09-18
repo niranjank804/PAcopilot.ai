@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   FileText,
+  History,
   Loader2,
   MessageSquarePlus,
   Mic,
@@ -42,6 +43,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -53,6 +60,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Tip } from "@/components/ui/tooltip";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useVoice } from "@/lib/voice";
@@ -75,39 +83,79 @@ const NO_AGENT = "none";
  * needs a cube, process or rule name that only the user knows. Nothing is
  * sent until they complete it and press Enter.
  */
-const TASKS: { label: string; agent: string; prompt: string }[] = [
+const TASKS: { label: string; agent: string; prompt: string; help: string }[] = [
   {
     label: "Generate TI",
     agent: "ti",
     prompt: "Generate a TurboIntegrator process that ",
+    help: "The TI agent drafts a process in your team's style (from Coding Standards), compile-checks it against the server, and files it as a draft. Nothing is created in TM1 until a person deploys it.",
   },
   {
     label: "Explain TI",
     agent: "ti",
     prompt: "Explain the TurboIntegrator process ",
+    help: "Reads the real process from your server and explains what each tab does, row by row, including what it writes to.",
   },
   {
     label: "Generate MDX",
     agent: "analyst",
     prompt: "Write an MDX query that returns ",
+    help: "The analyst agent writes the query against your cube's actual dimensions and can run it read-only to check the result.",
   },
   {
     label: "Analyze rules",
     agent: "developer",
     prompt: "Review the rules on cube ",
+    help: "Reads the cube's rules and explains what they calculate, in what order, and where a result could be wrong. Read-only unless you ask for a fix, which becomes a reviewable draft.",
   },
   {
     label: "Analyze feeders",
     agent: "developer",
     prompt:
       "Check the feeders on cube  for calculated cells that are never fed: ",
+    help: "Finds rule-calculated cells with no feeder — the usual cause of a total that shows zero — and proposes the feeder as a draft.",
   },
   {
     label: "Document cube",
     agent: "documentation",
     prompt: "Write technical documentation for cube ",
+    help: "The documentation agent reads the cube, its dimensions, rules and dependent processes from the live model and writes them up.",
   },
 ];
+
+/**
+ * Which model answers. The backend accepts any model it has a price for;
+ * this offers the two that matter and remembers the choice.
+ *
+ * Fast is the default because latency was the complaint. Best is one
+ * click away for the work that needs it.
+ */
+const MODELS = [
+  {
+    id: "claude-sonnet-5",
+    label: "Fast",
+    help: "Claude Sonnet 5. Noticeably quicker to first word and about 40% cheaper per token. The right choice for questions, explanations and most drafting.",
+  },
+  {
+    id: "claude-opus-5",
+    label: "Best",
+    help: "Claude Opus 5. Slower and about 1.7× the cost per token, with the most careful reasoning — for tangled rule and feeder logic or a large TI refactor.",
+  },
+] as const;
+
+const MODEL_STORAGE_KEY = "pa-copilot-model";
+
+function readStoredModel(): string {
+  if (typeof window === "undefined") return MODELS[0].id;
+
+  try {
+    const stored = window.localStorage.getItem(MODEL_STORAGE_KEY);
+
+    return MODELS.some((model) => model.id === stored) ? stored! : MODELS[0].id;
+  } catch {
+    return MODELS[0].id;
+  }
+}
 
 const ACCEPTED_ATTACHMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".docx"];
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
@@ -266,6 +314,19 @@ export default function ChatPage() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [agent, setAgent] = useState<string>(() => searchParams.get("agent") ?? NO_AGENT);
+  const [model, setModel] = useState<string>(readStoredModel);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const chooseModel = (id: string) => {
+    setModel(id);
+
+    try {
+      window.localStorage.setItem(MODEL_STORAGE_KEY, id);
+    } catch {
+      // Private mode or blocked storage: the choice still holds for this
+      // session, which is what the state above is for.
+    }
+  };
   const [input, setInput] = useState(() => searchParams.get("prompt") ?? "");
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -546,6 +607,7 @@ export default function ChatPage() {
         conversation_id: conversationId ?? undefined,
         agent: agent === NO_AGENT ? undefined : agent,
         enable_tools: agent !== NO_AGENT,
+        model,
         attachments: attachmentsForThisMessage.length
           ? attachmentsForThisMessage
           : undefined,
@@ -701,9 +763,10 @@ export default function ChatPage() {
     ),
   })).filter((bucket) => bucket.conversations.length > 0);
 
-  return (
-    <div className="flex h-full gap-4">
-      <aside className="flex w-64 shrink-0 flex-col gap-3 border-r pr-4">
+  // One list, rendered in the desktop aside or in the phone drawer —
+  // never both at once, so the tour handle inside it stays unique.
+  const conversationList = (
+    <>
         <Button size="sm" onClick={newConversation} disabled={isStreaming}>
           <MessageSquarePlus className="mr-2 h-4 w-4" />
           New conversation
@@ -790,7 +853,10 @@ export default function ChatPage() {
                         <>
                           <button
                             type="button"
-                            onClick={() => openConversation(conversation.id)}
+                            onClick={() => {
+                              openConversation(conversation.id);
+                              setHistoryOpen(false);
+                            }}
                             className="flex-1 truncate text-left"
                             title={conversation.title ?? "Untitled conversation"}
                           >
@@ -824,9 +890,16 @@ export default function ChatPage() {
             ))
           )}
         </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-full gap-4">
+      <aside className="hidden w-64 shrink-0 flex-col gap-3 border-r pr-4 md:flex">
+        {conversationList}
       </aside>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="page-title">Ask PA Copilot</h1>
@@ -834,6 +907,45 @@ export default function ChatPage() {
               AI assistance for IBM Planning Analytics engineering. Pick a
               specialist agent to give it TM1 tools.
             </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+          <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+            <Tip content="Earlier conversations. Threads are kept, so you can return to what an agent proposed last week and carry on." side="bottom">
+              <DialogTrigger
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[0.8125rem] font-medium md:hidden"
+              >
+                <History className="size-4" aria-hidden />
+                History
+              </DialogTrigger>
+            </Tip>
+            <DialogContent className="left-0 top-0 h-full w-80 max-w-[85vw] translate-x-0 translate-y-0 rounded-none border-r border-border sm:rounded-none">
+              <DialogTitle className="sr-only">Conversations</DialogTitle>
+              <div className="flex h-full flex-col gap-3 pt-6">{conversationList}</div>
+            </DialogContent>
+          </Dialog>
+          <div
+            role="group"
+            aria-label="Model"
+            className="flex rounded-lg border border-border bg-card p-0.5"
+          >
+            {MODELS.map((choice) => (
+              <Tip key={choice.id} content={choice.help} side="bottom">
+                <button
+                  type="button"
+                  aria-pressed={model === choice.id}
+                  onClick={() => chooseModel(choice.id)}
+                  className={cn(
+                    "rounded-md px-3 py-1 text-[0.8125rem] font-medium transition-colors duration-150",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    model === choice.id
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {choice.label}
+                </button>
+              </Tip>
+            ))}
           </div>
           <Select
             value={agent}
@@ -846,15 +958,32 @@ export default function ChatPage() {
                 }
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_AGENT}>No agent (plain chat)</SelectItem>
+            <SelectContent className="w-80 max-w-[calc(100vw-2rem)]">
+              <SelectItem value={NO_AGENT}>
+                <span className="block whitespace-normal">
+                  <span className="block">No agent (plain chat)</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Answers from general TM1 knowledge only — no tools, no
+                    access to your model.
+                  </span>
+                </span>
+              </SelectItem>
+              {/* Each agent carries its own description from the backend,
+                  so what the list says an agent does is what its prompt
+                  and tool list actually are. */}
               {agentsQuery.data?.map((a) => (
                 <SelectItem key={a.name} value={a.name}>
-                  {titleCase(a.name)}
+                  <span className="block whitespace-normal">
+                    <span className="block">{titleCase(a.name)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {a.description}
+                    </span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          </div>
         </div>
 
         <Card className="flex flex-1 flex-col overflow-hidden">
@@ -869,14 +998,15 @@ export default function ChatPage() {
                 </p>
                 <div className="mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-2">
                   {TASKS.map((task) => (
-                    <button
-                      key={task.label}
-                      type="button"
-                      onClick={() => startTask(task)}
-                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-[0.8125rem] font-medium text-foreground transition-colors duration-150 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {task.label}
-                    </button>
+                    <Tip key={task.label} content={task.help} side="bottom">
+                      <button
+                        type="button"
+                        onClick={() => startTask(task)}
+                        className="rounded-lg border border-border bg-card px-3 py-1.5 text-[0.8125rem] font-medium text-foreground transition-colors duration-150 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {task.label}
+                      </button>
+                    </Tip>
                   ))}
                 </div>
                 <p className="mt-4 text-center text-xs text-tertiary-foreground">
@@ -1072,16 +1202,17 @@ export default function ChatPage() {
                 event.target.value = "";
               }}
             />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming}
-              aria-label="Attach files"
-              title="Attach PDF, JPG, PNG, or DOCX"
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
+            <Tip content="Attach up to 5 files (PDF, JPG, PNG or DOCX, 15 MB each). The model reads them directly — a screenshot of an error or a page of a spec works.">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isStreaming}
+                aria-label="Attach files"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+            </Tip>
             <Textarea
               ref={inputRef}
               value={input}
@@ -1099,65 +1230,75 @@ export default function ChatPage() {
               disabled={isStreaming}
             />
             {voice.isSupported ? (
-              <Button
-                type="button"
-                variant={isListening ? "destructive" : "outline"}
-                onClick={toggleListening}
-                disabled={isStreaming}
-                data-tour="voice-input"
-                aria-label={isListening ? "Stop voice input" : "Start voice input"}
-                title={
+              <Tip
+                content={
                   voice.state === "requesting-permission"
-                    ? "Waiting for microphone permission"
+                    ? "Waiting for microphone permission."
                     : isListening
-                      ? "Stop voice input"
-                      : "Ask by voice"
+                      ? "Listening. Click to stop; what you said lands in the box for you to check before sending."
+                      : "Dictate your question. It is transcribed into the box — nothing is sent until you press Send — and the answer is read back aloud."
                 }
               >
-                {isListening ? (
-                  <MicOff className="h-4 w-4 animate-pulse" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )}
-              </Button>
+                <Button
+                  type="button"
+                  variant={isListening ? "destructive" : "outline"}
+                  onClick={toggleListening}
+                  disabled={isStreaming}
+                  data-tour="voice-input"
+                  aria-label={isListening ? "Stop voice input" : "Start voice input"}
+                >
+                  {isListening ? (
+                    <MicOff className="h-4 w-4 animate-pulse" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+              </Tip>
             ) : null}
 
             {/* Only while there is something to interrupt. A permanently
                 visible stop button is a control that does nothing most
                 of the time. */}
             {voice.state === "speaking" ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={voice.stopSpeaking}
-                aria-label="Stop speaking"
-                title="Stop speaking"
-              >
-                <Square className="h-4 w-4" />
-              </Button>
+              <Tip content="Stop reading the answer aloud.">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={voice.stopSpeaking}
+                  aria-label="Stop speaking"
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              </Tip>
             ) : null}
 
             {voice.canSpeak ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={voice.toggleMuted}
-                aria-label={
-                  voice.isMuted ? "Unmute spoken answers" : "Mute spoken answers"
-                }
-                aria-pressed={voice.isMuted}
-                title={
-                  voice.isMuted ? "Spoken answers muted" : "Mute spoken answers"
+              <Tip
+                content={
+                  voice.isMuted
+                    ? "Spoken answers are muted. Click to have answers to dictated questions read aloud again."
+                    : "Answers to dictated questions are read aloud, sentence by sentence as they arrive. Click to mute."
                 }
               >
-                {voice.isMuted ? (
-                  <VolumeX className="h-4 w-4" />
-                ) : (
-                  <Volume2 className="h-4 w-4" />
-                )}
-              </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={voice.toggleMuted}
+                  aria-label={
+                    voice.isMuted ? "Unmute spoken answers" : "Mute spoken answers"
+                  }
+                  aria-pressed={voice.isMuted}
+                >
+                  {voice.isMuted ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </Tip>
             ) : null}
+            <Tip content="Send (Enter). Shift+Enter starts a new line.">
             <Button
               onClick={send}
               disabled={isStreaming || (!input.trim() && pendingAttachments.length === 0)}
@@ -1169,12 +1310,14 @@ export default function ChatPage() {
                 <Send className="h-4 w-4" />
               )}
             </Button>
+            </Tip>
             </div>
           </div>
         </Card>
       </div>
 
-      <aside className="w-72 shrink-0 space-y-4 overflow-y-auto border-l pl-4">
+      {/* Context panel: secondary, so it yields first as the screen narrows. */}
+      <aside className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l pl-4 xl:block">
         <div>
           <h2 className="mb-2 text-sm font-semibold">Agent</h2>
           {selectedAgent ? (

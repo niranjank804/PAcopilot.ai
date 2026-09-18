@@ -91,9 +91,11 @@ describe("measure", () => {
     });
   });
 
-  it("reports page coordinates, not viewport ones", () => {
-    // The overlay is absolutely positioned on the page, so a scrolled
-    // viewport would otherwise put the spotlight in the wrong place.
+  it("reports viewport coordinates even when the window is scrolled", () => {
+    // The overlay is position: fixed, so it moves with the viewport
+    // already. The previous version of this test asserted the opposite,
+    // and in a real browser that put the spotlight exactly one scroll
+    // offset below the microphone it described.
     const element = document.createElement("div");
     element.setAttribute("data-tour", "scrolled");
     element.getBoundingClientRect = () =>
@@ -105,8 +107,8 @@ describe("measure", () => {
 
     const spotlight = measure("scrolled");
 
-    expect(spotlight?.top).toBe(510);
-    expect(spotlight?.left).toBe(35);
+    expect(spotlight?.top).toBe(10);
+    expect(spotlight?.left).toBe(5);
 
     window.scrollY = 0;
     window.scrollX = 0;
