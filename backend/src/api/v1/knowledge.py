@@ -11,11 +11,6 @@ from src.errors.classifier import classify_error
 from src.knowledge.loaders.registry import resolve_content_type
 from src.core.exceptions import NotFoundException
 from src.knowledge.service import knowledge_service
-from src.knowledge.visual.providers.registry import (
-    get_visual_provider,
-    visual_rag_availability,
-)
-from src.knowledge.visual.service import visual_service
 from src.repositories.visual_page_repository import visual_page_repository
 from src.core.config import settings
 from src.schemas.ai import UsageResponse
@@ -314,6 +309,13 @@ async def visual_status(
     "this never worked".
     """
 
+    # Imported on use: the visual package carries numpy and pypdfium2,
+    # which would otherwise load at every cold start for a status check.
+    from src.knowledge.visual.providers.registry import (
+        get_visual_provider,
+        visual_rag_availability,
+    )
+
     availability = visual_rag_availability()
 
     return ApiResponse(
@@ -348,6 +350,8 @@ async def get_page_image(
         # 404 rather than 403: whether a page id exists is itself
         # information about another organization's documents.
         raise NotFoundException("Page not found.")
+
+    from src.knowledge.visual.service import visual_service
 
     image = await visual_service.load_image(
         db, organization_id=current_user.organization_id, page=page

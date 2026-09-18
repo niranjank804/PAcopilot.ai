@@ -1,6 +1,7 @@
-from collections.abc import AsyncIterator
+from __future__ import annotations
 
-import anthropic
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 from src.ai.exceptions import (
     AIProviderAuthenticationError,
@@ -17,6 +18,22 @@ from src.ai.schemas import (
     Usage,
 )
 from src.core.config import settings
+
+if TYPE_CHECKING:
+    import anthropic
+
+
+def _anthropic():
+    """The SDK, imported on first use.
+
+    Importing it costs a few seconds on the free instance's CPU, and it
+    is paid at every cold start whether or not a request needs it. The
+    module is cached by Python after the first call.
+    """
+
+    import anthropic as sdk
+
+    return sdk
 
 
 def _usage_from(usage) -> Usage:
@@ -85,7 +102,7 @@ def _reasoning_kwargs() -> dict:
 class AnthropicProvider(AIProvider):
 
     def __init__(self):
-        self._client = anthropic.AsyncAnthropic(
+        self._client = _anthropic().AsyncAnthropic(
             api_key=settings.ANTHROPIC_API_KEY,
         )
 
@@ -98,7 +115,7 @@ class AnthropicProvider(AIProvider):
         """
 
         if not request.system and not request.system_context:
-            return anthropic.NOT_GIVEN
+            return _anthropic().NOT_GIVEN
 
         blocks = []
 
@@ -232,7 +249,7 @@ class AnthropicProvider(AIProvider):
         tools: list[ToolDefinition] | None,
     ):
         if not tools:
-            return anthropic.NOT_GIVEN
+            return _anthropic().NOT_GIVEN
 
         return [
             {
@@ -257,11 +274,11 @@ class AnthropicProvider(AIProvider):
                 tools=self._tools_payload(request.tools),
                 **_reasoning_kwargs(),
             )
-        except anthropic.RateLimitError as exc:
+        except _anthropic().RateLimitError as exc:
             raise AIProviderRateLimitError(str(exc)) from exc
-        except anthropic.AuthenticationError as exc:
+        except _anthropic().AuthenticationError as exc:
             raise AIProviderAuthenticationError(str(exc)) from exc
-        except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
+        except (_anthropic().APIStatusError, _anthropic().APIConnectionError) as exc:
             raise AIProviderError(str(exc)) from exc
 
         text = "".join(
@@ -313,11 +330,11 @@ class AnthropicProvider(AIProvider):
                     tool_calls=tool_calls,
                     stop_reason=final_message.stop_reason,
                 )
-        except anthropic.RateLimitError as exc:
+        except _anthropic().RateLimitError as exc:
             raise AIProviderRateLimitError(str(exc)) from exc
-        except anthropic.AuthenticationError as exc:
+        except _anthropic().AuthenticationError as exc:
             raise AIProviderAuthenticationError(str(exc)) from exc
-        except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
+        except (_anthropic().APIStatusError, _anthropic().APIConnectionError) as exc:
             raise AIProviderError(str(exc)) from exc
 
     async def count_tokens(
@@ -337,7 +354,7 @@ class AnthropicProvider(AIProvider):
                 # budget pre-check relies on.
                 tools=self._tools_payload(request.tools),
             )
-        except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
+        except (_anthropic().APIStatusError, _anthropic().APIConnectionError) as exc:
             raise AIProviderError(str(exc)) from exc
 
         return result.input_tokens

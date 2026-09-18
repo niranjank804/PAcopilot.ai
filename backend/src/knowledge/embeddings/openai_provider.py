@@ -1,4 +1,6 @@
-import openai
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from src.ai.exceptions import (
     AIProviderAuthenticationError,
@@ -7,6 +9,18 @@ from src.ai.exceptions import (
 )
 from src.core.config import settings
 from src.knowledge.embeddings.base import EmbeddingProvider
+
+if TYPE_CHECKING:
+    import openai
+
+
+def _openai():
+    """The SDK, imported on first use — see _anthropic() in the chat
+    provider for why."""
+
+    import openai as sdk
+
+    return sdk
 
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
@@ -18,10 +32,10 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
     def client(self) -> openai.AsyncOpenAI:
         if self._client is None:
             try:
-                self._client = openai.AsyncOpenAI(
+                self._client = _openai().AsyncOpenAI(
                     api_key=settings.OPENAI_API_KEY,
                 )
-            except openai.OpenAIError as exc:
+            except _openai().OpenAIError as exc:
                 raise AIProviderAuthenticationError(str(exc)) from exc
 
         return self._client
@@ -36,11 +50,11 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
                 model=settings.EMBEDDING_MODEL,
                 input=texts,
             )
-        except openai.RateLimitError as exc:
+        except _openai().RateLimitError as exc:
             raise AIProviderRateLimitError(str(exc)) from exc
-        except openai.AuthenticationError as exc:
+        except _openai().AuthenticationError as exc:
             raise AIProviderAuthenticationError(str(exc)) from exc
-        except (openai.APIStatusError, openai.APIConnectionError) as exc:
+        except (_openai().APIStatusError, _openai().APIConnectionError) as exc:
             raise AIProviderError(str(exc)) from exc
 
         return [item.embedding for item in response.data]

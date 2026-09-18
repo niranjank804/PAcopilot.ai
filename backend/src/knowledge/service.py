@@ -15,8 +15,6 @@ from src.knowledge.chunking import chunk_text
 from src.knowledge.embeddings import cache as embedding_cache
 from src.knowledge.embeddings.registry import get_embedding_provider
 from src.knowledge.loaders.registry import get_loader
-from src.knowledge.visual.providers.registry import visual_rag_availability
-from src.knowledge.visual.service import visual_service
 from src.schemas.ai import AttachmentInput
 from src.repositories.knowledge_chunk_repository import knowledge_chunk_repository
 from src.repositories.knowledge_document_repository import (
@@ -125,6 +123,8 @@ class KnowledgeService:
         # page image outlives its row indefinitely and is billed for the
         # privilege. Deleting the objects needs the references, which
         # only exist while the rows do.
+        from src.knowledge.visual.service import visual_service
+
         await visual_service.delete_for_document(
             db,
             organization_id=organization_id,
@@ -227,6 +227,8 @@ class KnowledgeService:
         # guessed at.
         if settings.VISUAL_RAG_ENABLED and content_type == "application/pdf":
             try:
+                from src.knowledge.visual.service import visual_service
+
                 result = await visual_service.index_document(
                     db,
                     document=document,
@@ -329,6 +331,12 @@ class KnowledgeService:
         if not settings.VISUAL_RAG_ENABLED:
             return []
 
+        # Imported here, not at the top: the visual package brings numpy
+        # and pypdfium2 with it, which is start-up time nobody needs until
+        # a PDF is actually indexed or searched.
+        from src.knowledge.visual.providers.registry import visual_rag_availability
+        from src.knowledge.visual.service import visual_service
+
         availability = visual_rag_availability()
 
         if not availability.available:
@@ -362,6 +370,8 @@ class KnowledgeService:
 
         for match in page_matches:
             try:
+                from src.knowledge.visual.service import visual_service
+
                 image = await visual_service.load_image(
                     db, organization_id=organization_id, page=match.page
                 )
