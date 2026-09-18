@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
@@ -67,6 +67,48 @@ import type {
 
 const NO_AGENT = "none";
 
+/**
+ * The engineering jobs this assistant is for.
+ *
+ * Each one selects the agent that owns the work and prefills the opening
+ * of the request — deliberately unfinished, because every one of these
+ * needs a cube, process or rule name that only the user knows. Nothing is
+ * sent until they complete it and press Enter.
+ */
+const TASKS: { label: string; agent: string; prompt: string }[] = [
+  {
+    label: "Generate TI",
+    agent: "ti",
+    prompt: "Generate a TurboIntegrator process that ",
+  },
+  {
+    label: "Explain TI",
+    agent: "ti",
+    prompt: "Explain the TurboIntegrator process ",
+  },
+  {
+    label: "Generate MDX",
+    agent: "analyst",
+    prompt: "Write an MDX query that returns ",
+  },
+  {
+    label: "Analyze rules",
+    agent: "developer",
+    prompt: "Review the rules on cube ",
+  },
+  {
+    label: "Analyze feeders",
+    agent: "developer",
+    prompt:
+      "Check the feeders on cube  for calculated cells that are never fed: ",
+  },
+  {
+    label: "Document cube",
+    agent: "documentation",
+    prompt: "Write technical documentation for cube ",
+  },
+];
+
 const ACCEPTED_ATTACHMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".docx"];
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 const MAX_ATTACHMENTS = 5;
@@ -98,8 +140,12 @@ function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
 }
 
+const AGENT_ACRONYMS: Record<string, string> = { ti: "TI" };
+
 function titleCase(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  return (
+    AGENT_ACRONYMS[value] ?? value.charAt(0).toUpperCase() + value.slice(1)
+  );
 }
 
 // Clicking a tool badge fills the input with a starter prompt instead of
@@ -126,6 +172,8 @@ const TOOL_PROMPTS: Record<string, string> = {
   execute_mdx: "Run this MDX query: [paste MDX here]",
   propose_rule_update: "Draft an update to the rules for the [cube name] cube: ",
   propose_process_update: "Draft a new TI process named [process name] that ",
+  propose_process_copy:
+    "Create a copy of the [process name] process named [new process name].",
 };
 
 function toolPrompt(tool: string): string {
@@ -172,7 +220,11 @@ const NAME_ARG_KEYS = [
 // (draft_change_id, status, validation_errors, impact, a fixed disclaimer
 // note) — well under the 500-char audit-log truncation limit, so this is
 // safe to parse directly rather than needing a dedicated field.
-const DRAFT_TOOL_NAMES = new Set(["propose_rule_update", "propose_process_update"]);
+const DRAFT_TOOL_NAMES = new Set([
+  "propose_rule_update",
+  "propose_process_update",
+  "propose_process_copy",
+]);
 
 function draftChangeId(execution: ToolExecutionResponse): string | null {
   if (!DRAFT_TOOL_NAMES.has(execution.tool_name) || execution.status !== "success") {
@@ -398,6 +450,13 @@ export default function ChatPage() {
     setMessages([]);
   };
 
+  /** Select the agent that owns a task and open its request. */
+  const startTask = (task: { agent: string; prompt: string }) => {
+    setAgent(task.agent);
+    setInput(task.prompt);
+    inputRef.current?.focus();
+  };
+
   const openConversation = async (id: string) => {
     if (isStreaming) return;
 
@@ -420,6 +479,23 @@ export default function ChatPage() {
       toast.error(errorMessage(error));
     }
   };
+
+  // Opened from the dashboard's recent activity (?conversation=<id>).
+  // Guarded by a ref rather than by state so that navigating away inside
+  // the page — starting a new conversation, say — does not pull the user
+  // back to the linked one on the next render.
+  const openedFromUrl = useRef(false);
+  const linkedConversation = searchParams.get("conversation");
+
+  useEffect(() => {
+    if (openedFromUrl.current || !linkedConversation) return;
+
+    openedFromUrl.current = true;
+    void openConversation(linkedConversation);
+    // openConversation is recreated every render and would re-run this on
+    // each one; the ref above is what makes it happen once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedConversation]);
 
   const markInterrupted = (id: string | null) => {
     if (id) {
@@ -753,10 +829,10 @@ export default function ChatPage() {
       <div className="flex flex-1 flex-col gap-4 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">AI Chat</h1>
-            <p className="text-sm text-muted-foreground">
-              Ask about your TM1 models — pick a specialist agent to enable TM1
-              tools.
+            <h1 className="page-title">Ask PA Copilot</h1>
+            <p className="page-subtitle">
+              AI assistance for IBM Planning Analytics engineering. Pick a
+              specialist agent to give it TM1 tools.
             </p>
           </div>
           <Select
@@ -787,10 +863,27 @@ export default function ChatPage() {
             className="flex-1 space-y-4 overflow-y-auto py-4"
           >
             {messages.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                No messages yet. Start by asking something like &quot;Which cubes
-                are in my model?&quot;
-              </p>
+              <div className="py-10">
+                <p className="text-center text-[0.9375rem] text-muted-foreground">
+                  What do you want to accomplish?
+                </p>
+                <div className="mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-2">
+                  {TASKS.map((task) => (
+                    <button
+                      key={task.label}
+                      type="button"
+                      onClick={() => startTask(task)}
+                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-[0.8125rem] font-medium text-foreground transition-colors duration-150 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {task.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-4 text-center text-xs text-tertiary-foreground">
+                  Each opens the specialist agent for that job and starts the
+                  request — you finish it with the cube or process name.
+                </p>
+              </div>
             ) : (
               messages.map((message, index) => (
                 <div
@@ -999,7 +1092,7 @@ export default function ChatPage() {
                   send();
                 }
               }}
-              placeholder="Ask about cubes, processes, dependencies..."
+              placeholder="What do you want to accomplish?"
               className="min-h-[44px] flex-1 resize-none"
               aria-label="Message"
               data-tour="chat-input"

@@ -482,7 +482,7 @@ function MetadataExplorer() {
           <div className="space-y-4">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight">
+                <h1 className="page-title">
                   {selected.name}
                 </h1>
                 <Badge variant="outline">{TYPE_LABEL[selected.type]}</Badge>

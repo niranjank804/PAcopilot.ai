@@ -85,7 +85,7 @@ function renderChat() {
 }
 
 async function sendMessage(user: ReturnType<typeof userEvent.setup>, text: string) {
-  const box = screen.getByPlaceholderText(/ask about cubes/i);
+  const box = screen.getByPlaceholderText(/what do you want to accomplish/i);
   await user.type(box, text);
   await user.keyboard("{Enter}");
 }
@@ -125,7 +125,7 @@ describe("sending a message", () => {
     const user = userEvent.setup();
     renderChat();
 
-    const box = screen.getByPlaceholderText(/ask about cubes/i);
+    const box = screen.getByPlaceholderText(/what do you want to accomplish/i);
     await user.click(box);
     await user.keyboard("{Enter}");
 
@@ -149,7 +149,7 @@ describe("sending a message", () => {
     await sendMessage(user, "hello");
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(""),
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toHaveValue(""),
     );
   });
 });
@@ -182,12 +182,12 @@ describe("while streaming", () => {
     // through the interface — a test that typed into the box would pass
     // whether or not it existed, which is why this asserts the disabled
     // state instead.)
-    expect(screen.getByPlaceholderText(/ask about cubes/i)).toBeDisabled();
+    expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toBeDisabled();
 
     release();
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toBeEnabled(),
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toBeEnabled(),
     );
   });
 });
@@ -353,7 +353,7 @@ describe("voice", () => {
     renderChat();
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toBeInTheDocument(),
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toBeInTheDocument(),
     );
 
     expect(
@@ -388,7 +388,7 @@ describe("voice", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toHaveValue(
         "list the sales cubes",
       ),
     );
@@ -417,7 +417,7 @@ describe("voice", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toHaveValue(
         "how many cubes",
       ),
     );
@@ -452,7 +452,7 @@ describe("voice", () => {
       results: { length: 1, 0: { 0: { transcript: "which cube" } } },
     });
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toHaveValue(
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toHaveValue(
         "which cube",
       ),
     );
@@ -477,7 +477,7 @@ describe("voice", () => {
     renderChat();
 
     await waitFor(() =>
-      expect(screen.getByPlaceholderText(/ask about cubes/i)).toBeInTheDocument(),
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toBeInTheDocument(),
     );
     await sendMessage(user, "how many cubes");
 
@@ -601,5 +601,26 @@ describe("long, tool-using answers", () => {
     expect(
       await screen.findByText("IT_Load Data loads Project.csv."),
     ).toBeInTheDocument();
+  });
+});
+
+
+describe("engineering tasks", () => {
+  // The empty thread offers the jobs this assistant is for. Each opens
+  // the agent that owns the job and starts the request without sending
+  // it: every one needs a cube or process name only the user has.
+  it("prefills the request and selects the owning agent without sending", async () => {
+    const user = userEvent.setup();
+
+    renderChat();
+
+    await user.click(screen.getByRole("button", { name: "Generate TI" }));
+
+    const box = screen.getByPlaceholderText(/what do you want to accomplish/i);
+    expect(box).toHaveValue("Generate a TurboIntegrator process that ");
+    // The trigger renders its chevron as text, so this matches the label
+    // rather than the whole content.
+    expect(screen.getByLabelText("Agent")).toHaveTextContent(/^Ti\b/i);
+    expect(streamRequest).not.toHaveBeenCalled();
   });
 });

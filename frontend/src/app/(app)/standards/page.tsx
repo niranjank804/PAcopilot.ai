@@ -102,7 +102,7 @@ export default function StandardsPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Coding Standards</h1>
+        <h1 className="page-title">Coding Standards</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Upload your exported TurboIntegrator processes and PA-Copilot measures
           how your team actually writes TM1. Generated code follows what it

@@ -36,7 +36,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <div className="flex flex-1 flex-col">
         <AppHeader />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
           {isLoading ? (
             <div className="space-y-4" aria-busy="true">
               <Skeleton className="h-8 w-64" />

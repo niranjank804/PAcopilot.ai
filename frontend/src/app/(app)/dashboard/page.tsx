@@ -1,8 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import {
+  Activity,
+  Coins,
+  Database,
+  MessageSquare,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,9 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import type {
+  ConversationSummary,
   TM1Connection,
   TM1ConnectionStatus,
   ToolUsage,
@@ -20,14 +35,64 @@ import type {
 } from "@/lib/types";
 
 const number = new Intl.NumberFormat("en-US");
+const percent = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
+const money = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 2,
+});
 
-const STATE_VARIANT: Record<TM1ConnectionStatus["state"], "default" | "secondary" | "destructive"> = {
-  closed: "default",
-  half_open: "secondary",
+/** A breaker that has tripped is a problem; half-open is recovering. */
+const STATE_VARIANT: Record<
+  TM1ConnectionStatus["state"],
+  "success" | "warning" | "destructive"
+> = {
+  closed: "success",
+  half_open: "warning",
   open: "destructive",
 };
 
+const STATE_LABEL: Record<TM1ConnectionStatus["state"], string> = {
+  closed: "healthy",
+  half_open: "recovering",
+  open: "unavailable",
+};
+
+function greeting(date: Date): string {
+  const hour = date.getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+
+  return "Good evening";
+}
+
+/** "4 minutes ago" — the unit a control room reads in. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+
+  if (Number.isNaN(then)) return "";
+
+  const minutes = Math.round((Date.now() - then) / 60_000);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.round(minutes / 60);
+
+  if (hours < 24) return `${hours} h ago`;
+
+  const days = Math.round(hours / 24);
+
+  return days === 1 ? "yesterday" : `${days} days ago`;
+}
+
 export default function DashboardPage() {
+  const { user } = useAuth();
+
   const connectionsQuery = useQuery({
     queryKey: ["tm1-connections"],
     queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
@@ -48,155 +113,225 @@ export default function DashboardPage() {
     queryFn: () => apiRequest<TM1ConnectionStatus[]>("/monitoring/tm1-status"),
   });
 
-  const toolCallTotal = toolsQuery.data?.reduce((sum, t) => sum + t.total_calls, 0) ?? 0;
-  const toolErrorTotal = toolsQuery.data?.reduce((sum, t) => sum + t.error_count, 0) ?? 0;
+  const conversationsQuery = useQuery({
+    queryKey: ["ai-conversations"],
+    queryFn: () => apiRequest<ConversationSummary[]>("/ai/conversations"),
+  });
+
+  const toolCallTotal =
+    toolsQuery.data?.reduce((sum, tool) => sum + tool.total_calls, 0) ?? 0;
+  const toolErrorTotal =
+    toolsQuery.data?.reduce((sum, tool) => sum + tool.error_count, 0) ?? 0;
+  const successRate =
+    toolCallTotal > 0 ? (toolCallTotal - toolErrorTotal) / toolCallTotal : null;
+
+  const unhealthy =
+    tm1StatusQuery.data?.filter((status) => status.state !== "closed") ?? [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Live overview of TM1 connections, AI usage, and platform health.
-        </p>
+    <div className="space-y-8">
+      <PageHeader
+        title={`${greeting(new Date())}${user ? `, ${user.first_name}` : ""}`}
+        description="Planning Analytics environment overview — the last 30 days."
+        actions={
+          <Link href="/chat" className={buttonVariants({ size: "lg" })}>
+            <MessageSquare className="size-4" aria-hidden />
+            Ask PA Copilot
+          </Link>
+        }
+      />
+
+      {/* Four measurements, each read straight from the monitoring API.
+          Nothing here is derived from a target the product does not
+          have: there is no quota endpoint, so there is no "% of plan". */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="AI runs"
+          icon={<Activity className="size-4" />}
+          value={number.format(usageQuery.data?.total_requests ?? 0)}
+          hint={
+            usageQuery.data?.total_requests
+              ? `${number.format(usageQuery.data.by_model.length)} model${
+                  usageQuery.data.by_model.length === 1 ? "" : "s"
+                } in use`
+              : "No AI activity in the last 30 days"
+          }
+          isPending={usageQuery.isPending}
+          isError={usageQuery.isError}
+          errorText="Usage unavailable"
+        />
+
+        <KpiCard
+          label="Tool success rate"
+          icon={<ShieldCheck className="size-4" />}
+          value={successRate === null ? "—" : percent.format(successRate)}
+          hint={
+            toolCallTotal > 0
+              ? `${number.format(toolCallTotal)} tool executions`
+              : "No tool executions yet"
+          }
+          isPending={toolsQuery.isPending}
+          isError={toolsQuery.isError}
+          errorText="Tool metrics unavailable"
+        />
+
+        <KpiCard
+          label="Tool errors"
+          icon={<TriangleAlert className="size-4" />}
+          value={number.format(toolErrorTotal)}
+          hint={
+            toolErrorTotal > 0
+              ? "Investigate in Monitoring"
+              : "No failed tool calls"
+          }
+          isPending={toolsQuery.isPending}
+          isError={toolsQuery.isError}
+          errorText="Tool metrics unavailable"
+        />
+
+        <KpiCard
+          label="Tokens"
+          icon={<Coins className="size-4" />}
+          value={number.format(usageQuery.data?.total_tokens ?? 0)}
+          hint={
+            usageQuery.data
+              ? `${money.format(usageQuery.data.total_cost_usd)} estimated · ${percent.format(
+                  usageQuery.data.cache_hit_rate,
+                )} cached`
+              : undefined
+          }
+          isPending={usageQuery.isPending}
+          isError={usageQuery.isError}
+          errorText="Usage unavailable"
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>TM1 Connections</CardDescription>
-            <CardTitle className="text-3xl">
-              {connectionsQuery.isPending ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                connectionsQuery.data?.length ?? 0
-              )}
-            </CardTitle>
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-card-title">Recent AI activity</CardTitle>
+            <CardDescription>
+              Your latest assistant sessions, newest first.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {connectionsQuery.isError
-              ? "Failed to load connections."
-              : connectionsQuery.isPending
-                ? "Loading..."
-                : connectionsQuery.data?.length
-                  ? `${connectionsQuery.data.filter((c) => c.is_active).length} active`
-                  : "No TM1 connections yet."}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>AI Usage (30 days)</CardDescription>
-            <CardTitle className="text-3xl">
-              {usageQuery.isPending ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                number.format(usageQuery.data?.total_requests ?? 0)
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {usageQuery.isError
-              ? "Failed to load usage."
-              : usageQuery.isPending
-                ? "Loading..."
-                : usageQuery.data && usageQuery.data.total_requests > 0
-                  ? `${number.format(usageQuery.data.total_tokens)} tokens`
-                  : "No AI activity in the last 30 days."}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Tool Executions (30 days)</CardDescription>
-            <CardTitle className="text-3xl">
-              {toolsQuery.isPending ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                number.format(toolCallTotal)
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {toolsQuery.isError
-              ? "Failed to load tool executions."
-              : toolsQuery.isPending
-                ? "Loading..."
-                : toolCallTotal > 0
-                  ? `${toolErrorTotal} error${toolErrorTotal === 1 ? "" : "s"}`
-                  : "No tool executions in the last 30 days."}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Circuit Breakers</CardDescription>
-            <CardTitle className="text-3xl">
-              {tm1StatusQuery.isPending ? (
-                <Skeleton className="h-8 w-12" />
-              ) : (
-                tm1StatusQuery.data?.length ?? 0
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {tm1StatusQuery.isError
-              ? "Failed to load circuit breaker status."
-              : tm1StatusQuery.isPending
-                ? "Loading..."
-                : tm1StatusQuery.data?.length
-                  ? `${tm1StatusQuery.data.filter((s) => s.state === "closed").length} healthy`
-                  : "No TM1 connections to monitor yet."}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>TM1 Connection Status</CardTitle>
-          <CardDescription>
-            Circuit breaker state per connection, read live from the backend.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {tm1StatusQuery.isError ? (
-            <p className="text-sm text-destructive">
-              Failed to load circuit breaker status.
-            </p>
-          ) : tm1StatusQuery.isPending ? (
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-full" />
-              <Skeleton className="h-6 w-full" />
-            </div>
-          ) : tm1StatusQuery.data?.length ? (
-            <ul className="divide-y">
-              {tm1StatusQuery.data.map((status) => (
-                <li
-                  key={status.connection_id}
-                  className="flex items-center justify-between py-2 text-sm"
-                >
-                  <span>{status.name}</span>
-                  <div className="flex items-center gap-3">
-                    {status.failure_count > 0 ? (
-                      <span className="text-muted-foreground">
-                        {status.failure_count} failure
-                        {status.failure_count === 1 ? "" : "s"}
+          <CardContent className="px-0">
+            {conversationsQuery.isError ? (
+              <p className="px-6 text-sm text-destructive">
+                Failed to load recent activity.
+              </p>
+            ) : conversationsQuery.isPending ? (
+              <div className="space-y-2 px-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : conversationsQuery.data?.length ? (
+              <ul className="divide-y divide-border">
+                {conversationsQuery.data.slice(0, 6).map((conversation) => (
+                  <li key={conversation.id}>
+                    <Link
+                      href={`/chat?conversation=${conversation.id}`}
+                      className="flex items-center justify-between gap-4 px-6 py-3 transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="min-w-0 truncate text-sm text-foreground">
+                        {conversation.title ?? "Untitled session"}
                       </span>
-                    ) : null}
-                    <Badge variant={STATE_VARIANT[status.state]}>
-                      {status.state.replace("_", " ")}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No TM1 connections yet — connections will appear here once
-              they&apos;re created.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                      <span className="shrink-0 text-xs text-tertiary-foreground">
+                        {relativeTime(conversation.updated_at)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                icon={<MessageSquare className="size-4" />}
+                title="No AI sessions yet"
+                description="Ask the assistant about a cube, a rule or a TurboIntegrator process to get started."
+                action={
+                  <Link
+                    href="/chat"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Open AI Assistant
+                  </Link>
+                }
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-card-title">TM1 connections</CardTitle>
+            <CardDescription>
+              {connectionsQuery.data?.length
+                ? `${connectionsQuery.data.filter((c) => c.is_active).length} of ${
+                    connectionsQuery.data.length
+                  } active · circuit breaker state`
+                : "Circuit breaker state per connection."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-0">
+            {tm1StatusQuery.isError ? (
+              <p className="px-6 text-sm text-destructive">
+                Failed to load circuit breaker status.
+              </p>
+            ) : tm1StatusQuery.isPending ? (
+              <div className="space-y-2 px-6">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : tm1StatusQuery.data?.length ? (
+              <ul className="divide-y divide-border">
+                {tm1StatusQuery.data.map((status) => (
+                  <li
+                    key={status.connection_id}
+                    className="flex items-center justify-between gap-3 px-6 py-3"
+                  >
+                    <span className="min-w-0 truncate text-sm">{status.name}</span>
+                    <div className="flex shrink-0 items-center gap-3">
+                      {status.failure_count > 0 ? (
+                        <span className="text-xs text-tertiary-foreground">
+                          {status.failure_count} failure
+                          {status.failure_count === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                      <Badge variant={STATE_VARIANT[status.state]}>
+                        {STATE_LABEL[status.state]}
+                      </Badge>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                icon={<Database className="size-4" />}
+                title="No TM1 connections"
+                description="Connect a Planning Analytics server to explore cubes, rules and processes."
+                action={
+                  <Link
+                    href="/connections"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Add a connection
+                  </Link>
+                }
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {unhealthy.length > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {unhealthy.length} connection{unhealthy.length === 1 ? "" : "s"} not
+          answering normally.{" "}
+          <Link href="/monitoring" className="text-primary hover:underline">
+            Open Monitoring
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,8 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { CodeBlock } from "@/components/ui/code-block";
+
 /**
  * The one renderer for model-written Markdown.
  *
@@ -38,13 +40,20 @@ const components: Components = {
   h3: ({ children }) => (
     <h4 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h4>
   ),
+  // A fenced block is generated TI, MDX or rule code. It gets the code
+  // surface with a language header and a copy button, because the thing
+  // people do with it is take it to Architect — not read it as prose.
   code: ({ children, className }) =>
     className ? (
-      <pre className="mb-2 overflow-x-auto rounded bg-black/10 p-2 text-xs last:mb-0">
-        <code>{children}</code>
-      </pre>
+      <CodeBlock
+        className="mb-2 last:mb-0"
+        language={className.replace(/^language-/, "") || undefined}
+        code={String(children).replace(/\n$/, "")}
+      />
     ) : (
-      <code className="rounded bg-black/10 px-1 py-0.5 text-xs">{children}</code>
+      <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem]">
+        {children}
+      </code>
     ),
   a: ({ href, children }) => (
     <a

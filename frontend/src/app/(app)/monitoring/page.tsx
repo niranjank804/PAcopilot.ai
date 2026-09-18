@@ -24,9 +24,9 @@ import type { TM1ConnectionStatus, ToolUsage, UsageSummary } from "@/lib/types";
 
 const number = new Intl.NumberFormat("en-US");
 
-const STATE_VARIANT: Record<TM1ConnectionStatus["state"], "default" | "secondary" | "destructive"> = {
-  closed: "default",
-  half_open: "secondary",
+const STATE_VARIANT: Record<TM1ConnectionStatus["state"], "success" | "warning" | "destructive"> = {
+  closed: "success",
+  half_open: "warning",
   open: "destructive",
 };
 
@@ -53,7 +53,7 @@ export default function MonitoringPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Monitoring</h1>
+        <h1 className="page-title">Monitoring</h1>
         <p className="text-sm text-muted-foreground">
           AI usage, tool execution health, and TM1 circuit breaker state over
           the last 30 days.

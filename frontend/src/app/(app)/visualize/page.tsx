@@ -107,7 +107,7 @@ export default function VisualizePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Visualize</h1>
+        <h1 className="page-title">Visualize</h1>
         <p className="text-sm text-muted-foreground">
           Ask a data question in plain language — the Analyst agent finds the
           right cube, confirms real element names, and runs the MDX for you.

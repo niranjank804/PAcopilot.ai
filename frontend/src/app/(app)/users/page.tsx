@@ -46,10 +46,10 @@ import type { AppUser, RegistrationStatus, RoleInfo } from "@/lib/types";
 
 const STATUS_VARIANT: Record<
   RegistrationStatus,
-  "default" | "secondary" | "destructive"
+  "success" | "warning" | "destructive"
 > = {
-  approved: "default",
-  pending: "secondary",
+  approved: "success",
+  pending: "warning",
   rejected: "destructive",
 };
 
@@ -284,7 +284,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+        <h1 className="page-title">Users</h1>
         <p className="text-sm text-muted-foreground">
           Approve or reject access requests, and see everyone in your
           organization.

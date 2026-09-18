@@ -4,11 +4,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Design tokens.
+ *
+ * Every colour, radius, type step and shadow in the product resolves
+ * here. Components reference the semantic name (bg-card, text-muted-
+ * foreground, text-kpi) rather than a literal, so the whole application
+ * can be restyled from this file — which is how the Apple-inspired
+ * palette below replaced the previous one without touching each page.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-app-sans);
+  --font-mono: var(--font-app-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -39,6 +48,26 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Status colours the product needs beyond primary/destructive: a
+     succeeded run, a degraded connection. Semantic, so dark mode shifts
+     them once rather than per component. */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  /* Code keeps its dark surface in both themes: TI and MDX read as
+     machine output, not prose, and switching it to a light panel in
+     light mode made generated code look like a quote block. */
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-border: var(--code-border);
+
+  /* A third text level, below muted-foreground: timestamps, units,
+     table meta. */
+  --color-tertiary-foreground: var(--tertiary-foreground);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -46,81 +75,147 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Type scale. Sizes and their line heights travel together so a
+     heading cannot be set 36px with body leading by accident. */
+  --text-hero: 3.25rem;
+  --text-hero--line-height: 1.05;
+  --text-hero--letter-spacing: -0.022em;
+  --text-hero--font-weight: 600;
+  --text-page: 2.25rem;
+  --text-page--line-height: 1.1;
+  --text-page--letter-spacing: -0.02em;
+  --text-page--font-weight: 600;
+  --text-section: 1.5rem;
+  --text-section--line-height: 1.2;
+  --text-section--letter-spacing: -0.015em;
+  --text-section--font-weight: 600;
+  /* Named card-title, not card: Tailwind derives a text-card COLOUR
+     utility from --color-card, and a size token of the same name would
+     lose to it — white-on-white titles, found in a screenshot. */
+  --text-card-title: 1.125rem;
+  --text-card-title--line-height: 1.3;
+  --text-card-title--letter-spacing: -0.01em;
+  --text-card-title--font-weight: 600;
+  --text-kpi: 2.25rem;
+  --text-kpi--line-height: 1.1;
+  --text-kpi--letter-spacing: -0.02em;
+  --text-kpi--font-weight: 600;
+
+  /* Borders do the separating; shadows only lift a surface off the
+     page. Anything heavier reads as a consumer app. */
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-raised: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
 
 :root {
+  /* San Francisco where the OS has it (every Mac and iPad a finance or
+     TM1 team uses), Inter everywhere else — self-hosted by next/font, so
+     Windows and Linux get the same metrics rather than Arial. */
+  --font-app-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-app-mono:
+    "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+
   /* Paints the browser canvas (and scrollbars, form controls) to match the
      theme before any stylesheet or React has rendered. Without it the first
      paint uses the UA default, which is what produced a flash of the wrong
      background between navigation and hydration. */
   color-scheme: light;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #1877f2;
+
+  /* The page is the light grey; surfaces are white and lift off it.
+     Keeping the canvas neutral is what lets one accent colour carry
+     meaning instead of competing with a coloured background. */
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --primary: #0071e3;
   --primary-foreground: #ffffff;
-  --secondary: #e7f0fd;
-  --secondary-foreground: #1877f2;
-  --muted: #f0f2f5;
-  --muted-foreground: #65676b;
-  --accent: #e7f0fd;
-  --accent-foreground: #1877f2;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #dadde1;
-  --input: #dadde1;
-  --ring: #1877f2;
-  --chart-1: #1877f2;
-  --chart-2: #42b72a;
-  --chart-3: #f7b928;
-  --chart-4: #e41e3f;
-  --chart-5: #7b68ee;
-  --radius: 0.625rem;
+  /* Secondary and accent stay neutral on purpose: the accent marks the
+     one action that matters on a screen, and a blue-tinted hover on
+     every row spends it on nothing. */
+  --secondary: #f2f2f7;
+  --secondary-foreground: #1d1d1f;
+  --muted: #f2f2f7;
+  --muted-foreground: #6e6e73;
+  --tertiary-foreground: #86868b;
+  --accent: #f2f2f7;
+  --accent-foreground: #1d1d1f;
+  --destructive: #ff3b30;
+  --success: #34c759;
+  --success-foreground: #0b3d1b;
+  --warning: #ff9f0a;
+  --warning-foreground: #4a2c00;
+  --code: #1c1c1e;
+  --code-foreground: #f5f5f7;
+  --code-border: rgba(255, 255, 255, 0.1);
+  --border: rgba(0, 0, 0, 0.08);
+  --input: rgba(0, 0, 0, 0.12);
+  --ring: #0071e3;
+  --chart-1: #0071e3;
+  --chart-2: #34c759;
+  --chart-3: #ff9f0a;
+  --chart-4: #ff3b30;
+  --chart-5: #6e6e73;
+  --radius: 0.75rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #1877f2;
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-primary: #0071e3;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e7f0fd;
-  --sidebar-accent-foreground: #1877f2;
-  --sidebar-border: #dadde1;
-  --sidebar-ring: #1877f2;
+  --sidebar-accent: #f2f2f7;
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-ring: #0071e3;
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #4e9bff;
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: #1c2b3f;
-  --secondary-foreground: #4e9bff;
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: #1c2b3f;
-  --accent-foreground: #4e9bff;
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: #4e9bff;
-  --chart-1: #4e9bff;
-  --chart-2: #5fd63f;
-  --chart-3: #f7c948;
-  --chart-4: #f0466a;
-  --chart-5: #9787ff;
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #4e9bff;
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: #1c2b3f;
-  --sidebar-accent-foreground: #4e9bff;
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #4e9bff;
+  --background: #0b0b0c;
+  --foreground: #f5f5f7;
+  --card: #1c1c1e;
+  --card-foreground: #f5f5f7;
+  --popover: #1c1c1e;
+  --popover-foreground: #f5f5f7;
+  /* Apple's dark-mode blue: #0071E3 on a near-black surface sits below
+     the contrast floor for small text. */
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: #2c2c2e;
+  --secondary-foreground: #f5f5f7;
+  --muted: #2c2c2e;
+  --muted-foreground: #a1a1a6;
+  --tertiary-foreground: #86868b;
+  --accent: #2c2c2e;
+  --accent-foreground: #f5f5f7;
+  --destructive: #ff453a;
+  --success: #30d158;
+  --success-foreground: #eafaee;
+  --warning: #ffa93a;
+  --warning-foreground: #fff3e0;
+  --code: #1c1c1e;
+  --code-foreground: #f5f5f7;
+  --code-border: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.16);
+  --ring: #0a84ff;
+  --chart-1: #0a84ff;
+  --chart-2: #30d158;
+  --chart-3: #ffa93a;
+  --chart-4: #ff453a;
+  --chart-5: #a1a1a6;
+  --sidebar: #131315;
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #0a84ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2c2c2e;
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #0a84ff;
 }
 
 @layer base {
@@ -129,8 +224,32 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
+  }
+  /* Optical sizing for the display steps: the type scale above is set
+     tight, which only reads well when the browser is not also faking
+     letter spacing. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  /* One definition of "this is a page title" / "this is a section", so
+     headings cannot drift a step apart from screen to screen. */
+  .page-title {
+    @apply text-page font-semibold text-foreground;
+  }
+  .section-title {
+    @apply text-section font-semibold text-foreground;
+  }
+  .page-subtitle {
+    @apply text-[0.9375rem] leading-6 text-muted-foreground;
   }
 }

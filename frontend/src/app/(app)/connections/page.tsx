@@ -247,7 +247,7 @@ export default function ConnectionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="page-title">
             TM1 Connections
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -283,7 +283,7 @@ export default function ConnectionsPage() {
                   >
                     <CardTitle className="text-lg">{connection.name}</CardTitle>
                   </Link>
-                  <Badge variant={connection.is_active ? "default" : "secondary"}>
+                  <Badge variant={connection.is_active ? "success" : "secondary"}>
                     {connection.is_active ? "active" : "inactive"}
                   </Badge>
                 </div>

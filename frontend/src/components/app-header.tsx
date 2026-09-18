@@ -1,9 +1,17 @@
 "use client";
 
-import { HelpCircle, LogOut, PlayCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { HelpCircle, LogOut, Menu, PlayCircle } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
+import { NAV_DESTINATIONS, SidebarBrand, SidebarNav } from "@/components/app-sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,10 +30,51 @@ function initialsFor(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
+/** The longest nav route that the current path sits under. */
+function currentSection(pathname: string): string | null {
+  const match = NAV_DESTINATIONS.filter(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  ).sort((a, b) => b.href.length - a.href.length)[0];
+
+  return match?.label ?? null;
+}
+
+/**
+ * The sidebar, for screens too narrow to hold one.
+ *
+ * Self-contained rather than lifted into the layout: the shell is
+ * rendered by a server-protected layout whose only job is auth, and
+ * keeping the open/closed state here means the navigation can be
+ * restyled without touching route protection.
+ */
+function MobileNav() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        aria-label="Open navigation"
+        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+      >
+        <Menu className="size-4" aria-hidden />
+      </DialogTrigger>
+      <DialogContent className="left-0 top-0 h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 rounded-none border-r border-border p-0 sm:rounded-none">
+        <DialogTitle className="sr-only">Navigation</DialogTitle>
+        <div className="flex h-full flex-col">
+          <SidebarBrand />
+          <SidebarNav onNavigate={() => setOpen(false)} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AppHeader() {
   const { user, logout } = useAuth();
   const restartTour = useRestartTour();
   const router = useRouter();
+  const pathname = usePathname();
+  const section = currentSection(pathname ?? "");
 
   const handleLogout = () => {
     logout();
@@ -33,11 +82,22 @@ export function AppHeader() {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b px-6">
-      <div className="text-sm text-muted-foreground">
-        {user ? `${user.first_name} ${user.last_name}` : ""}
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-sm md:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <MobileNav />
+        {/* Says where you are, which the sidebar cannot do once it is a
+            drawer. */}
+        {section ? (
+          <span className="truncate text-sm font-medium text-foreground">
+            {section}
+          </span>
+        ) : null}
       </div>
-      <div className="flex items-center gap-2">
+
+      <div className="flex items-center gap-1">
+        <span className="mr-2 hidden text-sm text-muted-foreground lg:inline">
+          {user ? `${user.first_name} ${user.last_name}` : ""}
+        </span>
         {/* Page-specific help, where a tour exists for the current
             route. Renders nothing elsewhere, so it needs no per-page
             wiring. */}
@@ -48,9 +108,9 @@ export function AppHeader() {
           <DropdownMenuTrigger
             data-tour="help-menu"
             aria-label="Help"
-            className="rounded-md p-2 outline-none ring-offset-background hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="rounded-lg p-2 text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <HelpCircle className="h-4 w-4" />
+            <HelpCircle className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuGroup>
@@ -72,9 +132,9 @@ export function AppHeader() {
         </DropdownMenu>
         <ThemeToggle />
         <DropdownMenu>
-          <DropdownMenuTrigger className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-            <Avatar>
-              <AvatarFallback>
+          <DropdownMenuTrigger className="ml-1 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+            <Avatar className="size-8">
+              <AvatarFallback className="text-xs">
                 {user ? initialsFor(user.first_name, user.last_name) : "?"}
               </AvatarFallback>
             </Avatar>
