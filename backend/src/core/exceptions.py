@@ -55,3 +55,7 @@ class RateLimitedException(AppException):
     def __init__(self, message: str, retry_after: float | None = None):
         super().__init__(message)
         self.retry_after = retry_after
+
+class ServiceUnavailableException(AppException):
+    status_code = 503
+    code = "SERVICE_UNAVAILABLE"

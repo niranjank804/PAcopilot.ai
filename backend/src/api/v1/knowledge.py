@@ -11,6 +11,8 @@ from src.errors.classifier import classify_error
 from src.knowledge.loaders.registry import resolve_content_type
 from src.core.exceptions import NotFoundException
 from src.knowledge.service import knowledge_service
+from src.reports.s3_storage import delete_upload, read_upload
+from src.schemas.uploads import UploadedFile
 from src.repositories.visual_page_repository import visual_page_repository
 from src.core.config import settings
 from src.schemas.ai import UsageResponse
@@ -70,6 +72,40 @@ async def upload_document(
         content_type=content_type,
         file_bytes=file_bytes,
     )
+
+    return ApiResponse(success=True, data=DocumentResponse.model_validate(document))
+
+
+@router.post(
+    "/documents/from-upload",
+    response_model=ApiResponse[DocumentResponse],
+    status_code=201,
+)
+async def upload_document_from_upload(
+    payload: UploadedFile,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("knowledge.write")),
+):
+    """The same as POST /documents, for a file the browser put in S3
+    first (see /uploads). The API reads it server-side, where no body
+    limit applies."""
+
+    file_bytes = await read_upload(current_user.organization_id, payload.key)
+
+    try:
+        if len(file_bytes) > MAX_UPLOAD_BYTES:
+            raise ValidationException("File exceeds the 50MB upload limit.")
+
+        document = await knowledge_service.upload_document(
+            db,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            filename=payload.filename,
+            content_type=resolve_content_type(payload.filename, None),
+            file_bytes=file_bytes,
+        )
+    finally:
+        await delete_upload(payload.key)
 
     return ApiResponse(success=True, data=DocumentResponse.model_validate(document))
 

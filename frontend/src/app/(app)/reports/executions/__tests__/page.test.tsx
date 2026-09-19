@@ -13,14 +13,33 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  apiRequest: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  class FakeApiError extends Error {
+    constructor(
+      public status: number,
+      public code: string,
+      message: string,
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    FakeApiError,
+    apiRequest: vi.fn(),
+    downloadRequest: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/api-client", () => ({
-  ApiError: class extends Error {},
+  ApiError: mocks.FakeApiError,
   apiRequest: mocks.apiRequest,
+  downloadRequest: mocks.downloadRequest,
   registerTokenAccessors: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
 import ExecutionsPage from "../page";
@@ -154,66 +173,80 @@ describe("Execution listing", () => {
 });
 
 describe("Artifact download", () => {
-  it("fetches with an Authorization header rather than a bare link", async () => {
-    // The security property: an artifact id is an identifier, not a
-    // capability. A plain <a href> would drop the credential and either
-    // fail or, worse, imply the URL alone is sufficient.
-    const detail = {
-      ...SUCCEEDED,
-      trace_log: null,
-      artifacts: [
-        {
-          id: "aaaa1111-aaaa-1111-aaaa-111111111111",
-          report_execution_id: SUCCEEDED.id,
-          output_format: "xlsx",
-          filename: "monthly-pl-11111111.xlsx",
-          mime_type: "application/vnd.ms-excel",
-          size_bytes: 20480,
-          checksum: "abcdef1234567890",
-          created_at: "2026-08-13T10:00:42Z",
-        },
-      ],
-    };
+  const detail = {
+    ...SUCCEEDED,
+    trace_log: null,
+    artifacts: [
+      {
+        id: "aaaa1111-aaaa-1111-aaaa-111111111111",
+        report_execution_id: SUCCEEDED.id,
+        output_format: "xlsx",
+        filename: "monthly-pl-11111111.xlsx",
+        mime_type: "application/vnd.ms-excel",
+        size_bytes: 20480,
+        checksum: "abcdef1234567890",
+        created_at: "2026-08-13T10:00:42Z",
+      },
+    ],
+  };
 
-    mocks.apiRequest.mockImplementation((path: string) =>
-      Promise.resolve(path.includes(SUCCEEDED.id) ? detail : [SUCCEEDED]),
-    );
-
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(["data"])),
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("localStorage", {
-      getItem: () => "test-access-token",
-      setItem: () => {},
-      removeItem: () => {},
-    });
-    // Only the two static helpers are stubbed. Replacing the whole URL
-    // global breaks it as a constructor, which happy-dom needs when the
-    // generated <a> is clicked — the test would still pass while the
-    // download path silently threw.
-    vi.stubGlobal(
-      "URL",
-      Object.assign(globalThis.URL, {
-        createObjectURL: () => "blob:fake",
-        revokeObjectURL: () => {},
-      }),
-    );
-
+  async function openAndDownload() {
     const user = userEvent.setup();
-
     renderPage();
 
     await user.click(await screen.findByText("11111111"));
     await user.click(await screen.findByRole("button", { name: /download/i }));
+  }
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  it("asks for a signed link through the authenticated API, then follows it", async () => {
+    // An artifact id is an identifier, not a capability: the link is
+    // issued by an authenticated request and expires in minutes. A bare
+    // <a href> to the API would carry no credential at all.
+    mocks.apiRequest.mockImplementation((path: string) => {
+      if (path.endsWith("/download-url")) {
+        return Promise.resolve({ url: "https://s3.test/signed", filename: "x.xlsx" });
+      }
+      return Promise.resolve(path.includes(SUCCEEDED.id) ? detail : [SUCCEEDED]);
+    });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
 
-    const [url, options] = fetchMock.mock.calls[0];
+    await openAndDownload();
 
-    expect(url).toContain("/reports/artifacts/");
-    expect(options.headers.Authorization).toBe("Bearer test-access-token");
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://s3.test/signed"));
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      "/reports/artifacts/aaaa1111-aaaa-1111-aaaa-111111111111/download-url",
+    );
+    expect(mocks.downloadRequest).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("streams through the authenticated API when no link is available", async () => {
+    mocks.apiRequest.mockImplementation((path: string) => {
+      if (path.endsWith("/download-url")) {
+        return Promise.reject(new mocks.FakeApiError(404, "NOT_FOUND", "No link."));
+      }
+      return Promise.resolve(path.includes(SUCCEEDED.id) ? detail : [SUCCEEDED]);
+    });
+    mocks.downloadRequest.mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(["data"])),
+    });
+    // Only the two static helpers are stubbed. Replacing the whole URL
+    // global breaks it as a constructor, which happy-dom needs when the
+    // generated <a> is clicked.
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    await openAndDownload();
+
+    await waitFor(() =>
+      expect(mocks.downloadRequest).toHaveBeenCalledWith(
+        "/reports/artifacts/aaaa1111-aaaa-1111-aaaa-111111111111/download",
+      ),
+    );
+
+    vi.restoreAllMocks();
   });
 });

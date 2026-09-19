@@ -190,3 +190,27 @@ describe("token refresh", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("downloadRequest", () => {
+  it("sends the session token, so a download is never an anonymous link", async () => {
+    // The executions page used to read localStorage under a key that did
+    // not exist and sent no token at all; this is where the credential
+    // now comes from.
+    const { downloadRequest } = await import("@/lib/api-client");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    registerTokenAccessors({
+      getAccessToken: () => "session-token",
+      getRefreshToken: () => null,
+      setTokens: () => {},
+    });
+
+    await downloadRequest("/reports/artifacts/a1/download");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/reports\/artifacts\/a1\/download$/);
+    expect(init.headers.Authorization).toBe("Bearer session-token");
+
+    vi.unstubAllGlobals();
+  });
+});

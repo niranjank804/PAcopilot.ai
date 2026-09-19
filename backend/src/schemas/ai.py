@@ -1,13 +1,24 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AttachmentInput(BaseModel):
     filename: str
     content_type: str
-    data: str  # base64, no data: URL prefix
+    # Either the bytes inline (base64, no data: URL prefix) or the key of
+    # an upload the browser put in S3 first — a chat request body cannot
+    # carry a 15MB PDF through a 4.5MB function limit.
+    data: str | None = None
+    upload_key: str | None = None
+
+    @model_validator(mode="after")
+    def _one_source(self):
+        if bool(self.data) == bool(self.upload_key):
+            raise ValueError("An attachment needs exactly one of data or upload_key.")
+
+        return self
 
 
 class ChatRequest(BaseModel):

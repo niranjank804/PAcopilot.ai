@@ -36,6 +36,7 @@ chain decides, which keeps the instance-role deployment key-free.
 """
 
 import asyncio
+import re
 import uuid
 from functools import lru_cache
 
@@ -222,3 +223,121 @@ class S3StorageBackend(StorageBackend):
 
 def s3_is_configured() -> bool:
     return bool(settings.S3_BUCKET)
+
+# --- Direct transfers ------------------------------------------------------
+#
+# Vercel caps a function's request and response body at 4.5 MB, and a
+# knowledge document, a workbook, an artifact or a chat attachment can be
+# ten times that. So the browser (or the worker) moves the bytes to and
+# from S3 itself, with URLs this module signs, and the API only ever
+# handles keys. Every key is tenant-prefixed and checked before use, and
+# a temporary upload is deleted once the API has consumed it.
+
+_UPLOAD_SEGMENT = "uploads"
+
+
+def upload_object_key(organization_id: uuid.UUID, filename: str) -> str:
+    """A fresh, tenant-prefixed key for a file the client is about to put."""
+
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", filename).strip("._") or "file"
+
+    return f"org/{organization_id}/{_UPLOAD_SEGMENT}/{uuid.uuid4()}/{safe[:120]}"
+
+
+def is_upload_key_for(organization_id: uuid.UUID, key: str) -> bool:
+    """Only keys this organization was issued, and only in the upload
+    area — never a stored artifact's key, which would let a presigned
+    upload overwrite one."""
+
+    return key.startswith(f"org/{organization_id}/{_UPLOAD_SEGMENT}/") and ".." not in key
+
+
+def presign_upload(key: str, *, content_type: str, expires_in: int) -> dict:
+    """A PUT URL plus the headers the client must send with it. The
+    headers are part of the signature, so encryption at rest is enforced
+    by the URL itself rather than trusted to the client."""
+
+    url = _client().generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": settings.S3_BUCKET,
+            "Key": key,
+            "ContentType": content_type,
+            "ServerSideEncryption": "AES256",
+        },
+        ExpiresIn=expires_in,
+    )
+
+    return {
+        "url": url,
+        "headers": {
+            "Content-Type": content_type,
+            "x-amz-server-side-encryption": "AES256",
+        },
+    }
+
+
+def presign_download(
+    reference: str,
+    *,
+    filename: str,
+    content_type: str,
+    expires_in: int,
+) -> str | None:
+    """A GET URL for a stored object, or None when the reference is not
+    in S3 (the database backend), so the caller can fall back to
+    streaming it."""
+
+    parsed = _parse(reference)
+
+    if parsed is None:
+        return None
+
+    bucket, key = parsed
+
+    return _client().generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+            "ResponseContentDisposition": f'attachment; filename="{filename}"',
+            "ResponseContentType": content_type,
+        },
+        ExpiresIn=expires_in,
+    )
+
+
+async def read_upload(organization_id: uuid.UUID, key: str) -> bytes:
+    """The bytes a client put under a key it was issued."""
+
+    if not is_upload_key_for(organization_id, key):
+        raise NotFoundException("Upload not found.")
+
+    def _read() -> bytes:
+        from botocore.exceptions import ClientError
+
+        try:
+            response = _client().get_object(Bucket=settings.S3_BUCKET, Key=key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+                raise NotFoundException("Upload not found.") from exc
+
+            raise
+
+        return response["Body"].read()
+
+    return await asyncio.to_thread(_read)
+
+
+async def delete_upload(key: str) -> None:
+    """Remove a consumed upload. Best effort: an object left behind costs
+    cents, while failing the request it belonged to would cost the user
+    the upload."""
+
+    def _delete() -> None:
+        try:
+            _client().delete_object(Bucket=settings.S3_BUCKET, Key=key)
+        except Exception:
+            pass
+
+    await asyncio.to_thread(_delete)

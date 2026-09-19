@@ -43,6 +43,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiRequest, uploadRequest } from "@/lib/api-client";
+import { directUpload } from "@/lib/uploads";
 import type {
   AgentInfo,
   AskResponseBody,
@@ -107,7 +108,16 @@ export default function KnowledgePage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
+      const ref = await directUpload(file);
+
+      if (ref) {
+        return apiRequest<KnowledgeDocument>("/knowledge/documents/from-upload", {
+          method: "POST",
+          body: ref,
+        });
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       return uploadRequest<KnowledgeDocument>("/knowledge/documents", formData);

@@ -160,15 +160,71 @@ class ControlPlaneClient:
     def download_workbook(self, execution_id: str) -> tuple[bytes, str | None]:
         """Fetch the workbook for a job, with the server's checksum.
 
-        Returns the raw bytes and the `X-Workbook-Checksum` header. The
+        Returns the raw bytes and the checksum the server recorded. The
         caller verifies; this client deliberately does not, so that the
         verification failure is attributed to the execution step that
         cares about it.
+
+        Preferred path: a signed link to the file in storage, fetched
+        directly — the control plane may run where a response cannot
+        exceed 4.5 MB. Older servers answer 404 to the link request and
+        the workbook is streamed through the API as before.
         """
+
+        link = self._raw_request("GET", f"/worker/jobs/{execution_id}/workbook-url")
+
+        if link.status_code == 200:
+            data = link.json().get("data") or {}
+
+            return self._fetch_signed(data["url"]), data.get("checksum")
+
+        if link.status_code != 404:
+            self._raise_for_status(link)
 
         response = self._raw_request("GET", f"/worker/jobs/{execution_id}/workbook")
 
         return response.content, response.headers.get("X-Workbook-Checksum")
+
+    def _fetch_signed(self, url: str) -> bytes:
+        """GET a signed storage URL. No bearer token: the URL is the
+        authorization, and the token belongs to the control plane only."""
+
+        try:
+            response = self._session.get(
+                url,
+                timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
+                verify=self.config.verify_tls,
+            )
+        except requests.RequestException as exc:
+            raise ControlPlaneError(
+                f"Could not reach storage ({type(exc).__name__})."
+            ) from exc
+
+        if response.status_code != 200:
+            raise ControlPlaneError(
+                f"Storage refused the download (HTTP {response.status_code})."
+            )
+
+        return response.content
+
+    def _put_signed(self, url: str, headers: dict[str, str], content: bytes) -> None:
+        try:
+            response = self._session.put(
+                url,
+                data=content,
+                headers=headers,
+                timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
+                verify=self.config.verify_tls,
+            )
+        except requests.RequestException as exc:
+            raise ControlPlaneError(
+                f"Could not reach storage ({type(exc).__name__})."
+            ) from exc
+
+        if response.status_code not in (200, 201, 204):
+            raise ControlPlaneError(
+                f"Storage refused the upload (HTTP {response.status_code})."
+            )
 
     def start_job(self, execution_id: str) -> dict[str, Any]:
         return self._request("POST", f"/worker/jobs/{execution_id}/start", json={})
@@ -198,7 +254,41 @@ class ControlPlaneClient:
         checksum: str,
         mime_type: str,
     ) -> dict[str, Any]:
-        """Upload one artifact. Idempotent server-side per (job, format)."""
+        """Upload one artifact. Idempotent server-side per (job, format).
+
+        Preferred path: put the file in storage under a signed URL and
+        record it by key, so the artifact never crosses the control
+        plane's body limit. Older servers answer 404 to the link request
+        and receive the multipart upload as before.
+        """
+
+        link = self._raw_request(
+            "POST",
+            f"/worker/jobs/{execution_id}/artifacts/upload-url",
+            json={
+                "filename": filename,
+                "content_type": mime_type,
+                "size_bytes": len(content),
+            },
+        )
+
+        if link.status_code == 201:
+            target = link.json().get("data") or {}
+            self._put_signed(target["url"], target.get("headers") or {}, content)
+
+            return self._request(
+                "POST",
+                f"/worker/jobs/{execution_id}/artifacts/from-upload",
+                json={
+                    "key": target["key"],
+                    "filename": filename,
+                    "output_format": output_format,
+                    "checksum": checksum,
+                },
+            )
+
+        if link.status_code not in (404, 503):
+            self._raise_for_status(link)
 
         return self._request(
             "POST",

@@ -41,7 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ApiError, apiRequest } from "@/lib/api-client";
+import { ApiError, apiRequest, uploadRequest } from "@/lib/api-client";
+import { directUpload } from "@/lib/uploads";
 import type {
   ReportDefinition,
   ReportWorkbook,
@@ -70,31 +71,23 @@ export default function ReportsPage() {
     queryFn: () => apiRequest<ReportWorkbook[]>("/reports/workbooks"),
   });
 
-  /** Multipart, so it bypasses apiRequest's JSON body handling. */
   const uploadWorkbook = useMutation({
     mutationFn: async (file: File) => {
-      const form = new FormData();
-      form.append("file", file);
+      // Straight to S3 where the server supports it; multipart through the
+      // API otherwise. Both paths carry the session token — the previous
+      // version read a localStorage key that does not exist and sent none.
+      const ref = await directUpload(file);
 
-      const token = localStorage.getItem("accessToken");
-
-      const response = await fetch(`${API_URL}/reports/workbooks`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      });
-
-      const body = await response.json();
-
-      if (!response.ok || !body.success) {
-        throw new ApiError(
-          response.status,
-          body.error?.code ?? "ERROR",
-          body.error?.message ?? "Upload failed",
-        );
+      if (ref) {
+        return apiRequest<ReportWorkbook>("/reports/workbooks/from-upload", {
+          method: "POST",
+          body: ref,
+        });
       }
 
-      return body.data as ReportWorkbook;
+      const form = new FormData();
+      form.append("file", file);
+      return uploadRequest<ReportWorkbook>("/reports/workbooks", form);
     },
     onSuccess: (workbook) => {
       toast.success(`Uploaded ${workbook.filename}`);

@@ -19,7 +19,7 @@ from src.database.session import AsyncSessionLocal
 from src.reports.execution_service import execution_service
 
 
-async def reap_stale_executions() -> None:
+async def reap_stale_executions() -> int:
     """Reclaim executions whose worker stopped heartbeating.
 
     Runs across every organization: `organization_id=None` is the
@@ -44,6 +44,8 @@ async def reap_stale_executions() -> None:
                 app_logger.info(
                     f"report reaper reclaimed {reaped} stale execution(s)"
                 )
+
+            return reaped
         except Exception:
             await session.rollback()
 

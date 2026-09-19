@@ -90,7 +90,16 @@ beforeEach(() => {
   mocks.toastSuccess.mockReset();
   mocks.toastError.mockReset();
   mocks.toastWarning.mockReset();
-  mocks.apiRequest.mockResolvedValue({ conventions: [] });
+  // A server with no S3: /uploads answers 503 and the pages fall back to
+  // multipart, which is what every test below exercises. The direct
+  // path has its own test at the end.
+  mocks.apiRequest.mockImplementation((path: string) =>
+    path === "/uploads"
+      ? Promise.reject(
+          new mocks.FakeApiError(503, "DIRECT_UPLOAD_UNAVAILABLE", "No S3."),
+        )
+      : Promise.resolve({ conventions: [] }),
+  );
 });
 
 describe("Set as our standards", () => {
@@ -190,5 +199,55 @@ describe("Preview report", () => {
       "One.pro",
       "Two.pro",
     ]);
+  });
+});
+
+describe("where the server offers direct upload", () => {
+  it("puts the file in storage and records it by key", async () => {
+    // What Vercel needs: the file never crosses the API. The page asks
+    // for a signed URL, PUTs the bytes there, and posts only the key.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    mocks.apiRequest.mockImplementation((path: string) => {
+      if (path === "/uploads") {
+        return Promise.resolve({
+          key: "org/o1/uploads/u1/Load.pro",
+          url: "https://s3.test/put",
+          headers: { "Content-Type": "text/plain" },
+          expires_in: 900,
+        });
+      }
+      if (path === "/learning/corpus/from-upload") return Promise.resolve(RUN);
+      return Promise.resolve({ conventions: [] });
+    });
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    const [learnInput] = fileInputs(container);
+
+    await user.upload(
+      learnInput,
+      new File(["#Section=Prolog\n"], "Load.pro", { type: "text/plain" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiRequest).toHaveBeenCalledWith(
+        "/learning/corpus/from-upload",
+        expect.objectContaining({
+          method: "POST",
+          body: { uploads: [{ key: "org/o1/uploads/u1/Load.pro", filename: "Load.pro" }] },
+        }),
+      ),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://s3.test/put");
+    expect(init.method).toBe("PUT");
+    // The session token must never go to storage.
+    expect(init.headers.Authorization).toBeUndefined();
+    expect(mocks.uploadRequest).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 });

@@ -386,6 +386,12 @@ class Settings(BaseSettings):
     VISUAL_RAG_MINIMUM_SCORE: float = 0.25
 
     S3_BUCKET: str | None = None
+
+    # Direct browser/worker <-> S3 transfers (s3_storage.presign_*). The
+    # API never carries these bytes: Vercel caps a function body at
+    # 4.5 MB and a workbook or knowledge document is far larger.
+    DIRECT_UPLOAD_MAX_BYTES: int = 100 * 1024 * 1024
+    DIRECT_UPLOAD_URL_TTL_SECONDS: int = 900
     S3_REGION: str = "eu-north-1"
 
     # Declared, but still not the preferred way to supply them.
@@ -433,6 +439,15 @@ class Settings(BaseSettings):
     # Comfortably shorter than REPORT_EXECUTION_LEASE_SECONDS so a lapsed
     # lease is noticed promptly rather than a whole lease later.
     REPORT_REAPER_INTERVAL_SECONDS: float = 60.0
+
+    # Off on Vercel, where a function instance is not a long-lived process
+    # and a loop started in lifespan would run whenever the platform felt
+    # like keeping an instance warm. The same tasks are driven there by a
+    # cron calling /internal/cron/* with CRON_SECRET.
+    SCHEDULER_ENABLED: bool = True
+    # Shared secret Vercel sends as "Authorization: Bearer ..." on cron
+    # invocations. Unset means the cron endpoints answer 401 to everyone.
+    CRON_SECRET: str | None = None
 
     # ------------------------------------------------------------------
     # Tenancy

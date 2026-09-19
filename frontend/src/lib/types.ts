@@ -203,7 +203,10 @@ export interface TM1ConnectionStatus {
 export interface ChatAttachmentInput {
   filename: string;
   content_type: string;
-  data: string; // base64, no data: URL prefix
+  /** Inline base64 (no data: URL prefix) for small files; an upload key
+   * for large ones, which went to storage first. Exactly one is set. */
+  data?: string;
+  upload_key?: string;
 }
 
 export interface AgentInfo {

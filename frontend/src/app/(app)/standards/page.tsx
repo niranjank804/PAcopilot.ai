@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest, uploadRequest } from "@/lib/api-client";
+import { directUploadAll } from "@/lib/uploads";
 import type {
   LearnedStandards,
   LearningRun,
@@ -71,8 +72,16 @@ export default function StandardsPage() {
   });
 
   const learn = useMutation({
-    mutationFn: (files: File[]) =>
-      uploadRequest<LearningRun>("/learning/corpus", buildFormData(files)),
+    mutationFn: async (files: File[]) => {
+      const refs = await directUploadAll(files);
+
+      return refs
+        ? apiRequest<LearningRun>("/learning/corpus/from-upload", {
+            method: "POST",
+            body: { uploads: refs },
+          })
+        : uploadRequest<LearningRun>("/learning/corpus", buildFormData(files));
+    },
     onSuccess: (run) => {
       setLastRun(run);
       queryClient.invalidateQueries({ queryKey: ["learning", "standards"] });
@@ -90,8 +99,16 @@ export default function StandardsPage() {
   });
 
   const previewReport = useMutation({
-    mutationFn: (files: File[]) =>
-      uploadRequest<StandardsReport>("/learning/report", buildFormData(files)),
+    mutationFn: async (files: File[]) => {
+      const refs = await directUploadAll(files);
+
+      return refs
+        ? apiRequest<StandardsReport>("/learning/report/from-upload", {
+            method: "POST",
+            body: { uploads: refs },
+          })
+        : uploadRequest<StandardsReport>("/learning/report", buildFormData(files));
+    },
     onSuccess: (report) => setPreview(report.markdown),
     onError: (error) => toast.error(errorMessage(error)),
   });

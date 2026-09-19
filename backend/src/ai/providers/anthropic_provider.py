@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
 
 from src.ai.exceptions import (
     AIProviderAuthenticationError,
@@ -19,8 +18,6 @@ from src.ai.schemas import (
 )
 from src.core.config import settings
 
-if TYPE_CHECKING:
-    import anthropic
 
 
 def _anthropic():

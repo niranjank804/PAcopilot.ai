@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agents.registry import list_agents
 from src.ai.exceptions import AIProviderError
+from src.ai.uploaded_attachments import resolve_uploaded_attachments
 from src.ai.orchestrator import _resolve_max_tool_rounds, ai_orchestrator
 from src.api.dependencies.permissions import require_permission
 from src.api.dependencies.rate_limit import ai_rate_limited
@@ -88,7 +89,9 @@ async def chat(
         model=request.model,
         enable_tools=request.enable_tools,
         agent=request.agent,
-        attachments=request.attachments,
+        attachments=await resolve_uploaded_attachments(
+                request.attachments, current_user.organization_id
+            ),
         ip_address=ip_address,
         user_agent=user_agent,
     )
@@ -255,7 +258,9 @@ async def chat_stream(
                 model=request.model,
                 enable_tools=request.enable_tools,
                 agent=request.agent,
-                attachments=request.attachments,
+                attachments=await resolve_uploaded_attachments(
+                request.attachments, current_user.organization_id
+            ),
                 ip_address=ip_address,
                 user_agent=user_agent,
             ):

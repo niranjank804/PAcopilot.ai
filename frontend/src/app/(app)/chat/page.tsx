@@ -63,6 +63,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { directUpload } from "@/lib/uploads";
 import { useVoice } from "@/lib/voice";
 import type {
   AgentInfo,
@@ -159,6 +160,9 @@ function readStoredModel(): string {
 
 const ACCEPTED_ATTACHMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".docx"];
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+// Above this the file goes to storage first and the message carries its
+// key: the API cannot accept a body over 4.5 MB, and base64 adds a third.
+const INLINE_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 const MAX_ATTACHMENTS = 5;
 
 interface ToolCallEvent {
@@ -441,10 +445,30 @@ export default function ChatPage() {
       }
 
       try {
+        if (file.size > INLINE_ATTACHMENT_BYTES) {
+          const ref = await directUpload(file);
+
+          if (!ref) {
+            toast.error(
+              `"${file.name}" is over 3MB and this server has no direct upload configured.`,
+            );
+            continue;
+          }
+
+          accepted.push({
+            filename: file.name,
+            content_type: file.type,
+            upload_key: ref.key,
+          });
+          continue;
+        }
+
         const data = await readFileAsBase64(file);
         accepted.push({ filename: file.name, content_type: file.type, data });
-      } catch {
-        toast.error(`Couldn't read "${file.name}".`);
+      } catch (error) {
+        toast.error(
+          error instanceof ApiError ? error.message : `Couldn't read "${file.name}".`,
+        );
       }
     }
 

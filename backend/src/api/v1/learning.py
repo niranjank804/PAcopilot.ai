@@ -2,6 +2,9 @@ import io
 import zipfile
 
 from fastapi import APIRouter, Depends, File, UploadFile
+
+from src.reports.s3_storage import delete_upload, read_upload
+from src.schemas.uploads import UploadedFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
@@ -324,3 +327,58 @@ async def standards_report(
             markdown=render_markdown(build_report(records))
         ),
     )
+
+# --- Uploads that went to S3 first ---------------------------------------
+#
+# Same endpoints, same logic: the files are read back from S3 into the
+# UploadFile shape the handlers above already take, so there is one
+# implementation of the 25MB limit, the zip expansion and the response.
+
+
+async def _uploads_as_files(organization_id, payload: UploadedFiles) -> list[UploadFile]:
+    files = []
+
+    for item in payload.uploads:
+        data = await read_upload(organization_id, item.key)
+        files.append(UploadFile(file=io.BytesIO(data), filename=item.filename, size=len(data)))
+
+    return files
+
+
+async def _discard(payload: UploadedFiles) -> None:
+    for item in payload.uploads:
+        await delete_upload(item.key)
+
+
+@router.post(
+    "/corpus/from-upload",
+    response_model=ApiResponse[LearningRunResponse],
+    status_code=201,
+)
+async def learn_corpus_from_upload(
+    payload: UploadedFiles,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.write")),
+):
+    files = await _uploads_as_files(current_user.organization_id, payload)
+
+    try:
+        return await learn_corpus(files=files, db=db, current_user=current_user)
+    finally:
+        await _discard(payload)
+
+
+@router.post(
+    "/report/from-upload",
+    response_model=ApiResponse[StandardsReportResponse],
+)
+async def standards_report_from_upload(
+    payload: UploadedFiles,
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+):
+    files = await _uploads_as_files(current_user.organization_id, payload)
+
+    try:
+        return await standards_report(files=files, current_user=current_user)
+    finally:
+        await _discard(payload)

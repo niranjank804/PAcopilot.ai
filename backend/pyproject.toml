@@ -33,3 +33,14 @@ ignore_missing_imports = true
 # strict mode as a merge gate would block every PR until a large
 # retrofit lands. Ratchet these up as modules are annotated.
 check_untyped_defs = false
+
+# Vercel. The app object lives in src/main.py, which Vercel would find on
+# its own; naming it keeps that from depending on a filename convention.
+# The build script runs after dependencies are installed and before the
+# function is deployed: migrations, then seeds, exactly what render.yaml's
+# buildCommand did. DATABASE_URL must be set for the build environment.
+[tool.vercel]
+entrypoint = "src.main:app"
+
+[tool.vercel.scripts]
+build = "python scripts/vercel_build.py"

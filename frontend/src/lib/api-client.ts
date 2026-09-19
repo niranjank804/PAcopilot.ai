@@ -215,6 +215,19 @@ async function unwrap<T>(response: Response): Promise<T> {
   return payload.data;
 }
 
+/** An authenticated GET whose body is a file, not a JSON envelope. Used
+ * only as the fallback when no signed download link is available. */
+export async function downloadRequest(path: string): Promise<Response> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return fetch(`${API_URL}${path}`, { headers });
+}
+
 /** Same auth/refresh handling as apiRequest, but for multipart file uploads
  * — no Content-Type header is set so the browser fills in the multipart
  * boundary itself, and the body is passed through as FormData rather than

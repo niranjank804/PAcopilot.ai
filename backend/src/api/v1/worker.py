@@ -21,6 +21,7 @@ of them:
    carry VBA, a macro name, a shell command, or a filesystem path.
 """
 
+import io
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
@@ -31,6 +32,14 @@ from src.api.dependencies.worker_auth import (
     worker_credential_throttle,
 )
 from src.core.config import settings
+from src.api.v1.uploads import issue_upload_target
+from src.reports.s3_storage import (
+    delete_upload,
+    presign_download,
+    read_upload,
+    s3_is_configured,
+)
+from src.schemas.uploads import ArtifactFromUpload, UploadRequest, UploadTarget
 from src.core.exceptions import (
     ConflictException,
     NotFoundException,
@@ -548,6 +557,101 @@ async def upload_artifact(
             "checksum": artifact.checksum,
         },
     )
+
+
+@router.get(
+    "/jobs/{execution_id}/workbook-url",
+    response_model=ApiResponse[dict],
+)
+async def job_workbook_url(
+    execution_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    worker: ReportWorker = Depends(get_current_worker),
+):
+    """A signed link to the job's workbook, for a worker to fetch from S3
+    directly. Same ownership rule as /workbook; 404 when the workbook is
+    not in S3, so the worker falls back to /workbook."""
+
+    execution = await _owned_execution(db, execution_id, worker)
+
+    workbook = await workbook_service.get_workbook(
+        db, execution.workbook_id, worker.organization_id
+    )
+
+    url = (
+        presign_download(
+            workbook.storage_reference,
+            filename=workbook.filename,
+            content_type=workbook.content_type,
+            expires_in=settings.DIRECT_UPLOAD_URL_TTL_SECONDS,
+        )
+        if s3_is_configured()
+        else None
+    )
+
+    if url is None:
+        raise NotFoundException("No direct link is available for this workbook.")
+
+    return ApiResponse(
+        success=True,
+        data={
+            "url": url,
+            "checksum": workbook.checksum,
+            "content_type": workbook.content_type,
+        },
+    )
+
+
+@router.post(
+    "/jobs/{execution_id}/artifacts/upload-url",
+    response_model=ApiResponse[UploadTarget],
+    status_code=201,
+)
+async def artifact_upload_url(
+    execution_id: uuid.UUID,
+    payload: UploadRequest,
+    db: AsyncSession = Depends(get_db),
+    worker: ReportWorker = Depends(get_current_worker),
+):
+    """Where a worker puts a finished artifact before recording it."""
+
+    await _owned_execution(db, execution_id, worker)
+
+    return ApiResponse(
+        success=True,
+        data=issue_upload_target(worker.organization_id, payload),
+    )
+
+
+@router.post(
+    "/jobs/{execution_id}/artifacts/from-upload",
+    response_model=ApiResponse[dict],
+    status_code=201,
+)
+async def upload_artifact_from_upload(
+    execution_id: uuid.UUID,
+    payload: ArtifactFromUpload,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    worker: ReportWorker = Depends(get_current_worker),
+):
+    """POST /artifacts for a file the worker put in S3 first. Same
+    idempotency and checksum rules; the bytes are read server-side."""
+
+    data = await read_upload(worker.organization_id, payload.key)
+
+    try:
+        return await upload_artifact(
+            execution_id=execution_id,
+            http_request=http_request,
+            file=UploadFile(file=io.BytesIO(data), filename=payload.filename, size=len(data)),
+            output_format=payload.output_format,
+            checksum=payload.checksum,
+            db=db,
+            worker=worker,
+        )
+    finally:
+        await delete_upload(payload.key)
 
 
 @router.post(

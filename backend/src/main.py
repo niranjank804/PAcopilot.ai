@@ -23,13 +23,16 @@ async def lifespan(app: FastAPI):
     """
 
     error_tracking.initialize()
-    register_tasks()
-    scheduler.start()
+
+    if settings.SCHEDULER_ENABLED:
+        register_tasks()
+        scheduler.start()
 
     try:
         yield
     finally:
-        await scheduler.stop()
+        if settings.SCHEDULER_ENABLED:
+            await scheduler.stop()
 
 app = FastAPI(
     title=settings.APP_NAME,

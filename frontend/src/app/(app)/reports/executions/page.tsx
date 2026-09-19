@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Download, History } from "lucide-react";
 import { useState } from "react";
@@ -29,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiRequest } from "@/lib/api-client";
+import { ApiError, apiRequest, downloadRequest } from "@/lib/api-client";
 import type {
   ReportExecution,
   ReportExecutionDetail,
@@ -45,6 +46,10 @@ function duration(ms: number | null) {
   const seconds = Math.round(ms / 100) / 10;
 
   return seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)}m`;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof ApiError ? error.message : "Something went wrong.";
 }
 
 export default function ExecutionsPage() {
@@ -65,17 +70,32 @@ export default function ExecutionsPage() {
     enabled: selected !== null,
   });
 
-  /** Downloads go through an authenticated request, not a bare link — an
-   * artifact id is an identifier, not a capability. */
+  /** An artifact id is an identifier, not a capability: the link is
+   * issued only after an authenticated permission check, and expires in
+   * minutes. Where no link is available the file streams through the
+   * API with the session token. */
   async function downloadArtifact(artifactId: string, filename: string) {
-    const token = localStorage.getItem("accessToken");
+    try {
+      const link = await apiRequest<{ url: string }>(
+        `/reports/artifacts/${artifactId}/download-url`,
+      );
+      window.location.assign(link.url);
+      return;
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 404)) {
+        toast.error(errorMessage(error));
+        return;
+      }
+    }
 
-    const response = await fetch(
-      `${API_URL}/reports/artifacts/${artifactId}/download`,
-      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    const response = await downloadRequest(
+      `/reports/artifacts/${artifactId}/download`,
     );
 
-    if (!response.ok) return;
+    if (!response.ok) {
+      toast.error(`Download failed (HTTP ${response.status}).`);
+      return;
+    }
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);

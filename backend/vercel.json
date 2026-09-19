@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/main.py": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/internal/cron/reap-executions",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

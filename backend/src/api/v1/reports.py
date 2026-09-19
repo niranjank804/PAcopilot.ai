@@ -8,6 +8,7 @@ resources use distinct literal segments (`/reports/definitions/{id}`,
 so no route depends on declaration order to avoid being shadowed.
 """
 
+import io
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
@@ -16,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies.permissions import require_permission
 from src.api.dependencies.rate_limit import general_rate_limited
 from src.database.session import get_db
+from src.core.config import settings
+from src.core.exceptions import NotFoundException
 from src.reports.artifact_service import artifact_service
 from src.reports.audit_actions import ReportAuditAction
 from src.reports.enums import ReportStatus
@@ -23,7 +26,14 @@ from src.reports.execution_service import execution_service
 from src.reports.report_service import report_service
 from src.reports.workbook_service import workbook_service
 from src.reports.worker_service import worker_service
+from src.reports.s3_storage import (
+    delete_upload,
+    presign_download,
+    read_upload,
+    s3_is_configured,
+)
 from src.schemas.auth import UserResponse
+from src.schemas.uploads import WorkbookFromUpload
 from src.schemas.reports import (
     ArtifactResponse,
     ExecutionDetailResponse,
@@ -793,6 +803,72 @@ async def list_execution_artifacts(
 # ======================================================================
 # Artifacts
 # ======================================================================
+
+
+@router.post(
+    "/workbooks/from-upload",
+    response_model=ApiResponse[WorkbookResponse],
+    status_code=201,
+)
+async def upload_workbook_from_upload(
+    payload: WorkbookFromUpload,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("reports.create")),
+    _: UserResponse = Depends(general_rate_limited),
+):
+    """POST /workbooks for a file the browser put in S3 first."""
+
+    data = await read_upload(current_user.organization_id, payload.key)
+
+    try:
+        return await upload_workbook(
+            http_request=http_request,
+            file=UploadFile(file=io.BytesIO(data), filename=payload.filename, size=len(data)),
+            name=payload.name,
+            description=payload.description,
+            db=db,
+            current_user=current_user,
+        )
+    finally:
+        await delete_upload(payload.key)
+
+
+@router.get(
+    "/artifacts/{artifact_id}/download-url",
+    response_model=ApiResponse[dict],
+)
+async def artifact_download_url(
+    artifact_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("reports.read")),
+):
+    """A short-lived signed link to the artifact in S3.
+
+    Authorization is the same as /download; the link expires in minutes
+    and is issued only after the permission and ownership checks. 404
+    when the artifact is not in S3, so a client falls back to /download.
+    """
+
+    artifact = await artifact_service.get_artifact(
+        db, artifact_id, current_user.organization_id
+    )
+
+    url = (
+        presign_download(
+            artifact.storage_reference,
+            filename=artifact.filename,
+            content_type=artifact.mime_type,
+            expires_in=settings.DIRECT_UPLOAD_URL_TTL_SECONDS,
+        )
+        if s3_is_configured()
+        else None
+    )
+
+    if url is None:
+        raise NotFoundException("No direct link is available for this artifact.")
+
+    return ApiResponse(success=True, data={"url": url, "filename": artifact.filename})
 
 
 @router.get("/artifacts/{artifact_id}/download")
