@@ -21,7 +21,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
-import { useBackendWarmup, useSlowFlag } from "@/lib/backend-warmup";
+import {
+  useBackendWarmup,
+  useElapsedSeconds,
+  useSlowFlag,
+} from "@/lib/backend-warmup";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -38,6 +42,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const isSlow = useSlowFlag(isSubmitting || isGoogleSubmitting);
+  const waited = useElapsedSeconds(isSlow);
 
   useBackendWarmup();
 
@@ -144,9 +149,9 @@ export default function LoginPage() {
                 role="status"
                 className="text-center text-xs text-muted-foreground"
               >
-                Waking up the server. After a quiet period the first sign-in
-                can take a minute or more — you don&apos;t need to click
-                again.
+                Waking up the server — {waited}s. After a quiet period the
+                first sign-in takes about a minute; you don&apos;t need to
+                click again.
               </p>
             ) : null}
             <p className="text-center text-xs text-muted-foreground">

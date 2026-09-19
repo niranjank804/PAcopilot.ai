@@ -39,6 +39,61 @@ export function useBackendWarmup(): void {
   }, []);
 }
 
+/** Seconds since `active` became true; 0 while it is false. Shown next
+ * to the wake-up notice so a cold start reads as progress, not a hang. */
+export function useElapsedSeconds(active: boolean): number {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const started = Date.now();
+    const timer = setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
+
+    return () => {
+      clearInterval(timer);
+      setElapsed(0);
+    };
+  }, [active]);
+
+  return active ? elapsed : 0;
+}
+
+/** Between pings, comfortably inside the free instance's 15-minute idle
+ * limit. */
+const KEEP_AWAKE_INTERVAL_MS = 10 * 60_000;
+
+/**
+ * Keep the backend awake for as long as the app is open.
+ *
+ * Reading an answer or a report for twenty minutes counts as idle to the
+ * hosting, and the next click then waits a minute for a cold start. A
+ * request every ten minutes from an open, visible tab prevents that for
+ * the length of a working session. It does nothing for the first visit
+ * of the day — only an external monitor or a paid instance can.
+ */
+export function useKeepAwake(): void {
+  useEffect(() => {
+    const ping = () => {
+      // A background tab is not a session; let the instance sleep.
+      if (document.visibilityState !== "visible") return;
+
+      fetch(`${API_URL}/health`, { mode: "no-cors", cache: "no-store" }).catch(
+        () => {
+          // Nothing to do: the next real request will report any outage.
+        },
+      );
+    };
+
+    const timer = setInterval(ping, KEEP_AWAKE_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, []);
+}
+
 /**
  * True once `active` has stayed true for `afterMs`.
  *

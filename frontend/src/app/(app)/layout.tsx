@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
+import { KeepAwake } from "@/components/backend-warmup";
 import { Onboarding } from "@/components/onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
@@ -54,6 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           page. It renders nothing once the user has finished or
           dismissed it. */}
       <Onboarding />
+      <KeepAwake />
     </div>
   );
 }

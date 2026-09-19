@@ -11,7 +11,12 @@ on:
     # A dedicated uptime monitor (UptimeRobot, cron-job.org) pinging
     # /health every 5 minutes, or a paid Render instance that never
     # sleeps, is what actually keeps it warm. This stays as a backstop.
-    - cron: "*/10 * * * *"
+    #
+    # Off the common minutes on purpose. GitHub runs schedules from a
+    # shared queue and the :00/:10/:20 slots are the busiest; measured
+    # gaps on "*/10" were 2-5 hours (2026-09-17 to 09-19). Unproven that
+    # this helps — compare the run history after a few days.
+    - cron: "7,17,27,37,47,57 * * * *"
   workflow_dispatch: {}
 
 jobs:
