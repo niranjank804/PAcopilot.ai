@@ -1,6 +1,79 @@
 # Migrating from Render to Vercel
 
-Status: **step 1 (database) ready to run. Steps 2–5 in progress.**
+Status (2026-09-20): **database on Neon (done), frontend on Vercel (done),
+backend code ready for Vercel (done, `cd03d1a` + `686c82d`), Vercel project
+`pa-copilot-api` created — secrets and first deploy pending, then cutover.**
+
+## Procedure from here
+
+The code side is finished. What remains is configuration in the Vercel
+dashboard and a cutover, in this order.
+
+### 1. Add the secrets to the `pa-copilot-api` project
+
+Settings → Environment Variables, all three environments. The non-secret
+values are already set (`DEBUG`, `TENANCY_ENFORCEMENT_ENABLED`,
+`SCHEDULER_ENABLED=false`, `CORS_ALLOWED_ORIGINS`, `FRONTEND_URL`,
+`S3_BUCKET`, `S3_REGION`, `GOOGLE_OAUTH_CLIENT_ID`). Add:
+
+| Variable | Value | Why |
+|---|---|---|
+| `DATABASE_URL` | Neon **pooled** string (host contains `-pooler`) | Runtime. `src/database/url.py` switches to NullPool for a pooler host. |
+| `DATABASE_URL_UNPOOLED` | Neon **direct** string (the one Render uses) | Build only: Alembic and the seeds run over it. |
+| `SECRET_KEY` | **same value as Render** | Existing sessions and refresh tokens stay valid. |
+| `TM1_CREDENTIALS_KEY` | **same value as Render** | Stored TM1 credentials decrypt. |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | same as Render | S3 artifacts and signed uploads. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` | same as Render | Models and embeddings. |
+| `CRON_SECRET` | any long random string (`openssl rand -base64 32`) | Vercel sends it on cron calls; `/internal/cron/*` refuses without it. |
+| `BOOTSTRAP_ADMIN_EMAIL`, `SMTP_*` | optional, same as Render | The admin already exists; the seed skips when unset. |
+
+Then Deployments → Redeploy the latest. The build runs
+`scripts/vercel_build.py` (migrations, seeds) and fails the deploy if the
+database is unreachable — that is intentional.
+
+### 2. Open the API to browsers
+
+Settings → Deployment Protection → Vercel Authentication → **Preview only**
+(the project was created with it on for all deployments, which returns a
+login page to the frontend's requests).
+
+### 3. Verify before pointing anything at it
+
+```
+curl https://pa-copilot-api.vercel.app/health/ready
+```
+must return `{"status":"ready", ...}` with the database check ok. Then
+sign in through the frontend with `NEXT_PUBLIC_API_URL` temporarily
+pointed at the new API on a preview deployment, or simply proceed to 4
+and roll back by flipping the variable if anything fails.
+
+### 4. S3 CORS (one rule, once)
+
+The IAM key in use cannot edit bucket CORS, so in the S3 console for
+`pacopilot-s3` → Permissions → CORS:
+
+```json
+[{"AllowedOrigins":["https://pa-copilot-frontend.vercel.app"],
+  "AllowedMethods":["PUT","GET","HEAD"],"AllowedHeaders":["*"],
+  "ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]
+```
+Until it exists, uploads fall back to the multipart path, which the
+Vercel API rejects above 4.5 MB.
+
+### 5. Cutover
+
+On the **frontend** project set `NEXT_PUBLIC_API_URL` to
+`https://pa-copilot-api.vercel.app` (all environments) and redeploy.
+Google Sign-In needs no change: the OAuth origin is the frontend.
+Keep Render running for a day; then delete the Render service, remove
+`.github/workflows/keep-alive.yml`, and delete `render.yaml`.
+
+### Rollback
+
+Set `NEXT_PUBLIC_API_URL` back to the Render URL and redeploy the
+frontend. Both backends share the same database and secrets, so either
+serves the same data.
+
 
 ## What goes where
 
