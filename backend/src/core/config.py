@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # src/database/url.py, which is where the surprising parts are
     # documented.
     DATABASE_URL: str | None = None
+    # Neon's direct (non-pooler) string, used only by the build step for
+    # migrations and seeds: Alembic wants a session, not a transaction
+    # pooler. Runtime keeps DATABASE_URL, which on Vercel is the pooled
+    # one. Declared here so the setting is documented next to its
+    # sibling; the app itself never reads it.
+    DATABASE_URL_UNPOOLED: str | None = None
 
     DATABASE_HOST: str | None = None
     DATABASE_PORT: int | None = None

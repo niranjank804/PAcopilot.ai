@@ -22,6 +22,14 @@ STEPS = [
 def main() -> None:
     env = {**os.environ, "PYTHONPATH": "."}
 
+    # Migrations over the direct connection where one is configured: a
+    # transaction pooler is right for request handlers and wrong for
+    # Alembic, which expects one session for the whole upgrade.
+    unpooled = os.environ.get("DATABASE_URL_UNPOOLED")
+
+    if unpooled:
+        env["DATABASE_URL"] = unpooled
+
     for step in STEPS:
         print("build:", " ".join(step[1:]), flush=True)
         subprocess.run(step, check=True, env=env)
