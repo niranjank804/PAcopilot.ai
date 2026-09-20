@@ -7,6 +7,7 @@ far more often than a bare hostname. TM1py then builds
 to say why. Normalising here, once, keeps every caller honest.
 """
 
+import ipaddress
 from dataclasses import dataclass
 
 # Every IBM Planning Analytics as a Service region lives under this domain
@@ -47,6 +48,40 @@ def is_saas_host(address: str) -> bool:
     # Parsed first: rows saved before normalisation existed still carry the
     # scheme or trailing slash they were pasted with.
     return parse_address(address).host.lower().endswith(SAAS_HOST_SUFFIX)
+
+
+def is_private_address(host: str) -> bool:
+    """True when `host` is an IP literal that is not a public address:
+    loopback, link-local (cloud metadata), private ranges, reserved,
+    multicast, unspecified — or the name `localhost`.
+
+    Hostnames are not resolved here: the check runs on save, where a DNS
+    lookup would make every form submit wait on the network. What a
+    hostname resolves to is the deployment's network policy to enforce.
+    """
+
+    value = host.strip().strip("[]").lower()
+
+    if value == "localhost":
+        return True
+
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+
+    # is_global already excludes private, loopback, link-local, reserved
+    # and unspecified ranges; multicast is not "global" in any sense a
+    # TM1 server could be reached at, but the stdlib counts it as such.
+    return not ip.is_global or ip.is_multicast
+
+
+PRIVATE_ADDRESS_REFUSED = (
+    "This address points at a local or private network, which this "
+    "deployment does not reach. Enter the public hostname of your TM1 "
+    "server. For a self-hosted deployment whose TM1 is on the same "
+    "network, the administrator can set TM1_ALLOW_PRIVATE_ADDRESSES."
+)
 
 
 SAAS_NEEDS_SAAS_TYPE = (

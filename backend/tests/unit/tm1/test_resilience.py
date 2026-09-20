@@ -276,6 +276,9 @@ async def test_call_with_resilience_times_out(monkeypatch):
     monkeypatch.setattr(
         "src.tm1.resilience.asyncio.sleep", AsyncMock(return_value=None)
     )
+    # The outer wait normally gives TM1py's own timeout a head start;
+    # this test is about the backstop itself.
+    monkeypatch.setattr("src.tm1.resilience.TIMEOUT_GRACE_SECONDS", 0.0)
 
     def slow_call():
         import time as time_module

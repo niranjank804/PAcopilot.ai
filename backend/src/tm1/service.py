@@ -3,10 +3,17 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
 from src.core.exceptions import NotFoundException, ValidationException
 from src.database.models.tm1_connection import TM1Connection
 from src.repositories.tm1_connection_repository import tm1_connection_repository
-from src.tm1.addressing import SAAS_NEEDS_SAAS_TYPE, is_saas_host, parse_address
+from src.tm1.addressing import (
+    PRIVATE_ADDRESS_REFUSED,
+    SAAS_NEEDS_SAAS_TYPE,
+    is_private_address,
+    is_saas_host,
+    parse_address,
+)
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.crypto import encrypt_password
 from src.tm1.exceptions import (
@@ -76,6 +83,14 @@ def _explain(problem: str, connection: TM1Connection) -> str:
     )
 
 
+def _check_address_reachable_by_policy(address: str) -> None:
+    if settings.TM1_ALLOW_PRIVATE_ADDRESSES:
+        return
+
+    if is_private_address(address):
+        raise ValidationException(PRIVATE_ADDRESS_REFUSED)
+
+
 class TM1IntegrationService:
 
     async def create_connection(
@@ -102,6 +117,8 @@ class TM1IntegrationService:
 
         if not address:
             raise ValidationException("Address is required.")
+
+        _check_address_reachable_by_policy(address)
 
         if is_saas_host(address) and authentication_type != "v12_saas":
             raise ValidationException(SAAS_NEEDS_SAAS_TYPE)
@@ -192,6 +209,8 @@ class TM1IntegrationService:
 
             if not address:
                 raise ValidationException("Address is required.")
+
+            _check_address_reachable_by_policy(address)
 
         next_address = address if address is not None else connection.address
         next_auth_type = authentication_type or connection.authentication_type

@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import logging
@@ -174,7 +175,9 @@ class KnowledgeService:
 
         try:
             loader = get_loader(content_type)
-            text = loader.load(file_bytes)
+            # Parsing a PDF is CPU-bound and can take seconds; on the
+            # event loop it stalled every other request for that long.
+            text = await asyncio.to_thread(loader.load, file_bytes)
 
             # Checked before embedding: a junk document costs money to
             # index and then degrades every later search by competing for
@@ -188,7 +191,7 @@ class KnowledgeService:
                     "This document was not indexed: " + " ".join(problems)
                 )
 
-            chunks = chunk_text(text)
+            chunks = await asyncio.to_thread(chunk_text, text)
 
             if not chunks:
                 raise ValueError("No extractable text found in document.")

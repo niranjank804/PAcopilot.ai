@@ -15,26 +15,22 @@ def rate_limited(scope: str):
     get_current_active_user dependency once per request.
     """
 
-    is_ai = scope == "ai"
+    user_setting, organization_setting = _LIMIT_SETTINGS.get(
+        scope, _LIMIT_SETTINGS["general"]
+    )
 
     async def checker(
         current_user: UserResponse = Depends(get_current_active_user),
     ) -> UserResponse:
 
+        # Resolved per request rather than captured, so a test (or an
+        # operator) can change a limit without rebuilding the app.
         rate_limit.enforce(
             scope=scope,
             user_id=current_user.id,
             organization_id=current_user.organization_id,
-            user_limit=(
-                settings.RATE_LIMIT_AI_USER_PER_WINDOW
-                if is_ai
-                else settings.RATE_LIMIT_USER_PER_WINDOW
-            ),
-            organization_limit=(
-                settings.RATE_LIMIT_AI_ORG_PER_WINDOW
-                if is_ai
-                else settings.RATE_LIMIT_ORG_PER_WINDOW
-            ),
+            user_limit=getattr(settings, user_setting),
+            organization_limit=getattr(settings, organization_setting),
         )
 
         return current_user
@@ -42,8 +38,17 @@ def rate_limited(scope: str):
     return checker
 
 
+# Scope -> (per-user setting, per-organization setting).
+_LIMIT_SETTINGS = {
+    "general": ("RATE_LIMIT_USER_PER_WINDOW", "RATE_LIMIT_ORG_PER_WINDOW"),
+    "ai": ("RATE_LIMIT_AI_USER_PER_WINDOW", "RATE_LIMIT_AI_ORG_PER_WINDOW"),
+    "heavy": ("RATE_LIMIT_HEAVY_USER_PER_WINDOW", "RATE_LIMIT_HEAVY_ORG_PER_WINDOW"),
+}
+
 ai_rate_limited = rate_limited("ai")
 general_rate_limited = rate_limited("general")
+# Parsing, embedding, corpus analysis, whole-model extraction.
+heavy_rate_limited = rate_limited("heavy")
 
 
 def auth_throttle(scope: str, limit_setting: str):

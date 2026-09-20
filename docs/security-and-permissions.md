@@ -157,3 +157,32 @@ grows enough to justify the extra complexity.
   any API response.
 - **Password reset tokens** and **user password hashes** are never stored
   or transmitted in raw form — only hashes.
+
+## 9. What a deployment refuses by default
+
+Added 2026-09-21, after the engineering audit. Each of these is a setting
+with a safe default; the setting exists for the deployment that needs
+the other behaviour, and `.env.example` says which that is.
+
+| Control | Default | Setting |
+|---|---|---|
+| New accounts wait for an Org Admin | pending | `REGISTRATION_AUTO_APPROVE=false` |
+| Models a chat request may name | Opus 5, Sonnet 5 | `AI_ALLOWED_MODELS` |
+| Turns in flight count against the quota | 50k tokens each | `AI_QUOTA_RESERVATION_TOKENS` |
+| TM1 connection to a loopback / link-local / private IP | refused | `TM1_ALLOW_PRIVATE_ADDRESSES=false` |
+| TM1 request timeout and thread pool | 30 s, 16 threads | `TM1_REQUEST_TIMEOUT_SECONDS`, `TM1_MAX_CONCURRENT_CALLS` |
+| Parsing, embedding, corpus and extraction routes | 10/min/user, 40/min/org | `RATE_LIMIT_HEAVY_*` |
+| Password-reset email without SMTP in production | dropped, not printed | `SMTP_HOST` |
+| Log file on disk | none (stdout only) | `LOG_FILE` |
+
+Two things are not settings. A TM1 error message never carries the
+server's response body or headers — the caller gets the status and
+reason, the log gets the rest (`src/tm1/resilience.py`). And a chat turn
+that ends before `done` (the client closed the stream, or the provider
+failed mid-answer) is still charged: exact usage for the rounds that
+completed, an estimate for the one that was cut off
+(`src/ai/orchestrator.py`).
+
+Every response also carries `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, a Content-Security-Policy, HSTS in production,
+and an `X-Request-ID` that stamps every log line the request produced.

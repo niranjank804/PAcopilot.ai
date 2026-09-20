@@ -1,6 +1,9 @@
 import asyncio
+import contextvars
+import functools
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Any, Callable
 
@@ -12,6 +15,7 @@ from TM1py.Exceptions import (
 )
 
 from src.core.config import settings
+from src.core.logging import app_logger
 from src.tm1.exceptions import (
     TM1AuthenticationError,
     TM1ConnectionError,
@@ -19,6 +23,72 @@ from src.tm1.exceptions import (
 )
 
 TRANSIENT_STATUS_THRESHOLD = 500
+
+# How much longer than TM1py's own timeout the caller waits before giving
+# up on the thread. TM1py's timeout (set in build_tm1_kwargs) is what
+# actually ends the request and frees the thread; this outer wait is the
+# backstop for the stretches it does not cover — DNS resolution and the
+# TLS handshake happen before the socket timeout starts.
+TIMEOUT_GRACE_SECONDS = 5.0
+
+_executor: ThreadPoolExecutor | None = None
+
+
+def _tm1_executor() -> ThreadPoolExecutor:
+    """The pool every TM1 call runs on.
+
+    Dedicated rather than asyncio's default executor: a TM1 server that
+    stops answering holds a thread per call until the timeout, and with
+    the shared pool that starved smtplib, boto3 and everything else that
+    uses to_thread. Now it can hold at most TM1_MAX_CONCURRENT_CALLS, and
+    only its own.
+    """
+
+    global _executor
+
+    if _executor is None:
+        _executor = ThreadPoolExecutor(
+            max_workers=settings.TM1_MAX_CONCURRENT_CALLS,
+            thread_name_prefix="tm1",
+        )
+
+    return _executor
+
+
+async def _run_in_tm1_thread(func: Callable, *args, **kwargs) -> Any:
+    # Same shape as asyncio.to_thread: the context is copied so the
+    # request id reaches the log lines the call writes.
+    loop = asyncio.get_running_loop()
+    context = contextvars.copy_context()
+
+    return await loop.run_in_executor(
+        _tm1_executor(),
+        functools.partial(context.run, func, *args, **kwargs),
+    )
+
+
+def describe_failure(exc: BaseException) -> str:
+    """What a caller may be told about a failed TM1 call.
+
+    TM1py's own messages carry the response body and every header the
+    server sent; for a server the caller controls the address of, that
+    is a way to read whatever answered. The detail goes to the log, the
+    caller gets the shape of the failure.
+    """
+
+    if isinstance(exc, TM1pyRestException):
+        return f"TM1 returned HTTP {exc.status_code} ({exc.reason})."
+
+    if isinstance(exc, (TM1pyTimeout, asyncio.TimeoutError, requests.exceptions.Timeout)):
+        return "The server did not respond in time."
+
+    if isinstance(exc, TM1pyNetworkException):
+        return (
+            "The server could not be reached, or something in front of it "
+            "answered instead."
+        )
+
+    return f"The server could not be reached ({type(exc).__name__})."
 
 
 class CircuitState(str, Enum):
@@ -116,8 +186,8 @@ async def call_with_resilience(
     for attempt in range(resolved_max_retries + 1):
         try:
             result = await asyncio.wait_for(
-                asyncio.to_thread(func, *args, **kwargs),
-                timeout=resolved_timeout,
+                _run_in_tm1_thread(func, *args, **kwargs),
+                timeout=resolved_timeout + TIMEOUT_GRACE_SECONDS,
             )
         except (
             TM1pyNetworkException,
@@ -131,14 +201,20 @@ async def call_with_resilience(
         ) as exc:
             last_exc = exc
         except TM1pyRestException as exc:
+            # Full text (body and headers) to the log only.
+            app_logger.warning(
+                f"TM1 call {getattr(func, '__name__', func)!s} on connection "
+                f"{connection_id} failed: {exc}"
+            )
+
             if exc.status_code in (401, 403):
-                raise TM1AuthenticationError(str(exc)) from exc
+                raise TM1AuthenticationError(describe_failure(exc)) from exc
 
             if exc.status_code == 404:
-                raise TM1NotFoundError(str(exc)) from exc
+                raise TM1NotFoundError(describe_failure(exc)) from exc
 
             if exc.status_code < TRANSIENT_STATUS_THRESHOLD:
-                raise TM1ConnectionError(str(exc)) from exc
+                raise TM1ConnectionError(describe_failure(exc)) from exc
 
             last_exc = exc
         else:
@@ -152,6 +228,13 @@ async def call_with_resilience(
 
     breaker.record_failure()
 
+    app_logger.warning(
+        f"TM1 call {getattr(func, '__name__', func)!s} on connection "
+        f"{connection_id} failed after {resolved_max_retries + 1} attempts: "
+        f"{last_exc!r}"
+    )
+
     raise TM1ConnectionError(
-        f"TM1 request failed after {resolved_max_retries + 1} attempts: {last_exc}"
+        f"TM1 request failed after {resolved_max_retries + 1} attempts: "
+        f"{describe_failure(last_exc)}"
     ) from last_exc

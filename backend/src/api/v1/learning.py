@@ -1,3 +1,4 @@
+import asyncio
 import io
 import zipfile
 
@@ -8,6 +9,7 @@ from src.schemas.uploads import UploadedFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
+from src.api.dependencies.rate_limit import heavy_rate_limited
 from src.core.exceptions import ValidationException
 from src.database.session import get_db
 from src.schemas.auth import UserResponse
@@ -176,6 +178,7 @@ async def learn_corpus(
     files: list[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("tm1.write")),
+    _: UserResponse = Depends(heavy_rate_limited),
 ):
     """Learn this organization's coding conventions from exported TI processes.
 
@@ -197,7 +200,9 @@ async def learn_corpus(
         if total > MAX_UPLOAD_BYTES:
             raise ValidationException("Upload exceeds the 25MB limit.")
 
-        expanded, skipped = _expand(upload.filename or "untitled", raw, budget)
+        expanded, skipped = await asyncio.to_thread(
+            _expand, upload.filename or "untitled", raw, budget
+        )
         corpus.update(expanded)
         rejected.extend(skipped)
 
@@ -292,6 +297,7 @@ async def read_standards(
 async def standards_report(
     files: list[UploadFile] = File(...),
     current_user: UserResponse = Depends(require_permission("tm1.read")),
+    _: UserResponse = Depends(heavy_rate_limited),
 ):
     """Render the standards report for a corpus without storing anything.
 
@@ -312,14 +318,16 @@ async def standards_report(
         if total > MAX_UPLOAD_BYTES:
             raise ValidationException("Upload exceeds the 25MB limit.")
 
-        expanded, skipped = _expand(upload.filename or "untitled", raw, budget)
+        expanded, skipped = await asyncio.to_thread(
+            _expand, upload.filename or "untitled", raw, budget
+        )
         corpus.update(expanded)
         rejected.extend(skipped)
 
     if not corpus:
         raise ValidationException(_nothing_found(rejected))
 
-    records, _ = parse_corpus(corpus)
+    records, _ = await asyncio.to_thread(parse_corpus, corpus)
 
     return ApiResponse(
         success=True,
@@ -359,11 +367,14 @@ async def learn_corpus_from_upload(
     payload: UploadedFiles,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("tm1.write")),
+    _: UserResponse = Depends(heavy_rate_limited),
 ):
     files = await _uploads_as_files(current_user.organization_id, payload)
 
     try:
-        return await learn_corpus(files=files, db=db, current_user=current_user)
+        return await learn_corpus(
+            files=files, db=db, current_user=current_user, _=current_user
+        )
     finally:
         await _discard(payload)
 
@@ -375,10 +386,13 @@ async def learn_corpus_from_upload(
 async def standards_report_from_upload(
     payload: UploadedFiles,
     current_user: UserResponse = Depends(require_permission("tm1.read")),
+    _: UserResponse = Depends(heavy_rate_limited),
 ):
     files = await _uploads_as_files(current_user.organization_id, payload)
 
     try:
-        return await standards_report(files=files, current_user=current_user)
+        return await standards_report(
+            files=files, current_user=current_user, _=current_user
+        )
     finally:
         await _discard(payload)

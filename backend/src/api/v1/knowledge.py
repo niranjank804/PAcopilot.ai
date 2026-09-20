@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
-from src.api.dependencies.rate_limit import ai_rate_limited
+from src.api.dependencies.rate_limit import ai_rate_limited, heavy_rate_limited
 from src.core.exceptions import ValidationException
 from src.database.session import get_db
 from src.errors.classifier import classify_error
@@ -56,6 +56,7 @@ async def upload_document(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("knowledge.write")),
+    _: UserResponse = Depends(heavy_rate_limited),
 ):
     file_bytes = await file.read()
 
@@ -85,6 +86,7 @@ async def upload_document_from_upload(
     payload: UploadedFile,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("knowledge.write")),
+    _: UserResponse = Depends(heavy_rate_limited),
 ):
     """The same as POST /documents, for a file the browser put in S3
     first (see /uploads). The API reads it server-side, where no body

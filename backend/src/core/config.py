@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
 
+    # A rotating log file, in addition to stdout. Unset by default: every
+    # platform this runs on collects stdout, and the disk is ephemeral
+    # (Render) or read-only outside /tmp (Vercel), where opening a file at
+    # import time fails before the app has served a request.
+    LOG_FILE: str | None = None
+
     # ------------------------------------------------------------------
     # Database
     # ------------------------------------------------------------------
@@ -173,6 +179,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_ORG_PER_WINDOW: int = 600
     RATE_LIMIT_AI_USER_PER_WINDOW: int = 12
     RATE_LIMIT_AI_ORG_PER_WINDOW: int = 60
+    # Uploads that are parsed and embedded, TI corpora that are analysed,
+    # metadata extractions that walk a whole model: each costs seconds of
+    # CPU or money per call, and none needed to be fast.
+    RATE_LIMIT_HEAVY_USER_PER_WINDOW: int = 10
+    RATE_LIMIT_HEAVY_ORG_PER_WINDOW: int = 40
 
     # The windows above key on user and organization id, so they can only
     # guard routes that have already authenticated. The endpoints that most
@@ -305,6 +316,23 @@ class Settings(BaseSettings):
     TM1_CREDENTIALS_KEY_PREVIOUS: str | None = None
     TM1_REQUEST_TIMEOUT_SECONDS: float = 30.0
     TM1_MAX_RETRIES: int = 3
+
+    # TM1py is synchronous, so every TM1 call occupies a thread for its
+    # whole duration. This is the size of the pool those threads come
+    # from — and therefore the most calls one process makes to all TM1
+    # servers at once. A server that stops answering can stall at most
+    # this many; the default executor that smtplib, boto3 and the rest
+    # use is not touched.
+    TM1_MAX_CONCURRENT_CALLS: int = 16
+
+    # A connection address is normally the public hostname of a TM1 or
+    # PA SaaS server. Off, an address that is a loopback, link-local,
+    # private or otherwise non-public IP literal is refused at save time:
+    # from a hosted deployment those point at the platform's own network
+    # (cloud metadata lives at 169.254.169.254), and TM1py would send
+    # requests there with the caller's chosen port and scheme. A
+    # self-hosted deployment whose TM1 sits on the LAN turns this on.
+    TM1_ALLOW_PRIVATE_ADDRESSES: bool = False
     TM1_CIRCUIT_BREAKER_THRESHOLD: int = 5
     TM1_CIRCUIT_BREAKER_COOLDOWN_SECONDS: float = 30.0
 

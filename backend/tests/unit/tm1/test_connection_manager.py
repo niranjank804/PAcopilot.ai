@@ -124,6 +124,10 @@ def test_build_tm1_kwargs_native_mode():
         "ssl": True,
         "user": "admin",
         "password": "secret",
+        # Every client carries TM1py's own request timeout; see
+        # test_connection_lifecycle.py for why.
+        "timeout": settings.TM1_REQUEST_TIMEOUT_SECONDS,
+        "cancel_at_timeout": True,
     }
 
 
@@ -149,6 +153,8 @@ def test_build_tm1_kwargs_v12_saas_mode():
         "password": "api-key-value",
         "ssl": True,
         "verify": True,
+        "timeout": settings.TM1_REQUEST_TIMEOUT_SECONDS,
+        "cancel_at_timeout": True,
     }
 
 

@@ -10,7 +10,10 @@ from src.core import error_tracking, scheduler
 from src.core.config import settings
 from src.core.exceptions import AppException
 from src.core.logging import app_logger
+from src.middleware.request_context import RequestContextMiddleware
+from src.middleware.security_headers import SecurityHeadersMiddleware
 from src.reports.tasks import register_tasks
+from src.tm1.client.connection_manager import tm1_connection_manager
 
 
 @asynccontextmanager
@@ -24,6 +27,14 @@ async def lifespan(app: FastAPI):
 
     error_tracking.initialize()
 
+    if not settings.DEBUG and not settings.SMTP_HOST:
+        # Not fatal — the rest of the product works — but said out loud,
+        # once, where the deploy log is read.
+        app_logger.warning(
+            "SMTP_HOST is not set: password-reset emails cannot be "
+            "delivered. Requests will be accepted and silently dropped."
+        )
+
     if settings.SCHEDULER_ENABLED:
         register_tasks()
         scheduler.start()
@@ -33,6 +44,8 @@ async def lifespan(app: FastAPI):
     finally:
         if settings.SCHEDULER_ENABLED:
             await scheduler.stop()
+
+        await tm1_connection_manager.shutdown()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -58,6 +71,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Added after CORS, so they wrap it: every response — preflight included —
+# carries the hardening headers and a request id. Both modules existed for
+# months without being registered here; nothing they promised was on the
+# wire.
+app.add_middleware(SecurityHeadersMiddleware, enable_hsts=settings.is_production)
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(api_router)
 
