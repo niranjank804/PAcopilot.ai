@@ -34,6 +34,31 @@ class TM1ChangeRepository:
 
         return result.scalar_one_or_none()
 
+    async def lock_for_update(
+        self,
+        db: AsyncSession,
+        change_id: uuid.UUID,
+    ) -> TM1Change | None:
+        """The row, locked until this transaction ends and re-read from the
+        database.
+
+        A status check made after this sees what any concurrent executor
+        has already committed, and a concurrent executor waits here until
+        this transaction commits — so two people pressing Execute on the
+        same draft produce one execution and one 409, not two writes to
+        TM1. populate_existing: the session may already hold this row
+        from the route's own lookup, and the point is the fresh state.
+        """
+
+        result = await db.execute(
+            select(TM1Change)
+            .where(TM1Change.id == change_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+        return result.scalar_one_or_none()
+
     async def list_by_connection(
         self,
         db: AsyncSession,

@@ -361,12 +361,29 @@ class ChangeService:
             "validation_errors": change.validation_errors,
         }
 
+    @staticmethod
+    async def _lock(db: AsyncSession, change: TM1Change) -> TM1Change:
+        """Serialise the status transitions on one draft.
+
+        Without this, two executors that both read "draft" — a double
+        click, or two admins — both wrote to TM1, and the second write
+        raced the first's snapshot. Held until the request's transaction
+        commits, which is after the TM1 write, so the second caller then
+        reads "executed" and gets the 409 it should.
+        """
+
+        locked = await tm1_change_repository.lock_for_update(db, change.id)
+
+        return locked if locked is not None else change
+
     async def execute_change(
         self,
         db: AsyncSession,
         change: TM1Change,
         executed_by: uuid.UUID,
     ) -> TM1Change:
+
+        change = await self._lock(db, change)
 
         if change.status != "draft":
             raise ConflictException(
@@ -482,6 +499,8 @@ class ChangeService:
         change: TM1Change,
     ) -> TM1Change:
 
+        change = await self._lock(db, change)
+
         if change.status != "draft":
             raise ConflictException(
                 f"Only draft changes can be rejected (status: {change.status})."
@@ -496,6 +515,8 @@ class ChangeService:
         db: AsyncSession,
         change: TM1Change,
     ) -> TM1Change:
+
+        change = await self._lock(db, change)
 
         if change.status != "executed":
             raise ConflictException(
