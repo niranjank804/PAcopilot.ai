@@ -45,11 +45,11 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_HOST: localhost
-      DATABASE_PORT: 5432
-      DATABASE_NAME: pacopilot_test
-      DATABASE_USER: pacopilot
-      DATABASE_PASSWORD: pacopilot
+      # The service container above, for the migration and seed steps.
+      DATABASE_URL: postgresql://pacopilot:pacopilot@localhost:5432/pacopilot_test
+      # tests/conftest.py refuses any other host and overrides DATABASE_URL
+      # with this one for the application under test.
+      TEST_DATABASE_URL: postgresql://pacopilot:pacopilot@localhost:5432/pacopilot_test
       # Test-only values. No real credential belongs in a workflow file;
       # anything genuinely secret comes from GitHub Secrets.
       SECRET_KEY: ci-secret-key-not-used-outside-tests
