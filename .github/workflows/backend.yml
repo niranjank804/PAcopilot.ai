@@ -27,7 +27,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12']
+        # 3.12 is what runs in production (backend/.python-version); 3.14
+        # is what developers run. 3.11 was dropped when numpy 2.5 stopped
+        # supporting it — the pins in requirements.txt need >= 3.12, and
+        # the job failed at install for two weeks before anyone noticed.
+        python-version: ['3.12', '3.14']
 
     services:
       postgres:
