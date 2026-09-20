@@ -58,6 +58,63 @@ async def test_chat_endpoint_returns_envelope(client, db_session, fake_provider)
 
 
 @pytest.mark.asyncio
+async def test_chat_refuses_a_model_outside_the_allowlist(
+    client, db_session, fake_provider
+):
+    """The request body is the one place a caller chooses what a token
+    costs; the quota counts tokens, so an unlisted, pricier model would be
+    spend the limit never sees."""
+
+    org, admin = await create_org_admin(db_session)
+
+    resp = await client.post(
+        "/ai/chat",
+        json={"message": "hello", "model": "claude-fable-5"},
+        headers=auth_headers(admin),
+    )
+
+    assert resp.status_code == 422
+    assert "claude-fable-5" in resp.json()["error"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_chat_runs_on_a_listed_model_by_name(client, db_session, fake_provider):
+    org, admin = await create_org_admin(db_session)
+
+    resp = await client.post(
+        "/ai/chat",
+        json={"message": "hello", "model": "claude-sonnet-5"},
+        headers=auth_headers(admin),
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["model"] == "claude-sonnet-5"
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_refuses_a_model_outside_the_allowlist(
+    client, db_session, fake_provider
+):
+    org, admin = await create_org_admin(db_session)
+
+    resp = await client.post(
+        "/ai/chat/stream",
+        json={"message": "hello", "model": "claude-fable-5"},
+        headers=auth_headers(admin),
+    )
+
+    assert resp.status_code == 200
+    events = [
+        line[len("data: "):]
+        for line in resp.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert len(events) == 1
+    assert '"type": "error"' in events[0]
+    assert "claude-fable-5" in events[0]
+
+
+@pytest.mark.asyncio
 async def test_chat_endpoint_writes_audit_log(client, db_session, fake_provider):
     org, admin = await create_org_admin(db_session)
 

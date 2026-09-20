@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -84,6 +85,63 @@ def _outcome_status(exc: AppException) -> str:
         return "not_found"
 
     return "error"
+
+
+def _resolve_model(requested: str | None) -> str:
+    """The model this turn runs on: the deployment default, or one of the
+    names it lets a caller choose.
+
+    Checked before anything is persisted, so a rejected request leaves no
+    conversation behind. The list exists because the quota is counted in
+    tokens: a model priced above the default would be a way to spend more
+    per token without ever reaching the limit.
+    """
+
+    if requested is None:
+        return settings.AI_DEFAULT_MODEL
+
+    if requested not in settings.AI_ALLOWED_MODELS:
+        raise ValidationException(
+            f"Model not available: {requested}. Choose one of "
+            f"{', '.join(settings.AI_ALLOWED_MODELS)}."
+        )
+
+    return requested
+
+
+# Chat turns in flight, per organization, for the quota check. The usage
+# row for a turn is written when the turn ends, so without this a burst of
+# requests at the edge of the limit all pass a check that none of them has
+# yet been charged for. Process-local, like the rate limiter: a
+# multi-instance deployment narrows the window per instance rather than
+# closing it.
+_INFLIGHT_TURNS: dict[uuid.UUID, int] = {}
+
+
+def _begin_turn(organization_id: uuid.UUID) -> None:
+    _INFLIGHT_TURNS[organization_id] = _INFLIGHT_TURNS.get(organization_id, 0) + 1
+
+
+def _end_turn(organization_id: uuid.UUID) -> None:
+    remaining = _INFLIGHT_TURNS.get(organization_id, 0) - 1
+
+    if remaining <= 0:
+        _INFLIGHT_TURNS.pop(organization_id, None)
+    else:
+        _INFLIGHT_TURNS[organization_id] = remaining
+
+
+def _inflight_turns(organization_id: uuid.UUID) -> int:
+    return _INFLIGHT_TURNS.get(organization_id, 0)
+
+
+def _estimate_tokens(text: str) -> int:
+    """A count for text whose real usage was never reported — four
+    characters per token, the order of magnitude the tokenizer produces
+    for English and code. Used only where the exact number is unavailable:
+    the round that was in progress when a stream was cut off."""
+
+    return len(text) // 4 + 1 if text else 0
 
 
 MAX_TOOL_ROUNDS = 5
@@ -723,6 +781,108 @@ class AIOrchestrator:
             cache_read_input_tokens=total_cache_read,
         )
 
+    # Sessions for writes that must outlive the request — see
+    # _record_interrupted_turn. Resolved on first use so importing this
+    # module never builds an engine; tests substitute their own.
+    _session_factory = None
+
+    def _new_session(self) -> AsyncSession:
+        if self._session_factory is None:
+            from src.database.session import AsyncSessionLocal
+
+            self._session_factory = AsyncSessionLocal
+
+        return self._session_factory()
+
+    async def _record_interrupted_turn(
+        self,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        model: str,
+        content: str,
+        usage: Usage,
+        latency_ms: int,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> None:
+        """Persist what a turn produced and consumed when it did not reach
+        `done`: the client closed the stream, or the provider or a tool
+        failed part-way.
+
+        The tokens were spent either way. Without this, a client that
+        closes the stream just before the final event is never charged for
+        anything — unmetered use of a metered quota — and the answer the
+        person watched arrive is gone from the conversation on reload.
+
+        Writes through its own session: the request's session is being
+        torn down by the disconnect that brought us here, and this write
+        must not depend on it. A failure here is logged, never raised —
+        there is nobody left to send it to.
+        """
+
+        try:
+            async with self._new_session() as session:
+                message_id = None
+
+                if content:
+                    assistant_message = await ai_message_repository.create(
+                        session,
+                        AIMessage(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=content,
+                        ),
+                    )
+                    message_id = assistant_message.id
+
+                await ai_usage_repository.create(
+                    session,
+                    AIUsage(
+                        conversation_id=conversation_id,
+                        message_id=message_id,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        provider="anthropic",
+                        model=model,
+                        prompt_tokens=usage.input_tokens,
+                        completion_tokens=usage.output_tokens,
+                        total_tokens=(
+                            usage.input_tokens
+                            + usage.cache_creation_input_tokens
+                            + usage.cache_read_input_tokens
+                            + usage.output_tokens
+                        ),
+                        cache_creation_tokens=usage.cache_creation_input_tokens,
+                        cache_read_tokens=usage.cache_read_input_tokens,
+                        estimated_cost_usd=estimate_cost(model, usage),
+                        latency_ms=latency_ms,
+                    ),
+                )
+
+                await audit_service.log(
+                    session,
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    action="chat_stream_interrupted",
+                    entity="AIConversation",
+                    entity_id=conversation_id,
+                    new_values={
+                        "model": model,
+                        "total_tokens": usage.input_tokens + usage.output_tokens,
+                    },
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                )
+
+                await session.commit()
+        except Exception:
+            app_logger.exception(
+                "Could not record the usage of an interrupted chat turn "
+                f"(conversation {conversation_id})"
+            )
+
     async def _check_usage_quota(
         self,
         db: AsyncSession,
@@ -758,7 +918,14 @@ class AIOrchestrator:
             db, organization_id, start_of_month
         )
 
-        if total_tokens >= limit:
+        # Turns still running have consumed tokens that are not yet in the
+        # ledger; each is assumed to cost AI_QUOTA_RESERVATION_TOKENS until
+        # it reports.
+        reserved = (
+            _inflight_turns(organization_id) * settings.AI_QUOTA_RESERVATION_TOKENS
+        )
+
+        if total_tokens + reserved >= limit:
             raise QuotaExceededException(
                 "Monthly AI usage quota exceeded for this organization."
             )
@@ -780,6 +947,47 @@ class AIOrchestrator:
         user_agent: str | None = None,
     ) -> ChatResult:
 
+        resolved_model = _resolve_model(model)
+
+        await self._check_usage_quota(db, organization_id)
+
+        _begin_turn(organization_id)
+
+        try:
+            return await self._chat_turn(
+                db,
+                organization_id=organization_id,
+                user_id=user_id,
+                message=message,
+                conversation_id=conversation_id,
+                resolved_model=resolved_model,
+                system=system,
+                enable_tools=enable_tools,
+                agent=agent,
+                attachments=attachments,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+        finally:
+            _end_turn(organization_id)
+
+    async def _chat_turn(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        message: str,
+        conversation_id: uuid.UUID | None,
+        resolved_model: str,
+        system: str | None,
+        enable_tools: bool,
+        agent: str | None,
+        attachments: list[AttachmentInput] | None,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> ChatResult:
+
         persona: AgentPersona | None = None
 
         # A caller asking for tools without naming an agent wants the full
@@ -793,8 +1001,6 @@ class AIOrchestrator:
                 raise ValidationException(f"Unknown agent: {agent}")
 
             enable_tools = True
-
-        await self._check_usage_quota(db, organization_id)
 
         conversation = await self._get_or_create_conversation(
             db,
@@ -826,7 +1032,6 @@ class AIOrchestrator:
             ),
         )
 
-        resolved_model = model or settings.AI_DEFAULT_MODEL
         provider = get_provider("anthropic")
 
         start = time.monotonic()
@@ -936,6 +1141,48 @@ class AIOrchestrator:
         user_agent: str | None = None,
     ) -> AsyncIterator[OrchestratedStreamEvent]:
 
+        resolved_model = _resolve_model(model)
+
+        await self._check_usage_quota(db, organization_id)
+
+        _begin_turn(organization_id)
+
+        try:
+            async for event in self._stream_turn(
+                db,
+                organization_id=organization_id,
+                user_id=user_id,
+                message=message,
+                conversation_id=conversation_id,
+                resolved_model=resolved_model,
+                system=system,
+                enable_tools=enable_tools,
+                agent=agent,
+                attachments=attachments,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            ):
+                yield event
+        finally:
+            _end_turn(organization_id)
+
+    async def _stream_turn(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        message: str,
+        conversation_id: uuid.UUID | None,
+        resolved_model: str,
+        system: str | None,
+        enable_tools: bool,
+        agent: str | None,
+        attachments: list[AttachmentInput] | None,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> AsyncIterator[OrchestratedStreamEvent]:
+
         persona: AgentPersona | None = None
 
         # A caller asking for tools without naming an agent wants the full
@@ -949,8 +1196,6 @@ class AIOrchestrator:
                 raise ValidationException(f"Unknown agent: {agent}")
 
             enable_tools = True
-
-        await self._check_usage_quota(db, organization_id)
 
         conversation = await self._get_or_create_conversation(
             db,
@@ -984,7 +1229,6 @@ class AIOrchestrator:
 
         yield OrchestratedStreamEvent(type="start", conversation_id=conversation.id)
 
-        resolved_model = model or settings.AI_DEFAULT_MODEL
         provider = get_provider("anthropic")
 
         tools: list[ToolDefinition] | None = None
@@ -1024,126 +1268,197 @@ class AIOrchestrator:
         total_cache_read = 0
         final_content_parts: list[str] = []
 
+        # For a turn that does not reach `done` (see the finally below):
+        # everything that streamed, the text of the round in progress, and
+        # the last usage the provider reported.
+        streamed_text: list[str] = []
+        in_flight_text: list[str] = []
+        last_round_usage: Usage | None = None
+        round_in_flight = False
+        completed = False
+
         start = time.monotonic()
 
         max_rounds = _resolve_max_tool_rounds(persona)
 
-        for _ in range(max_rounds):
-            round_content_parts: list[str] = []
-            round_usage: Usage | None = None
-            round_tool_calls: list[ToolCall] | None = None
-            round_stop_reason: str | None = None
+        try:
+            for _ in range(max_rounds):
+                round_content_parts: list[str] = []
+                round_usage: Usage | None = None
+                round_tool_calls: list[ToolCall] | None = None
+                round_stop_reason: str | None = None
 
-            request = ChatRequest(
-                messages=history,
-                model=resolved_model,
-                system=resolved_system,
-                system_context=resolved_system_context,
-                tools=tools,
-            )
+                request = ChatRequest(
+                    messages=history,
+                    model=resolved_model,
+                    system=resolved_system,
+                    system_context=resolved_system_context,
+                    tools=tools,
+                )
 
-            await _release_db(db)
+                await _release_db(db)
 
-            async for event in provider.stream_chat(request):
-                if event.type == "text_delta":
-                    round_content_parts.append(event.text or "")
+                in_flight_text.clear()
+                round_in_flight = True
+
+                async for event in provider.stream_chat(request):
+                    if event.type == "text_delta":
+                        round_content_parts.append(event.text or "")
+                        streamed_text.append(event.text or "")
+                        in_flight_text.append(event.text or "")
+
+                        yield OrchestratedStreamEvent(
+                            type="text_delta",
+                            text=event.text,
+                        )
+                    elif event.type == "message_stop":
+                        round_usage = event.usage
+                        round_tool_calls = event.tool_calls
+                        round_stop_reason = event.stop_reason
+
+                round_in_flight = False
+
+                if round_usage is not None:
+                    total_input_tokens += round_usage.input_tokens
+                    total_output_tokens += round_usage.output_tokens
+                    total_cache_creation += round_usage.cache_creation_input_tokens
+                    total_cache_read += round_usage.cache_read_input_tokens
+                    last_round_usage = round_usage
+
+                final_content_parts = round_content_parts
+
+                if (
+                    not enable_tools
+                    or round_stop_reason != "tool_use"
+                    or not round_tool_calls
+                ):
+                    break
+
+                history.append(
+                    ChatMessage(
+                        role="assistant",
+                        content="".join(round_content_parts),
+                        tool_calls=round_tool_calls,
+                    )
+                )
+
+                tool_results: list[ToolResult] = []
+
+                for tool_call in round_tool_calls:
+                    result = await self._execute_tool_call(
+                        db,
+                        tool_call,
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        conversation_id=conversation.id,
+                        allowed_tools=allowed_tools,
+                    )
+                    tool_results.append(result)
 
                     yield OrchestratedStreamEvent(
-                        type="text_delta",
-                        text=event.text,
+                        type="tool_call",
+                        tool_name=tool_call.name,
+                        tool_status="error" if result.is_error else "success",
                     )
-                elif event.type == "message_stop":
-                    round_usage = event.usage
-                    round_tool_calls = event.tool_calls
-                    round_stop_reason = event.stop_reason
 
-            if round_usage is not None:
-                total_input_tokens += round_usage.input_tokens
-                total_output_tokens += round_usage.output_tokens
-                total_cache_creation += round_usage.cache_creation_input_tokens
-                total_cache_read += round_usage.cache_read_input_tokens
-
-            final_content_parts = round_content_parts
-
-            if (
-                not enable_tools
-                or round_stop_reason != "tool_use"
-                or not round_tool_calls
-            ):
-                break
-
-            history.append(
-                ChatMessage(
-                    role="assistant",
-                    content="".join(round_content_parts),
-                    tool_calls=round_tool_calls,
-                )
-            )
-
-            tool_results: list[ToolResult] = []
-
-            for tool_call in round_tool_calls:
-                result = await self._execute_tool_call(
-                    db,
-                    tool_call,
-                    organization_id=organization_id,
-                    user_id=user_id,
-                    conversation_id=conversation.id,
-                    allowed_tools=allowed_tools,
-                )
-                tool_results.append(result)
-
-                yield OrchestratedStreamEvent(
-                    type="tool_call",
-                    tool_name=tool_call.name,
-                    tool_status="error" if result.is_error else "success",
-                )
-
-            history.append(
-                ChatMessage(
-                    role="user",
-                    content="",
-                    tool_results=tool_results,
-                )
-            )
-        else:
-            # Budget exhausted with the model still asking for tools. See the
-            # note on the same branch in _run_tool_loop: without this the user
-            # is left with the last partial sentence and no answer.
-            history.append(
-                ChatMessage(role="user", content=_TOOL_BUDGET_EXHAUSTED)
-            )
-
-            request = ChatRequest(
-                messages=history,
-                model=resolved_model,
-                system=resolved_system,
-                system_context=resolved_system_context,
-                tools=[],
-            )
-
-            await _release_db(db)
-
-            final_parts: list[str] = []
-
-            async for event in provider.stream_chat(request):
-                if event.type == "text_delta":
-                    final_parts.append(event.text or "")
-
-                    yield OrchestratedStreamEvent(
-                        type="text_delta",
-                        text=event.text,
+                history.append(
+                    ChatMessage(
+                        role="user",
+                        content="",
+                        tool_results=tool_results,
                     )
-                elif event.type == "message_stop" and event.usage is not None:
-                    total_input_tokens += event.usage.input_tokens
-                    total_output_tokens += event.usage.output_tokens
-                    total_cache_creation += event.usage.cache_creation_input_tokens
-                    total_cache_read += event.usage.cache_read_input_tokens
+                )
+            else:
+                # Budget exhausted with the model still asking for tools. See the
+                # note on the same branch in _run_tool_loop: without this the user
+                # is left with the last partial sentence and no answer.
+                history.append(
+                    ChatMessage(role="user", content=_TOOL_BUDGET_EXHAUSTED)
+                )
 
-            # Appended, not replaced: the narration already streamed to the
-            # user's screen, and dropping it here would make the persisted
-            # conversation disagree with what they watched arrive.
-            final_content_parts = final_content_parts + final_parts
+                request = ChatRequest(
+                    messages=history,
+                    model=resolved_model,
+                    system=resolved_system,
+                    system_context=resolved_system_context,
+                    tools=[],
+                )
+
+                await _release_db(db)
+
+                final_parts: list[str] = []
+
+                in_flight_text.clear()
+                round_in_flight = True
+
+                async for event in provider.stream_chat(request):
+                    if event.type == "text_delta":
+                        final_parts.append(event.text or "")
+                        streamed_text.append(event.text or "")
+                        in_flight_text.append(event.text or "")
+
+                        yield OrchestratedStreamEvent(
+                            type="text_delta",
+                            text=event.text,
+                        )
+                    elif event.type == "message_stop" and event.usage is not None:
+                        total_input_tokens += event.usage.input_tokens
+                        total_output_tokens += event.usage.output_tokens
+                        total_cache_creation += event.usage.cache_creation_input_tokens
+                        total_cache_read += event.usage.cache_read_input_tokens
+                        last_round_usage = event.usage
+
+                round_in_flight = False
+
+                # Appended, not replaced: the narration already streamed to the
+                # user's screen, and dropping it here would make the persisted
+                # conversation disagree with what they watched arrive.
+                final_content_parts = final_content_parts + final_parts
+
+            completed = True
+        finally:
+            if not completed:
+                # The provider reported nothing for the round that was cut
+                # off, so it is charged an estimate: the prompt was the
+                # same size as the last round's (it only grows), the
+                # answer is what streamed before the cut.
+                if round_in_flight:
+                    if last_round_usage is not None:
+                        estimated_input = (
+                            last_round_usage.input_tokens
+                            + last_round_usage.cache_creation_input_tokens
+                            + last_round_usage.cache_read_input_tokens
+                        )
+                    else:
+                        estimated_input = _estimate_tokens(
+                            (resolved_system or "")
+                            + (resolved_system_context or "")
+                            + "".join(m.content or "" for m in history)
+                        )
+
+                    total_input_tokens += estimated_input
+                    total_output_tokens += _estimate_tokens("".join(in_flight_text))
+
+                # Shielded: the cancellation that brought us here must not
+                # also cancel the write that accounts for it.
+                await asyncio.shield(
+                    self._record_interrupted_turn(
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        conversation_id=conversation.id,
+                        model=resolved_model,
+                        content="".join(streamed_text),
+                        usage=Usage(
+                            input_tokens=total_input_tokens,
+                            output_tokens=total_output_tokens,
+                            cache_creation_input_tokens=total_cache_creation,
+                            cache_read_input_tokens=total_cache_read,
+                        ),
+                        latency_ms=int((time.monotonic() - start) * 1000),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                    )
+                )
 
         latency_ms = int((time.monotonic() - start) * 1000)
 

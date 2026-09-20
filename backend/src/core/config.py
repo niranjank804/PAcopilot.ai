@@ -238,6 +238,16 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str | None = None
     AI_DEFAULT_MODEL: str = "claude-opus-5"
 
+    # The models a chat request may ask for by name. Anything else is a
+    # 422, whatever the caller's role: the request body is the one place a
+    # user chooses how much each of their tokens costs, and the quota is
+    # counted in tokens, not dollars — so an unlisted, pricier model would
+    # be a way to spend more without ever hitting the limit. Every entry
+    # must be priced in src/ai/pricing.py (a unit test enforces it) and
+    # AI_DEFAULT_MODEL must be one of them. JSON list in the environment,
+    # like CORS_ALLOWED_ORIGINS.
+    AI_ALLOWED_MODELS: list[str] = ["claude-opus-5", "claude-sonnet-5"]
+
     # Adaptive thinking lets the model decide how much to reason per turn.
     # It is NOT the default on the wire: a request that omits `thinking`
     # runs with no thinking at all, which is what this codebase was doing.
@@ -271,6 +281,15 @@ class Settings(BaseSettings):
     # Global monthly token cap applied to every organization; None = unlimited.
     # A per-organization limit needs a real billing/plan concept first.
     AI_MONTHLY_TOKEN_LIMIT: int | None = None
+
+    # What a chat turn still in flight is assumed to cost until it reports
+    # its real usage. The quota check counts every in-flight turn for the
+    # organization at this size, so a burst of concurrent requests at the
+    # edge of the limit is refused instead of all passing a check that
+    # none of them has yet been charged for. Per process, like the rate
+    # limiter; sized for a tool-using turn (several rounds of a large
+    # cached prompt plus a long answer).
+    AI_QUOTA_RESERVATION_TOKENS: int = 50_000
 
     # ------------------------------------------------------------------
     # TM1

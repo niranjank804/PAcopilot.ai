@@ -26,6 +26,20 @@ def test_default_model_is_priced_explicitly():
     )
 
 
+def test_every_selectable_model_is_priced_explicitly():
+    """A caller may name any model in AI_ALLOWED_MODELS; each must have a
+    real rate, or choosing it would price against the fallback."""
+
+    for model in settings.AI_ALLOWED_MODELS:
+        assert model in PRICING, f"{model!r} is selectable but not priced."
+
+
+def test_default_model_is_selectable():
+    """A request that names the default explicitly must not be refused."""
+
+    assert settings.AI_DEFAULT_MODEL in settings.AI_ALLOWED_MODELS
+
+
 def test_fable_is_priced_above_the_fallback():
     """The one model where the fallback would under-bill, not round."""
 
