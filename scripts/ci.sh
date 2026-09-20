@@ -21,6 +21,17 @@ step "Lint (blocking rules)"
 step "Migration integrity"
 (cd "$BACKEND" && PYTHONPATH=. python scripts/check_migrations.py)
 
+step "Test database"
+# Same rule as the Makefile: the suite runs only against the docker-compose
+# Postgres. A root .env may move its published port (POSTGRES_PORT).
+if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
+TEST_DATABASE_URL="${TEST_DATABASE_URL:-postgresql://postgres:postgres@localhost:${POSTGRES_PORT:-5432}/enterprise_ai_test}"
+export TEST_DATABASE_URL
+(cd "$ROOT" && docker compose up -d --wait postgres)
+(cd "$BACKEND" && DATABASE_URL="$TEST_DATABASE_URL" PYTHONPATH=. python -m alembic upgrade head)
+(cd "$BACKEND" && DATABASE_URL="$TEST_DATABASE_URL" PYTHONPATH=. python scripts/seed_roles.py)
+(cd "$BACKEND" && DATABASE_URL="$TEST_DATABASE_URL" PYTHONPATH=. python scripts/seed_permissions.py)
+
 step "Backend tests"
 (cd "$BACKEND" && PYTHONPATH=. python -m pytest tests/unit tests/integration -q -p no:logging)
 

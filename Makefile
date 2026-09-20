@@ -11,9 +11,18 @@ BACKEND  := backend
 FRONTEND := frontend
 PY       := python
 
+# The backend suite runs only against the docker-compose Postgres (see
+# backend/tests/conftest.py). POSTGRES_PORT in a root .env moves the
+# published port when 5432 is taken; the same port must then be in
+# TEST_DATABASE_URL, which is exported to pytest below.
+-include .env
+POSTGRES_PORT     ?= 5432
+TEST_DATABASE_URL ?= postgresql://postgres:postgres@localhost:$(POSTGRES_PORT)/enterprise_ai_test
+export TEST_DATABASE_URL
+
 .DEFAULT_GOAL := help
-.PHONY: help install test lint typecheck coverage quality migrations audit \
-        frontend-check ci clean
+.PHONY: help install test-db test lint typecheck coverage quality migrations \
+        audit frontend-check ci clean
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -23,7 +32,13 @@ install: ## Install backend and frontend dependencies
 	cd $(BACKEND) && $(PY) -m pip install -r requirements.txt -r requirements-dev.txt
 	cd $(FRONTEND) && npm ci
 
-test: ## Backend tests
+test-db: ## Start the local Postgres; migrate and seed the test database
+	docker compose up -d --wait postgres
+	cd $(BACKEND) && DATABASE_URL=$(TEST_DATABASE_URL) PYTHONPATH=. $(PY) -m alembic upgrade head
+	cd $(BACKEND) && DATABASE_URL=$(TEST_DATABASE_URL) PYTHONPATH=. $(PY) scripts/seed_roles.py
+	cd $(BACKEND) && DATABASE_URL=$(TEST_DATABASE_URL) PYTHONPATH=. $(PY) scripts/seed_permissions.py
+
+test: test-db ## Backend tests, against the local test database only
 	cd $(BACKEND) && PYTHONPATH=. $(PY) -m pytest tests/unit tests/integration -q -p no:logging
 
 lint: ## Blocking lint (pyflakes-level only, same as CI)

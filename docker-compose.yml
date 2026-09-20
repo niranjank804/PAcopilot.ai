@@ -11,6 +11,17 @@
 #
 # The credentials below match the defaults in .env.example, so a fresh
 # clone works with no further configuration.
+#
+# Two databases live in this one server: `enterprise_ai` for running the
+# application locally and `enterprise_ai_test` for the backend test suite
+# (created by scripts/postgres-init on first start). The suite refuses to
+# run against anything but a local server — see backend/tests/conftest.py
+# — and `make test-db` brings the test database to the current migration
+# head and seeds the reference data.
+#
+# If 5432 is already taken on your machine, set POSTGRES_PORT in a `.env`
+# file next to this one (it is gitignored) and put the same port in
+# backend/.env.test as TEST_DATABASE_URL.
 
 services:
   postgres:
@@ -21,9 +32,10 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: enterprise_ai
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
     # Compose reports the service healthy only once Postgres actually
     # accepts connections, rather than when the container starts — the
     # gap between those two is long enough for `alembic upgrade` to fail

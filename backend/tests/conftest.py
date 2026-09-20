@@ -1,14 +1,110 @@
-import httpx2
-import pytest
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
+"""Suite-wide fixtures.
 
-from src.core import rate_limit
-from src.core.config import settings
-from src.reports import storage as report_storage
-from src.knowledge.embeddings import cache as embedding_cache
-from src.database.session import engine, get_db
-from src.main import app
+The test database is chosen here, before anything under ``src`` is
+imported, because ``src.database.session`` builds the engine from settings
+at import time. Everything below the first ``src`` import inherits it.
+"""
+
+import os
+from pathlib import Path
+from urllib.parse import urlsplit
+
+import pytest
+
+# ----------------------------------------------------------------------
+# Test database
+# ----------------------------------------------------------------------
+# The suite never runs against the application's configured database.
+# `backend/.env` is the *runtime* configuration, and on a developer machine
+# it points wherever that developer last deployed — which, for a while,
+# was production. Every test wraps itself in a transaction that is rolled
+# back, but "every test rolls back" is a property of the tests written so
+# far, not a guarantee: one fixture that commits, or a debugger left open
+# mid-test, writes to whatever `.env` names.
+#
+# Resolution order:
+#   1. TEST_DATABASE_URL in the environment (CI sets this).
+#   2. TEST_DATABASE_URL in backend/.env.test (gitignored, per machine).
+#   3. The docker-compose default from the repository root.
+#
+# Whichever wins must name a local host. A remote host is refused outright
+# unless TEST_DATABASE_ALLOW_REMOTE=1 is set, which exists for a
+# purpose-built remote test database and nothing else.
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_DEFAULT_TEST_DATABASE_URL = (
+    "postgresql://postgres:postgres@localhost:5432/enterprise_ai_test"
+)
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _dotenv_value(path: Path, key: str) -> str | None:
+    """One key from a dotenv file, without loading the file into the
+    environment: only this key is wanted, and only here."""
+
+    if not path.is_file():
+        return None
+
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        name, _, value = line.partition("=")
+
+        if name.strip() == key:
+            return value.strip().strip("'\"")
+
+    return None
+
+
+def _describe(url: str) -> str:
+    """host:port/database — never the credentials."""
+
+    parts = urlsplit(url)
+    port = f":{parts.port}" if parts.port else ""
+
+    return f"{parts.hostname or '?'}{port}{parts.path}"
+
+
+def _select_test_database() -> str:
+    url = (
+        os.environ.get("TEST_DATABASE_URL")
+        or _dotenv_value(_BACKEND_DIR / ".env.test", "TEST_DATABASE_URL")
+        or _DEFAULT_TEST_DATABASE_URL
+    )
+    host = urlsplit(url).hostname or ""
+    allow_remote = os.environ.get("TEST_DATABASE_ALLOW_REMOTE") == "1"
+
+    if host not in _LOCAL_HOSTS and not allow_remote:
+        raise pytest.UsageError(
+            "Refusing to run the test suite against a remote database "
+            f"({_describe(url)}). Tests run only against a local Postgres: "
+            "start one with `docker compose up -d` and prepare it with "
+            "`make test-db`, or point TEST_DATABASE_URL at a local server."
+        )
+
+    # Settings read the environment before .env, so this is what the
+    # application under test connects to, whatever .env says.
+    os.environ["DATABASE_URL"] = url
+    os.environ.pop("DATABASE_URL_UNPOOLED", None)
+
+    return url
+
+
+TEST_DATABASE_URL = _select_test_database()
+
+import httpx2  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
+
+from src.core import rate_limit  # noqa: E402
+from src.core.config import settings  # noqa: E402
+from src.reports import storage as report_storage  # noqa: E402
+from src.knowledge.embeddings import cache as embedding_cache  # noqa: E402
+from src.database.session import engine, get_db  # noqa: E402
+from src.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -72,6 +168,24 @@ def _clean_rate_limit_windows():
     rate_limit.reset()
     yield
     rate_limit.reset()
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _test_database_reachable():
+    """One clear message when the test database is down, instead of every
+    test failing with the same connection traceback."""
+
+    try:
+        connection = await engine.connect()
+    except Exception as exc:
+        pytest.exit(
+            f"The test database at {_describe(TEST_DATABASE_URL)} is not "
+            f"reachable ({type(exc).__name__}: {exc}). Start it with "
+            "`docker compose up -d` and prepare it with `make test-db`.",
+            returncode=4,
+        )
+
+    await connection.close()
 
 
 @pytest_asyncio.fixture
