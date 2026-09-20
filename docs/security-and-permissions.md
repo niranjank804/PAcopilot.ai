@@ -80,9 +80,16 @@ Added 2026-07-23. Two independent gates sit in front of every login,
 checked in this order (`auth_service._check_can_authenticate`):
 
 1. **`registration_status`**: `pending` → `approved` → (or `rejected`).
-   Set once, by an Org Admin, never automatic. New accounts start
-   `pending` regardless of how they're created (self-service or Google
-   sign-in only ever *logs into* an existing account, never creates one).
+   Set once, by an Org Admin. New accounts start `pending` regardless of
+   how they're created: `POST /auth/register`, or a first-time Google
+   sign-in, which provisions the account (in the shared default
+   organization, holding `DEFAULT_SIGNUP_ROLE`) and then refuses the token
+   until an admin approves it. The one exception is a deployment that sets
+   `REGISTRATION_AUTO_APPROVE=true` (off by default), which was the
+   2026-07 testing-phase behaviour: every signup is approved on the spot
+   and immediately holds `tm1.read` on every connection in its
+   organization. Never enable it where strangers can reach the sign-up
+   page.
 2. **`is_active`**: independent of the above — an Org Admin can
    deactivate/reactivate an *already-approved* account at any time (e.g. an
    employee leaving) without touching their registration history. An admin

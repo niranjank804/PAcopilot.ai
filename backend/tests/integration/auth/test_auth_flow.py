@@ -59,7 +59,7 @@ def fake_email_provider(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_register_creates_an_approved_account(client, db_session):
+async def test_register_creates_a_pending_account(client, db_session):
     org = await create_organization(db_session)
     suffix = uuid.uuid4().hex[:8]
 
@@ -78,7 +78,34 @@ async def test_register_creates_an_approved_account(client, db_session):
     body = register_resp.json()
     assert body["success"] is True
     assert body["data"]["username"] == f"user_{suffix}"
-    assert body["data"]["registration_status"] == "approved"
+    assert body["data"]["registration_status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_register_auto_approves_only_when_the_deployment_opts_in(
+    client, db_session, monkeypatch
+):
+    # The 2026-07 testing-phase behaviour survives behind a setting that
+    # is off by default; this pins both the setting and the default.
+    monkeypatch.setattr(
+        auth_service_module.settings, "REGISTRATION_AUTO_APPROVE", True
+    )
+    org = await create_organization(db_session)
+    suffix = uuid.uuid4().hex[:8]
+
+    register_resp = await client.post(
+        "/auth/register",
+        json={
+            "username": f"user_{suffix}",
+            "email": f"user_{suffix}@example.com",
+            "password": DEFAULT_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User",
+            "organization_code": org.code,
+        },
+    )
+    assert register_resp.status_code == 201
+    assert register_resp.json()["data"]["registration_status"] == "approved"
 
 
 @pytest.mark.asyncio
@@ -98,7 +125,7 @@ async def test_register_without_organization_code_uses_default_org(
         },
     )
     assert register_resp.status_code == 201
-    assert register_resp.json()["data"]["registration_status"] == "approved"
+    assert register_resp.json()["data"]["registration_status"] == "pending"
 
     # Registering a second user with no code lands in the same default org
     # rather than creating a new one each time.
@@ -121,7 +148,12 @@ async def test_register_without_organization_code_uses_default_org(
 
 
 @pytest.mark.asyncio
-async def test_register_then_login_succeeds_immediately(client, db_session):
+async def test_register_then_login_waits_for_approval(client, db_session):
+    """A stranger who signs up gets an account, not a session. Until an
+    admin approves it, no token is issued — so nothing behind
+    `require_permission` (TM1 connections, the assistant, the knowledge
+    base) is reachable, whatever role the account was granted."""
+
     org = await create_organization(db_session)
     suffix = uuid.uuid4().hex[:8]
     username = f"user_{suffix}"
@@ -137,6 +169,17 @@ async def test_register_then_login_succeeds_immediately(client, db_session):
             "organization_code": org.code,
         },
     )
+
+    refused = await client.post(
+        "/auth/login",
+        json={"username": username, "password": DEFAULT_PASSWORD},
+    )
+    assert refused.status_code == 403
+    assert "pending" in refused.json()["error"]["message"].lower()
+
+    user = await user_repository.get_by_username(db_session, username)
+    user.registration_status = "approved"
+    await user_repository.update(db_session, user)
 
     login_resp = await client.post(
         "/auth/login",
@@ -399,19 +442,16 @@ async def test_google_login_auto_creates_account_for_new_email(
 
     resp = await client.post("/auth/google", json={"id_token": "fake-token"})
 
-    assert resp.status_code == 200
-    body = resp.json()["data"]
-    assert "access_token" in body
+    # The account now exists for the admin to decide on; the person gets
+    # the pending message, not a session.
+    assert resp.status_code == 403
+    assert "pending" in resp.json()["error"]["message"].lower()
 
-    me_resp = await client.get(
-        "/auth/me",
-        headers={"Authorization": f"Bearer {body['access_token']}"},
-    )
-    assert me_resp.status_code == 200
-    me_data = me_resp.json()["data"]
-    assert me_data["email"] == email
-    assert me_data["first_name"] == "New"
-    assert me_data["last_name"] == "Googler"
+    user = await user_repository.get_by_email(db_session, email)
+    assert user is not None
+    assert user.first_name == "New"
+    assert user.last_name == "Googler"
+    assert user.registration_status == "pending"
 
 
 @pytest.mark.asyncio
@@ -428,24 +468,24 @@ async def test_google_login_reuses_account_on_second_login(
     )
 
     first_resp = await client.post("/auth/google", json={"id_token": "fake-token"})
-    second_resp = await client.post("/auth/google", json={"id_token": "fake-token"})
+    assert first_resp.status_code == 403
 
-    assert first_resp.status_code == 200
+    user = await user_repository.get_by_email(db_session, email)
+    user.registration_status = "approved"
+    await user_repository.update(db_session, user)
+
+    second_resp = await client.post("/auth/google", json={"id_token": "fake-token"})
     assert second_resp.status_code == 200
 
-    first_me = await client.get(
-        "/auth/me",
-        headers={
-            "Authorization": f"Bearer {first_resp.json()['data']['access_token']}"
-        },
-    )
-    second_me = await client.get(
+    me_resp = await client.get(
         "/auth/me",
         headers={
             "Authorization": f"Bearer {second_resp.json()['data']['access_token']}"
         },
     )
-    assert first_me.json()["data"]["id"] == second_me.json()["data"]["id"]
+    # Approval is what let the second sign-in through; no second account
+    # was created for the same email.
+    assert me_resp.json()["data"]["id"] == str(user.id)
 
 
 # ---------------------------------------------------------------------------

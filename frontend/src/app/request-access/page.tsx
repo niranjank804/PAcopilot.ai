@@ -65,15 +65,18 @@ export default function RequestAccessPage() {
     <div className="flex flex-1 items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <h1 className="sr-only">Create a PA-Copilot account</h1>
-          <CardTitle className="text-xl">Create account</CardTitle>
-          <CardDescription>Sign up to start using PA-Copilot.</CardDescription>
+          <h1 className="sr-only">Request a PA-Copilot account</h1>
+          <CardTitle className="text-xl">Request access</CardTitle>
+          <CardDescription>
+            An administrator reviews every new account before it can sign in.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {submitted ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Your account is ready — you can sign in now.
+                Your request has been sent. You&apos;ll be able to sign in once an
+                administrator approves it.
               </p>
               <Link
                 href="/login"

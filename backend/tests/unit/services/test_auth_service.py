@@ -208,21 +208,42 @@ async def test_google_login_issues_tokens_for_existing_active_user(
 
 
 @pytest.mark.asyncio
-async def test_google_login_auto_creates_account_with_no_existing_user(
+async def test_google_login_creates_a_pending_account_for_an_unknown_email(
     db_session, fake_google_claims
 ):
+    """A first Google sign-in provisions the account so the admin can see
+    the request, but issues no token: the person is told to wait, not
+    let in."""
+
     fake_google_claims["email"] = "brandnew@example.com"
     fake_google_claims["email_verified"] = True
     fake_google_claims["given_name"] = "Brand"
     fake_google_claims["family_name"] = "New"
 
-    result = await auth_service.google_login(db_session, "fake-id-token")
+    with pytest.raises(PermissionDeniedException, match="pending"):
+        await auth_service.google_login(db_session, "fake-id-token")
 
-    assert result.access_token
     user = await user_repository.get_by_email(db_session, "brandnew@example.com")
     assert user is not None
     assert user.first_name == "Brand"
     assert user.last_name == "New"
+    assert user.registration_status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_google_login_auto_approves_only_when_the_deployment_opts_in(
+    db_session, fake_google_claims, monkeypatch
+):
+    monkeypatch.setattr(
+        auth_service_module.settings, "REGISTRATION_AUTO_APPROVE", True
+    )
+    fake_google_claims["email"] = "brandnew@example.com"
+    fake_google_claims["email_verified"] = True
+
+    result = await auth_service.google_login(db_session, "fake-id-token")
+
+    assert result.access_token
+    user = await user_repository.get_by_email(db_session, "brandnew@example.com")
     assert user.registration_status == "approved"
 
 

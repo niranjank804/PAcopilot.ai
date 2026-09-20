@@ -15,11 +15,9 @@ from tests.fixtures.factories import (
 
 
 async def _register_pending(client, db_session, org, suffix: str):
-    """Registration now auto-approves (testing-phase default) - these tests
-    are about the approve/reject/deactivate endpoints themselves, which
-    still need a genuinely pending account to exercise, so force it back
-    to pending after registering rather than via the (now-unreachable
-    through the API) pending-by-default path."""
+    """Registers through the real endpoint. A new account starts pending
+    (REGISTRATION_AUTO_APPROVE is off by default), which is exactly what
+    the approve/reject/deactivate tests below need."""
 
     resp = await client.post(
         "/auth/register",
@@ -34,12 +32,12 @@ async def _register_pending(client, db_session, org, suffix: str):
     )
     assert resp.status_code == 201
 
-    user = await user_repository.get_by_username(db_session, f"pending_{suffix}")
-    user.registration_status = "pending"
-    await user_repository.update(db_session, user)
-
     data = resp.json()["data"]
-    data["registration_status"] = "pending"
+    assert data["registration_status"] == "pending"
+
+    user = await user_repository.get_by_username(db_session, f"pending_{suffix}")
+    assert user.registration_status == "pending"
+
     return data
 
 

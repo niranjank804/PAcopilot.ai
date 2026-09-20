@@ -115,9 +115,9 @@ const SECURITY = [
   },
   {
     icon: UserCheck,
-    title: "Instant access, revocable anytime",
+    title: "Approved access, revocable anytime",
     description:
-      "Sign up and start using PA-Copilot right away — an administrator can still deactivate any account at any time.",
+      "Every new account is approved by an administrator before it can sign in, and can be deactivated at any time after.",
   },
   {
     icon: Lock,
@@ -343,12 +343,9 @@ export default function LandingPage() {
             <h2 className="text-3xl font-bold tracking-tight">
               Ready to try it on your environment?
             </h2>
-            {/* The fact worth stating is that there is no approval
-                queue, which is a property of how access works — not of
-                a beta that will one day end. Framing it as temporary
-                also implied a deadline nobody had set. */}
             <p className="mt-3 text-muted-foreground">
-              Sign up and you&apos;re in — no approval wait, no sales call.
+              Request an account and an administrator lets you in — no sales
+              call.
             </p>
             <div className="mt-8 flex items-center justify-center gap-3">
               <Link

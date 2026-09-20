@@ -62,6 +62,16 @@ async def get_current_user(
     # anything in its real body would silently never run under test.
     db.info["organization_id"] = current_user.organization_id
 
+    # No path issues a token to a pending or rejected account (see
+    # auth_service._check_can_authenticate), so this only ever fires for
+    # a token minted before the status changed, or outside the
+    # application. One comparison per request buys a second gate on the
+    # decision that stands between a stranger and the TM1 model.
+    if current_user.registration_status != "approved":
+        raise PermissionDeniedException(
+            "Your account is pending administrator approval."
+        )
+
     return current_user
 
 

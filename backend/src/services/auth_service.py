@@ -47,6 +47,18 @@ def _hash_reset_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode()).hexdigest()
 
 
+def _initial_registration_status() -> str:
+    """What a brand-new account starts as.
+
+    `pending` unless the deployment has opted into auto-approval: a
+    pending account exists (so the admin can see and decide on it) but
+    cannot obtain a token by any path — `_check_can_authenticate` gates
+    login, refresh and Google sign-in alike.
+    """
+
+    return "approved" if settings.REGISTRATION_AUTO_APPROVE else "pending"
+
+
 def _check_can_authenticate(user: User) -> None:
     """Shared gate for every path that issues tokens (login, refresh,
     Google sign-in) — registration_status is checked first since a
@@ -189,13 +201,9 @@ class AuthService:
         if existing_email:
             raise ConflictException("Email already exists")
 
-        # Testing phase (user's explicit choice, 2026-07-23): every
-        # self-registration is auto-approved, no admin review step. The
-        # approval machinery itself (user_service.approve_user/reject_user)
-        # is untouched — an admin can still manually reject or deactivate
-        # an account after the fact, and "pending" is still a valid status
-        # for that path. This only changes the default a new signup starts
-        # at, so it's a one-line revert if the testing phase ends.
+        # The account is created now, with its role, so that approving it
+        # is a one-step decision for the admin; until then it cannot sign
+        # in. REGISTRATION_AUTO_APPROVE (off by default) skips the wait.
         user = User(
             organization_id=organization.id,
             username=request.username,
@@ -206,7 +214,7 @@ class AuthService:
             first_name=request.first_name,
             last_name=request.last_name,
             is_active=True,
-            registration_status="approved",
+            registration_status=_initial_registration_status(),
         )
 
         user = await user_repository.create(db, user)
@@ -408,13 +416,12 @@ class AuthService:
 
         user = await user_repository.get_by_email(db, email)
 
-        # Testing phase (user's explicit choice, 2026-07-24, superseding the
-        # earlier "never auto-create" policy): a first-time Google sign-in
-        # now provisions an account on the spot, same default-org +
-        # auto-approved treatment as a plain self-registration. The
-        # org-scoped-RBAC question that blocked this before ("which org
-        # would a brand-new Google user join?") is answered the same way
-        # register() answers it — the shared default org.
+        # A first-time Google sign-in provisions an account the same way a
+        # plain self-registration does — in the shared default organization,
+        # holding DEFAULT_SIGNUP_ROLE — and it waits for the same approval:
+        # `_check_can_authenticate` below refuses the token while the
+        # account is pending, so the person sees the "pending approval"
+        # message and the admin sees the request under Users.
         if user is None:
             organization = await self._resolve_registration_organization(
                 db, None
@@ -435,12 +442,20 @@ class AuthService:
                 first_name=claims.get("given_name") or "Google",
                 last_name=claims.get("family_name") or "User",
                 is_active=True,
-                registration_status="approved",
+                registration_status=_initial_registration_status(),
             )
 
             user = await user_repository.create(db, user)
 
             await self._grant_default_role(db, user)
+
+            if user.registration_status != "approved":
+                # The refusal below is an exception, and the request
+                # scope rolls back on exceptions — which would erase the
+                # account the admin is supposed to approve. Commit it
+                # first: the account is the outcome, the 403 is the
+                # message.
+                await db.commit()
 
         _check_can_authenticate(user)
 

@@ -147,6 +147,19 @@ class Settings(BaseSettings):
     # string to restore the previous behaviour of granting nothing.
     DEFAULT_SIGNUP_ROLE: str = "Analyst"
 
+    # Whether a self-registered or first-time-Google account can sign in
+    # without an administrator approving it first. Off, an account starts
+    # `pending`; an Org Admin sees it under Users and approves or rejects
+    # it (docs/security-and-permissions.md §4).
+    #
+    # On, anyone who reaches the sign-up page is immediately a member of
+    # the organization their code names — or of the shared default
+    # organization when they give none — holding DEFAULT_SIGNUP_ROLE, which
+    # includes reading every TM1 connection there. That was the 2026-07
+    # testing-phase setting; it is only ever safe when the deployment is
+    # not reachable by strangers.
+    REGISTRATION_AUTO_APPROVE: bool = False
+
     # ------------------------------------------------------------------
     # Rate limiting (src/core/rate_limit.py)
     # ------------------------------------------------------------------
