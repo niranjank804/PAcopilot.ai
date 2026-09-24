@@ -99,3 +99,38 @@ async def check_cube_rules(
         cube_name,
         **resilience_kwargs,
     )
+
+
+async def list_cubes_with_rules(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    **resilience_kwargs,
+) -> list[str]:
+    """Names of cubes that carry a rule, so an audit can skip the rest."""
+
+    return await call_with_resilience(
+        connection_id,
+        client.cubes.get_all_names_with_rules,
+        skip_control_cubes=True,
+        **resilience_kwargs,
+    ) or []
+
+
+async def search_rule_substring(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    substring: str,
+    **resilience_kwargs,
+) -> list[str]:
+    """Cubes whose rule text contains substring. Matched on the server."""
+
+    cubes = await call_with_resilience(
+        connection_id,
+        client.cubes.search_for_rule_substring,
+        substring=substring,
+        skip_control_cubes=True,
+        case_insensitive=True,
+        space_insensitive=True,
+        **resilience_kwargs,
+    )
+    return [cube.name for cube in (cubes or [])]

@@ -28,8 +28,34 @@ from src.ai.tools.tm1.metadata import (
     GetDimensionDependentsTool,
     GetObjectRelationshipsTool,
 )
-from src.ai.tools.tm1.processes import GetProcessTool, ListProcessesTool
+from src.ai.tools.tm1.health import RunModelHealthCheckTool
+from src.ai.tools.tm1.logs import (
+    GetMessageLogTool,
+    GetProcessErrorLogTool,
+    GetTransactionLogTool,
+    ListProcessErrorLogsTool,
+    MapLogErrorToCodeTool,
+)
+from src.ai.tools.tm1.processes import (
+    DiffProcessTool,
+    GetProcessTool,
+    ListProcessesTool,
+    SearchProcessCodeTool,
+)
+from src.ai.tools.tm1.rules import (
+    AnalyzeCubeRulesTool,
+    AuditModelRulesTool,
+    SearchRulesTool,
+    TraceCellCalculationTool,
+)
 from src.ai.tools.tm1.standards import GetCodingStandardsTool
+from src.ai.tools.tm1.structure import (
+    GetDimensionAttributesTool,
+    GetElementContextTool,
+    GetServerStateTool,
+    ListCubeViewsTool,
+    ListDimensionSubsetsTool,
+)
 
 TOOLS: dict[str, Tool] = {
     tool.name: tool
@@ -43,6 +69,23 @@ TOOLS: dict[str, Tool] = {
         ExecuteMDXTool(),
         ListProcessesTool(),
         GetProcessTool(),
+        SearchProcessCodeTool(),
+        DiffProcessTool(),
+        ListCubeViewsTool(),
+        ListDimensionSubsetsTool(),
+        GetDimensionAttributesTool(),
+        GetElementContextTool(),
+        GetServerStateTool(),
+        RunModelHealthCheckTool(),
+        AnalyzeCubeRulesTool(),
+        TraceCellCalculationTool(),
+        SearchRulesTool(),
+        AuditModelRulesTool(),
+        GetMessageLogTool(),
+        GetTransactionLogTool(),
+        ListProcessErrorLogsTool(),
+        GetProcessErrorLogTool(),
+        MapLogErrorToCodeTool(),
         ListChoresTool(),
         GetChoreTool(),
         GetCubeDependenciesTool(),

@@ -168,3 +168,25 @@ async def process_exists(
         process_name,
         **resilience_kwargs,
     )
+
+
+async def search_process_code(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    search_string: str,
+    **resilience_kwargs,
+) -> list[str]:
+    """Names of processes whose code contains search_string (case-insensitive).
+
+    TM1py pushes this down to the server rather than fetching every process,
+    which matters on a model with hundreds of them.
+    """
+
+    matches = await call_with_resilience(
+        connection_id,
+        client.processes.search_string_in_code,
+        search_string=search_string,
+        skip_control_processes=True,
+        **resilience_kwargs,
+    )
+    return matches or []

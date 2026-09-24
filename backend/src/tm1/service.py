@@ -1,5 +1,6 @@
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,8 +28,10 @@ from src.tm1.services import (
     chore_service,
     cube_service,
     dimension_service,
+    log_service,
     process_service,
     security_service,
+    structure_service,
 )
 from src.tm1.services.cell_service import CellsetResult
 from src.tm1.services.chore_service import ChoreInfo
@@ -484,6 +487,251 @@ class TM1IntegrationService:
             client,
             connection.id,
             group_name,
+        )
+
+    async def _client_for(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+    ):
+        connection = await self.get_connection(db, connection_id, organization_id)
+        return connection, await tm1_connection_manager.get_client(connection)
+
+    async def list_views(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        cube_name: str,
+    ) -> dict:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.list_views(client, connection.id, cube_name)
+
+    async def list_hierarchies(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        dimension_name: str,
+    ) -> list[str]:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.list_hierarchies(
+            client, connection.id, dimension_name
+        )
+
+    async def get_default_member(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        dimension_name: str,
+        hierarchy_name: str,
+    ) -> str | None:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.get_default_member(
+            client, connection.id, dimension_name, hierarchy_name
+        )
+
+    async def list_subsets(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        dimension_name: str,
+        hierarchy_name: str,
+    ) -> list[str]:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.list_subsets(
+            client, connection.id, dimension_name, hierarchy_name
+        )
+
+    async def get_attribute_definitions(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        dimension_name: str,
+        hierarchy_name: str,
+    ) -> list[dict]:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.get_attribute_definitions(
+            client, connection.id, dimension_name, hierarchy_name
+        )
+
+    async def get_element_parents(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        dimension_name: str,
+        hierarchy_name: str,
+        element_name: str,
+    ) -> list[str]:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.get_parents(
+            client, connection.id, dimension_name, hierarchy_name, element_name
+        )
+
+    async def get_leaves_under(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        dimension_name: str,
+        hierarchy_name: str,
+        consolidation: str,
+    ) -> list[str]:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.get_leaves_under(
+            client, connection.id, dimension_name, hierarchy_name, consolidation
+        )
+
+    async def get_server_state(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+    ) -> dict:
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+        return await structure_service.get_server_state(client, connection.id)
+
+    async def list_cubes_with_rules(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+    ) -> list[str]:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await cube_service.list_cubes_with_rules(client, connection.id)
+
+    async def search_rule_substring(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        substring: str,
+    ) -> list[str]:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await cube_service.search_rule_substring(
+            client, connection.id, substring
+        )
+
+    async def search_process_code(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        search_string: str,
+    ) -> list[str]:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await process_service.search_process_code(
+            client,
+            connection.id,
+            search_string,
+        )
+
+    async def get_message_log(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        top: int | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        level: str | None = None,
+        logger: str | None = None,
+    ) -> list[dict]:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await log_service.get_message_log(
+            client,
+            connection.id,
+            top=top,
+            since=since,
+            until=until,
+            level=level,
+            logger=logger,
+        )
+
+    async def get_transaction_log(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        cube: str | None = None,
+        user: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        top: int | None = None,
+    ) -> list[dict]:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await log_service.get_transaction_log(
+            client,
+            connection.id,
+            cube=cube,
+            user=user,
+            since=since,
+            until=until,
+            top=top,
+        )
+
+    async def list_process_error_logs(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        process_name: str | None = None,
+        top: int | None = None,
+    ) -> list[str]:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await log_service.list_process_error_logs(
+            client,
+            connection.id,
+            process_name=process_name,
+            top=top,
+        )
+
+    async def get_process_error_log(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        file_name: str,
+    ) -> str:
+
+        connection = await self.get_connection(db, connection_id, organization_id)
+        client = await tm1_connection_manager.get_client(connection)
+
+        return await log_service.get_process_error_log(
+            client,
+            connection.id,
+            file_name,
         )
 
 
