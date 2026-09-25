@@ -89,7 +89,14 @@ class RecordingChatProvider(AIProvider):
 
 
 @pytest.fixture
-def keyword_embeddings():
+def keyword_embeddings(monkeypatch):
+    # The text-proxy provider refuses to run without an OpenAI key, before
+    # it ever reaches the embedder — correct in production, where the
+    # embedder is OpenAI. Here the embedder is fake, so a placeholder key
+    # satisfies the check. Without it these tests passed only on machines
+    # whose environment happened to carry a real key, and failed in CI.
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test-placeholder-not-a-key")
+
     original = EMBEDDING_PROVIDERS.get("openai")
     EMBEDDING_PROVIDERS["openai"] = KeywordEmbeddingProvider()
     yield
