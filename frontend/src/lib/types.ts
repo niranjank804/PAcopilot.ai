@@ -11,7 +11,7 @@ export interface TM1Connection {
   ssl: boolean;
   username: string;
   is_active: boolean;
-  authentication_type: "native" | "v12_saas";
+  authentication_type: "native" | "v12_saas" | "pa_cloud";
   tenant: string | null;
   database: string | null;
 }

@@ -28,14 +28,27 @@ export function looksLikeSaasAddress(address: string | undefined): boolean {
   return SAAS_HOST.test((address ?? "").trim());
 }
 
+// The database in a PA on Cloud REST base URL, as a TM1 .env holds it:
+// https://<name>.planning-analytics.ibmcloud.com/tm1/api/<database>
+// Mirrors backend/src/tm1/addressing.py, which reads it on save.
+const PA_CLOUD_BASE_URL = /\/tm1\/api\/([^/?#]+)/i;
+
+export function databaseFromBaseUrl(address: string | undefined): string | null {
+  const match = PA_CLOUD_BASE_URL.exec((address ?? "").trim());
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 const AUTH_TYPE_LABEL: Record<string, string> = {
   native: "Native (on-prem / self-hosted TM1)",
   v12_saas: "Planning Analytics as a Service (IBM Cloud API key)",
+  pa_cloud: "Planning Analytics on Cloud (non-interactive account)",
 };
+
+type AuthType = "native" | "v12_saas" | "pa_cloud";
 
 export interface ConnectionFormValues {
   name: string;
-  authentication_type: "native" | "v12_saas";
+  authentication_type: AuthType;
   address: string;
   port: number;
   ssl: boolean;
@@ -49,7 +62,7 @@ interface ConnectionFormFieldsProps<T extends FieldValues> {
   register: UseFormRegister<T>;
   control: Control<T>;
   errors: FieldErrors<T>;
-  authType: "native" | "v12_saas";
+  authType: AuthType;
   passwordLabel: string;
   passwordPlaceholder?: string;
 }
@@ -96,7 +109,7 @@ export function ConnectionFormFields<T extends FieldValues>({
           name={"authentication_type" as Path<T>}
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger id="authentication_type" className="w-full">
+              <SelectTrigger id="authentication_type" className="w-full min-w-0 [&>span]:truncate">
                 <SelectValue>
                   {(value: string) =>
                     AUTH_TYPE_LABEL[value] ?? "Select authentication type"
@@ -110,6 +123,9 @@ export function ConnectionFormFields<T extends FieldValues>({
                 <SelectItem value="v12_saas">
                   Planning Analytics as a Service (IBM Cloud API key)
                 </SelectItem>
+                <SelectItem value="pa_cloud">
+                  Planning Analytics on Cloud (non-interactive account)
+                </SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -118,14 +134,20 @@ export function ConnectionFormFields<T extends FieldValues>({
 
       <div className="space-y-2">
         <Label htmlFor="address">
-          {authType === "v12_saas" ? "PA SaaS hostname" : "Address"}
+          {authType === "v12_saas"
+            ? "PA SaaS hostname"
+            : authType === "pa_cloud"
+              ? "TM1 base URL or hostname"
+              : "Address"}
         </Label>
         <Input
           id="address"
           placeholder={
             authType === "v12_saas"
               ? "us-east-1.planninganalytics.saas.ibm.com"
-              : "tm1.example.com"
+              : authType === "pa_cloud"
+                ? "https://mycompany.planning-analytics.ibmcloud.com/tm1/api/MyDatabase"
+                : "tm1.example.com"
           }
           {...register("address" as Path<T>)}
         />
@@ -150,8 +172,48 @@ export function ConnectionFormFields<T extends FieldValues>({
         ) : null}
       </div>
 
-      {authType === "v12_saas" ? (
-        <div className="grid grid-cols-2 gap-4">
+      {/* Keyed by type: without a key React reuses the same <input>
+          elements when the type changes, and the port's 8010 stayed on
+          screen in the Tenant ID box — then was saved as the tenant. */}
+      {authType === "pa_cloud" ? (
+        <div key="pa_cloud" className="grid grid-cols-2 gap-4 [&>*]:min-w-0">
+          <p className="col-span-2 text-xs text-muted-foreground">
+            For a service (non-interactive) account IBM issued for your
+            Planning Analytics on Cloud environment. Paste the TM1 base URL
+            above — the same value as <code>TM1_BASE_URL</code> in a TM1 tool&rsquo;s
+            .env — and the database is read from it; or enter the hostname
+            and the database separately. PA-Copilot signs in through
+            IBM&rsquo;s gateway with the LDAP namespace, over HTTPS.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="username">Service account</Label>
+            <Input
+              id="username"
+              placeholder="mycompany_tm1_automation"
+              {...register("username" as Path<T>)}
+            />
+            {errors.username ? (
+              <p className="text-sm text-destructive">
+                {String(errors.username.message)}
+              </p>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="database">Database</Label>
+            <Input
+              id="database"
+              placeholder={databaseFromBaseUrl(address) ?? "Read from the base URL"}
+              {...register("database" as Path<T>)}
+            />
+            {errors.database ? (
+              <p className="text-sm text-destructive">
+                {String(errors.database.message)}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : authType === "v12_saas" ? (
+        <div key="v12_saas" className="grid grid-cols-2 gap-4 [&>*]:min-w-0">
           <p className="col-span-2 text-xs text-muted-foreground">
             Tenant is your IBM tenant ID, a code like 2CX4TZWY5PSX — not the
             connection name. Database is the Planning Analytics database
@@ -185,7 +247,7 @@ export function ConnectionFormFields<T extends FieldValues>({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div key="native" className="grid grid-cols-3 gap-4 [&>*]:min-w-0">
           <div className="col-span-2 space-y-2">
             <Label htmlFor="username">Username</Label>
             <Input id="username" {...register("username" as Path<T>)} />

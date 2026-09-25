@@ -55,6 +55,26 @@ class ConnectionDiagnosis:
 
 def _explain(problem: str, connection: TM1Connection) -> str:
     saas = connection.authentication_type == "v12_saas"
+    cloud = connection.authentication_type == "pa_cloud"
+
+    if cloud:
+        if problem == CREDENTIALS_REJECTED:
+            return (
+                f"IBM rejected the non-interactive account "
+                f"'{connection.username}'. Check the account name and "
+                "password exactly as IBM issued them, and that the account "
+                f"has access to database '{connection.database}'."
+            )
+        if problem == NOT_FOUND:
+            return (
+                f"The server answered but database '{connection.database}' "
+                "was not found. It is the TM1 server name shown in "
+                "Planning Analytics Workspace, and it is case-sensitive."
+            )
+        return (
+            f"Could not reach {connection.address}. Check the hostname — it "
+            "ends in .planning-analytics.ibmcloud.com."
+        )
 
     if problem == CREDENTIALS_REJECTED:
         if saas:
@@ -84,6 +104,23 @@ def _explain(problem: str, connection: TM1Connection) -> str:
         "address, port and SSL setting, and that the server accepts "
         "connections from the internet."
     )
+
+
+def _check_pa_cloud(auth_type: str, database: str | None, username: str | None) -> None:
+    if auth_type != "pa_cloud":
+        return
+
+    if not (database or "").strip():
+        raise ValidationException(
+            "A Planning Analytics on Cloud connection needs the database: "
+            "the TM1 server name shown in Planning Analytics Workspace."
+        )
+
+    if not (username or "").strip() or username == "apikey":
+        raise ValidationException(
+            "A Planning Analytics on Cloud connection needs the "
+            "non-interactive account name IBM issued."
+        )
 
 
 def _check_address_reachable_by_policy(address: str) -> None:
@@ -130,6 +167,8 @@ class TM1IntegrationService:
             raise ValidationException(
                 "v12_saas connections require both 'tenant' and 'database'."
             )
+
+        _check_pa_cloud(authentication_type, database, username)
 
         connection = TM1Connection(
             organization_id=organization_id,
@@ -227,6 +266,12 @@ class TM1IntegrationService:
             raise ValidationException(
                 "v12_saas connections require both 'tenant' and 'database'."
             )
+
+        _check_pa_cloud(
+            next_auth_type,
+            next_database,
+            username if username is not None else connection.username,
+        )
 
         if name is not None:
             connection.name = name

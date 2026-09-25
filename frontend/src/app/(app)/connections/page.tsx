@@ -37,14 +37,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectionFormFields } from "@/components/connection-form-fields";
+import {
+  ConnectionFormFields,
+  databaseFromBaseUrl,
+} from "@/components/connection-form-fields";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import type { TM1Connection } from "@/lib/types";
 
 const connectionSchema = z
   .object({
     name: z.string().min(1, "Name is required").max(100),
-    authentication_type: z.enum(["native", "v12_saas"]),
+    authentication_type: z.enum(["native", "v12_saas", "pa_cloud"]),
     address: z.string().min(1, "Address is required"),
     port: z.number().int().min(1).max(65535),
     ssl: z.boolean(),
@@ -53,7 +56,7 @@ const connectionSchema = z
     tenant: z.string().optional(),
     database: z.string().optional(),
   })
-  .refine((v) => v.authentication_type !== "native" || !!v.username?.trim(), {
+  .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
     path: ["username"],
   })
@@ -61,10 +64,17 @@ const connectionSchema = z
     message: "Tenant is required",
     path: ["tenant"],
   })
-  .refine((v) => v.authentication_type !== "v12_saas" || !!v.database?.trim(), {
-    message: "Database is required",
-    path: ["database"],
-  });
+  .refine(
+    (v) =>
+      v.authentication_type === "native" ||
+      !!v.database?.trim() ||
+      // A PA on Cloud base URL carries the database; the server reads it.
+      (v.authentication_type === "pa_cloud" && !!databaseFromBaseUrl(v.address)),
+    {
+      message: "Database is required",
+      path: ["database"],
+    },
+  );
 
 type ConnectionValues = z.infer<typeof connectionSchema>;
 
@@ -73,7 +83,7 @@ type ConnectionValues = z.infer<typeof connectionSchema>;
 const editSchema = z
   .object({
     name: z.string().min(1, "Name is required").max(100),
-    authentication_type: z.enum(["native", "v12_saas"]),
+    authentication_type: z.enum(["native", "v12_saas", "pa_cloud"]),
     address: z.string().min(1, "Address is required"),
     port: z.number().int().min(1).max(65535),
     ssl: z.boolean(),
@@ -82,7 +92,7 @@ const editSchema = z
     tenant: z.string().optional(),
     database: z.string().optional(),
   })
-  .refine((v) => v.authentication_type !== "native" || !!v.username?.trim(), {
+  .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
     path: ["username"],
   })
@@ -90,10 +100,17 @@ const editSchema = z
     message: "Tenant is required",
     path: ["tenant"],
   })
-  .refine((v) => v.authentication_type !== "v12_saas" || !!v.database?.trim(), {
-    message: "Database is required",
-    path: ["database"],
-  });
+  .refine(
+    (v) =>
+      v.authentication_type === "native" ||
+      !!v.database?.trim() ||
+      // A PA on Cloud base URL carries the database; the server reads it.
+      (v.authentication_type === "pa_cloud" && !!databaseFromBaseUrl(v.address)),
+    {
+      message: "Database is required",
+      path: ["database"],
+    },
+  );
 
 type EditValues = z.infer<typeof editSchema>;
 
@@ -148,7 +165,9 @@ export default function ConnectionsPage() {
           ...values,
           username: values.authentication_type === "v12_saas" ? "apikey" : values.username,
           tenant: values.authentication_type === "v12_saas" ? values.tenant : undefined,
-          database: values.authentication_type === "v12_saas" ? values.database : undefined,
+          database: values.authentication_type === "native" ? undefined : values.database,
+          // PA on Cloud is always HTTPS on 443 behind IBM's gateway.
+          ...(values.authentication_type === "pa_cloud" ? { port: 443, ssl: true } : {}),
         },
       }),
     onSuccess: (created) => {
@@ -172,7 +191,9 @@ export default function ConnectionsPage() {
           password: values.password?.trim() ? values.password : undefined,
           username: values.authentication_type === "v12_saas" ? "apikey" : values.username,
           tenant: values.authentication_type === "v12_saas" ? values.tenant : undefined,
-          database: values.authentication_type === "v12_saas" ? values.database : undefined,
+          database: values.authentication_type === "native" ? undefined : values.database,
+          // PA on Cloud is always HTTPS on 443 behind IBM's gateway.
+          ...(values.authentication_type === "pa_cloud" ? { port: 443, ssl: true } : {}),
         },
       });
     },
@@ -222,6 +243,8 @@ export default function ConnectionsPage() {
         toast.error(
           connection.authentication_type === "v12_saas"
             ? `Could not connect to "${connection.name}" — check the tenant ID, database name, and API key.`
+            : connection.authentication_type === "pa_cloud"
+            ? `Could not connect to "${connection.name}" — check the hostname, database name, and the non-interactive account's name and password.`
             : `Could not connect to "${connection.name}" — check address, port, and credentials.`,
         );
       }
@@ -351,7 +374,7 @@ export default function ConnectionsPage() {
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>New TM1 Connection</DialogTitle>
             <DialogDescription>
@@ -392,7 +415,7 @@ export default function ConnectionsPage() {
           if (!open) setEditTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit &quot;{editTarget?.name}&quot;</DialogTitle>
             <DialogDescription>

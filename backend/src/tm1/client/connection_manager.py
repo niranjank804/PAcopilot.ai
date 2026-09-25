@@ -41,6 +41,27 @@ def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
             **_timeout_kwargs(),
         }
 
+    if connection.authentication_type == PA_CLOUD:
+        # Planning Analytics on Cloud with an IBM non-interactive account.
+        # IBM's gateway serves each database under /tm1/api/<database>/ and
+        # authenticates non-interactive accounts through CAM with the LDAP
+        # namespace — a plain basic login is rejected. TM1py treats a
+        # base_url plus a namespace as CAM and appends /api/v1 itself.
+        # async_requests_mode keeps long calls under the gateway's 60-second
+        # limit (TM1py's documented setting for IBM Cloud).
+        host = parse_address(connection.address).host
+
+        return {
+            "base_url": f"https://{host}/tm1/api/{connection.database}/",
+            "user": connection.username,
+            "password": password,
+            "namespace": PA_CLOUD_NAMESPACE,
+            "ssl": True,
+            "verify": True,
+            "async_requests_mode": True,
+            **_timeout_kwargs(),
+        }
+
     return {
         "address": connection.address,
         "port": connection.port,
@@ -49,6 +70,11 @@ def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
         "password": password,
         **_timeout_kwargs(),
     }
+
+
+PA_CLOUD = "pa_cloud"
+# The namespace IBM assigns non-interactive accounts on PA on Cloud.
+PA_CLOUD_NAMESPACE = "LDAP"
 
 
 def _timeout_kwargs() -> dict:

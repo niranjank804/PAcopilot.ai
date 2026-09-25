@@ -41,6 +41,11 @@ def parse_address(raw: str) -> ParsedAddress:
     ):
         return ParsedAddress(host=host, tenant=segments[1], database=segments[4])
 
+    # Planning Analytics on Cloud REST URL:
+    # https://<host>/tm1/api/<database>/api/v1/...
+    if len(segments) >= 3 and segments[0] == "tm1" and segments[1] == "api":
+        return ParsedAddress(host=host, database=segments[2])
+
     return ParsedAddress(host=host)
 
 

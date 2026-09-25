@@ -12,7 +12,11 @@ class ConnectionCreate(BaseModel):
     ssl: bool = True
     username: str = "apikey"
     password: str
-    authentication_type: Literal["native", "v12_saas"] = "native"
+    # native: on-prem / self-hosted TM1, basic login.
+    # v12_saas: Planning Analytics as a Service, API key.
+    # pa_cloud: Planning Analytics on Cloud (*.planning-analytics.ibmcloud.com)
+    #           with an IBM non-interactive account.
+    authentication_type: Literal["native", "v12_saas", "pa_cloud"] = "native"
     tenant: str | None = None
     database: str | None = None
 
@@ -27,7 +31,7 @@ class ConnectionUpdate(BaseModel):
     # credential (never round-tripped back to the client, so there's nothing
     # to prefill on an edit form; leaving it blank means "no change").
     password: str | None = None
-    authentication_type: Literal["native", "v12_saas"] | None = None
+    authentication_type: Literal["native", "v12_saas", "pa_cloud"] | None = None
     tenant: str | None = None
     database: str | None = None
 

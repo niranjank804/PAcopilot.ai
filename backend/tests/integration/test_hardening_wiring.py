@@ -8,9 +8,25 @@ here fails against the tree as it was.
 
 import pytest
 
+from cryptography.fernet import Fernet
+
+import src.tm1.crypto as crypto_module
 from src.core import rate_limit
 from src.core.config import settings
 from tests.fixtures.factories import auth_headers, create_org_admin
+
+
+@pytest.fixture
+def tm1_credentials_key():
+    """Saving a connection encrypts its password. Without a key the save
+    fails, so the test would pass only where a developer's .env has one."""
+
+    original = settings.TM1_CREDENTIALS_KEY
+    settings.TM1_CREDENTIALS_KEY = Fernet.generate_key().decode()
+    crypto_module._fernet = None
+    yield
+    settings.TM1_CREDENTIALS_KEY = original
+    crypto_module._fernet = None
 
 
 @pytest.mark.asyncio
@@ -80,7 +96,7 @@ async def test_a_connection_cannot_point_at_the_platforms_own_network(
 
 @pytest.mark.asyncio
 async def test_a_self_hosted_deployment_can_allow_private_addresses(
-    client, db_session, monkeypatch
+    client, db_session, monkeypatch, tm1_credentials_key
 ):
     monkeypatch.setattr(settings, "TM1_ALLOW_PRIVATE_ADDRESSES", True)
     org, admin = await create_org_admin(db_session)
