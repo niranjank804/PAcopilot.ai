@@ -76,16 +76,35 @@ async def _ran_mdx(db: AsyncSession, conversation_id: uuid.UUID) -> list[str]:
 
     queries: list[str] = []
     for execution in reversed(executions):
-        mdx = (execution.arguments or {}).get("mdx")
-        if (
-            execution.tool_name == "execute_mdx"
-            and execution.status == "success"
-            and mdx
-            and str(mdx) not in queries
-        ):
+        if execution.status != "success":
+            continue
+        if execution.tool_name in ("execute_mdx", "show_chart"):
+            mdx = (execution.arguments or {}).get("mdx")
+        elif execution.tool_name == "query_cube":
+            # query_cube builds its MDX; its result starts with it.
+            mdx = _mdx_from_query_cube(execution.result_summary or "")
+        else:
+            continue
+        if mdx and str(mdx) not in queries:
             queries.append(str(mdx))
 
     return queries
+
+
+_QUERY_CUBE_MDX = re.compile(r'^\{"mdx":\s*("(?:[^"\\]|\\.)*")')
+
+
+def _mdx_from_query_cube(summary: str) -> str | None:
+    """The MDX at the start of a query_cube result, if it was not cut off
+    by the 500-character summary."""
+
+    match = _QUERY_CUBE_MDX.match(summary)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
 
 
 def _cube_from_mdx(mdx: str) -> str:
@@ -129,17 +148,14 @@ async def generate_visualization(
     prompt = (
         f"Use connection_id={connection_id} for every tool call. "
         f"Visualization request: {query}\n\n"
-        "Find the right cube and confirm real element names, then run the "
-        "MDX with execute_mdx to prove it works. Put the dimension the user "
-        "wants to compare across (usually time) on COLUMNS and a second "
-        "breakdown, if they asked for one, on ROWS; put fixed selections in "
-        "WHERE. Steps: find the cube; call get_query_context for it; write "
-        "the query with every dimension either on an axis or pinned in "
-        "WHERE (start from its where_all_totals); run it with execute_mdx. "
-        "If it returns no cells, run the same axes with where_all_totals to "
-        "see whether the cube holds data at all, then narrow one dimension "
-        "at a time. Do not call show_chart: this page draws the chart from "
-        "your query.\n\n"
+        "Steps: find the right cube (list_cubes, get_cube). Call find_data "
+        "on it with the members the request names as filters (the account "
+        "or measure, a version or year). Then call query_cube with the "
+        "dimension to compare across (usually time) as columns, the "
+        "breakdown asked for as rows, and find_data's where_with_data as "
+        "filters. Do not write MDX by hand, and do not call show_chart: "
+        "this page draws the chart from your query. If find_data says "
+        "found: false, say there is no data for that selection.\n\n"
         "If part of the request has no data (for example Actual is empty "
         "for a future year, or the model calls Budget 'Plan'), do not give "
         "up: use the query that does return data and say in the summary "
@@ -147,8 +163,8 @@ async def generate_visualization(
         "When you're done, respond with at most three short sentences on "
         "what the data shows (and anything missing), followed by a fenced "
         '```json code block containing exactly this shape: {"cube_name": '
-        '"...", "mdx": "..."} — the mdx must be the exact query that '
-        "returned data when you ran it. Always include the block when any "
+        '"...", "mdx": "..."} — the mdx must be the exact query query_cube '
+        "returned and that returned data. Always include the block when any "
         "query returned data."
     )
 

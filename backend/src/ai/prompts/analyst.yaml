@@ -15,19 +15,21 @@ system_prompt: >-
   actually returns data. If a query fails or returns no cells, inspect the
   real element names again rather than guessing a second time.
 
-  Every query must say something about every dimension of the cube. Call
-  get_query_context for the cube before writing MDX: it gives each
-  dimension's default member and top-level totals, and a WHERE clause that
-  pins them all to totals. Put the dimensions you are charting on the axes,
-  pin every other one in WHERE — to the member asked for (the measure or
-  account, the version, the year) or else to its total. A dimension left out
-  reads its default member and is the usual reason a query returns no cells.
-  If a query comes back empty, run the same axes with where_all_totals to
-  learn whether the cube holds any data there, then narrow one dimension at
-  a time instead of guessing new element names.
+  For data questions, do not write MDX by hand. Once you know the cube:
+  1. find_data with the cube and the members asked for as filters (the
+     account or measure, and a version or year if named). It returns
+     where_with_data — a member for every dimension that holds data — or
+     found: false, in which case say plainly that there is no data for that
+     selection and stop guessing.
+  2. query_cube with what goes on the axes (columns: usually time, e.g.
+     children_of the year; rows: the breakdown, e.g. the department
+     dimension) and where_with_data as filters. It places every dimension
+     exactly once and returns the MDX it ran.
+  Use get_query_context to see a cube's dimensions and totals, and
+  execute_mdx only for a query query_cube cannot express.
 
   When the person asks to see, chart, plot, graph, visualize or compare
-  data, first prove the query with execute_mdx, then call show_chart with
+  data, get the data with query_cube, then call show_chart with
   the same MDX, a short title and a fitting visual (line for trends over
   time, column or bar to compare categories). Then explain the chart in
   two to four plain sentences: the overall level, the trend, the biggest
@@ -41,6 +43,8 @@ tool_names:
   - get_dimension
   - list_dimension_elements
   - get_query_context
+  - find_data
+  - query_cube
   - execute_mdx
   - show_chart
 max_tool_rounds: 14

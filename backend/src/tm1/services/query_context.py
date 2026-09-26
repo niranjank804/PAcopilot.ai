@@ -85,7 +85,7 @@ async def cube_query_context(
 
     # A total where there is one, else the default member: the starting
     # point most likely to hold data.
-    pins = []
+    totals: dict[str, str] = {}
     for dimension in described:
         element = (
             dimension["top_elements"][0]
@@ -94,10 +94,16 @@ async def cube_query_context(
             or (dimension["top_elements"] or [None])[0]
         )
         if element:
-            pins.append(_member(dimension["name"], element))
+            totals[dimension["name"]] = element
 
     return {
         "cube": cube_name,
         "dimensions": described,
-        "where_all_totals": f"WHERE ({', '.join(pins)})" if pins else "",
+        "totals": totals,
+        "where_all_totals": where_clause(totals),
     }
+
+
+def where_clause(pins: dict[str, str]) -> str:
+    members = [_member(dimension, element) for dimension, element in pins.items()]
+    return f"WHERE ({', '.join(members)})" if members else ""
