@@ -145,7 +145,22 @@ class VisualizeRequest(BaseModel):
 
 class VisualizeCell(BaseModel):
     label: str
-    value: float
+    # A text cell is a real TM1 value, not an error. Declared as float
+    # only, one text cell in the result made the whole request fail.
+    value: float | str | None
+
+
+class VisualizeRow(BaseModel):
+    # Dimension -> element for this cell. Context (WHERE) members are
+    # omitted; they are the same for every row.
+    members: dict[str, str]
+    value: float | str | None
+
+
+class VisualizeTable(BaseModel):
+    dimensions: list[str]
+    rows: list[VisualizeRow]
+    truncated: bool = False
 
 
 class VisualizeResponse(BaseModel):
@@ -153,6 +168,19 @@ class VisualizeResponse(BaseModel):
     mdx: str
     summary: str
     cells: list[VisualizeCell]
+    # The same result with each dimension kept separate, so the page can
+    # pivot it (axis, legend, heatmap) without another AI call.
+    table: VisualizeTable | None = None
+
+
+class VisualizeRunRequest(BaseModel):
+    mdx: str = Field(min_length=1, max_length=20000)
+
+
+class VisualizeRunResponse(BaseModel):
+    cube_name: str
+    mdx: str
+    table: VisualizeTable
 
 
 class ChangeCreate(BaseModel):

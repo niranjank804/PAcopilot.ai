@@ -26,9 +26,14 @@ class AIConversationRepository:
         user_id: uuid.UUID,
     ) -> list[AIConversation]:
 
+        # Only conversations the person had: ones the product started for
+        # itself (Visualize) carry a purpose and are left out.
         result = await db.execute(
             select(AIConversation)
-            .where(AIConversation.user_id == user_id)
+            .where(
+                AIConversation.user_id == user_id,
+                AIConversation.purpose.is_(None),
+            )
             .order_by(AIConversation.created_at.desc())
         )
 

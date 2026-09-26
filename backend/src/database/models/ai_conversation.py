@@ -35,6 +35,15 @@ class AIConversation(BaseModel, OrganizationScoped):
         String(255),
     )
 
+    # Set when the product started the conversation for itself (e.g.
+    # "visualize"), rather than a person in Chat. Such conversations are
+    # kept — their usage rows are billing records — but left out of the
+    # Chat history list.
+    purpose: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
     messages = relationship(
         "AIMessage",
         back_populates="conversation",

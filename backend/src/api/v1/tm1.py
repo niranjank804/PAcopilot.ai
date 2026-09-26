@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
-from src.api.dependencies.rate_limit import ai_rate_limited, heavy_rate_limited
+from src.api.dependencies.rate_limit import (
+    ai_rate_limited,
+    general_rate_limited,
+    heavy_rate_limited,
+)
 from src.database.models.tm1_connection import TM1Connection
 from src.database.session import get_db
 from src.schemas.auth import UserResponse
@@ -35,8 +39,11 @@ from src.schemas.tm1 import (
     VisualizeCell,
     VisualizeRequest,
     VisualizeResponse,
+    VisualizeRunRequest,
+    VisualizeRunResponse,
+    VisualizeTable,
 )
-from src.ai.visualization import generate_visualization
+from src.ai.visualization import _cube_from_mdx, generate_visualization, run_mdx
 from src.services.audit_service import audit_service
 from src.tm1.deployment.change_service import change_service
 from src.tm1.metadata import dependency_analyzer
@@ -548,6 +555,61 @@ async def visualize(
                 VisualizeCell(label=label, value=value)
                 for label, value in result.cells.items()
             ],
+            table=VisualizeTable(**result.table),
+        ),
+    )
+
+
+@router.post(
+    "/connections/{connection_id}/visualize/run",
+    response_model=ApiResponse[VisualizeRunResponse],
+)
+async def visualize_run(
+    connection_id: uuid.UUID,
+    request: VisualizeRunRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+    _: UserResponse = Depends(general_rate_limited),
+):
+    """Re-run edited MDX for a chart, without the AI.
+
+    Read-only: TM1 MDX selects, it never writes. Same permission as
+    reading cube data anywhere else in the product, and audited the same
+    way as the AI-assisted request.
+    """
+
+    start = time.monotonic()
+
+    connection = await tm1_integration_service.get_connection(
+        db,
+        connection_id,
+        current_user.organization_id,
+    )
+
+    table = await run_mdx(
+        db,
+        organization_id=current_user.organization_id,
+        connection_id=connection_id,
+        mdx=request.mdx,
+    )
+
+    await _log_tm1_access(
+        db,
+        current_user,
+        http_request,
+        action="visualize_mdx",
+        connection=connection,
+        elapsed_ms=int((time.monotonic() - start) * 1000),
+        extra={"cell_count": len(table["rows"])},
+    )
+
+    return ApiResponse(
+        success=True,
+        data=VisualizeRunResponse(
+            cube_name=_cube_from_mdx(request.mdx),
+            mdx=request.mdx,
+            table=VisualizeTable(**table),
         ),
     )
 
