@@ -5,6 +5,7 @@ import { BarChart3, Code2, Loader2, Play, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Markdown } from "@/components/markdown";
 import { ChartBuilder } from "@/components/visualize/chart-builder";
 import { Button } from "@/components/ui/button";
 import {
@@ -190,7 +191,12 @@ export default function VisualizePage() {
               <BarChart3 className="h-4 w-4" />
               {shown.cubeName || "Results"}
             </CardTitle>
-            {shown.summary ? <CardDescription>{shown.summary}</CardDescription> : null}
+            {/* Markdown, as in Chat: the analyst writes **bold** and lists. */}
+            {shown.summary ? (
+              <div className="text-sm text-muted-foreground">
+                <Markdown>{shown.summary}</Markdown>
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

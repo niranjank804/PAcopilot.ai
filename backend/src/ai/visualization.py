@@ -55,23 +55,37 @@ def _mdx_from_answer(content: str) -> tuple[str | None, str]:
     return None, ""
 
 
-async def _last_working_mdx(db: AsyncSession, conversation_id: uuid.UUID) -> str | None:
-    """The last MDX the agent ran successfully in this conversation.
+# How many of the agent's own queries to re-run, newest first, looking for
+# one that returns data.
+_MAX_FALLBACK_QUERIES = 5
+
+
+async def _ran_mdx(db: AsyncSession, conversation_id: uuid.UUID) -> list[str]:
+    """The MDX the agent ran successfully in this conversation, newest first.
 
     The agent proves its query by running it; when its final message then
-    forgets the JSON block, the query it proved is still in the tool log.
+    leaves out the JSON block, the queries it ran are still in the tool
+    log. Newest first but not only the newest: an agent often ends on an
+    exploratory query that came back empty after an earlier one that
+    returned exactly the data asked for.
     """
 
     executions = await ai_tool_execution_repository.list_by_conversation(
         db, conversation_id
     )
 
+    queries: list[str] = []
     for execution in reversed(executions):
         mdx = (execution.arguments or {}).get("mdx")
-        if execution.tool_name == "execute_mdx" and execution.status == "success" and mdx:
-            return str(mdx)
+        if (
+            execution.tool_name == "execute_mdx"
+            and execution.status == "success"
+            and mdx
+            and str(mdx) not in queries
+        ):
+            queries.append(str(mdx))
 
-    return None
+    return queries
 
 
 def _cube_from_mdx(mdx: str) -> str:
@@ -119,11 +133,18 @@ async def generate_visualization(
         "MDX with execute_mdx to prove it works. Put the dimension the user "
         "wants to compare across (usually time) on COLUMNS and a second "
         "breakdown, if they asked for one, on ROWS; put fixed selections in "
-        "WHERE. When you're done, respond with one short sentence "
-        "summarizing what the data shows, followed by a fenced ```json code "
-        'block containing exactly this shape: {"cube_name": "...", "mdx": '
-        '"..."} — the mdx must be the exact, final query that already worked '
-        "when you ran it."
+        "WHERE. Be economical with tool calls: find the cube, check the "
+        "element names you need, run the query.\n\n"
+        "If part of the request has no data (for example Actual is empty "
+        "for a future year, or the model calls Budget 'Plan'), do not give "
+        "up: use the query that does return data and say in the summary "
+        "what is missing and why.\n\n"
+        "When you're done, respond with at most three short sentences on "
+        "what the data shows (and anything missing), followed by a fenced "
+        '```json code block containing exactly this shape: {"cube_name": '
+        '"...", "mdx": "..."} — the mdx must be the exact query that '
+        "returned data when you ran it. Always include the block when any "
+        "query returned data."
     )
 
     # Created up front, already marked, and passed in: the run then never
@@ -153,21 +174,40 @@ async def generate_visualization(
         ),
     )
 
-    mdx, cube_name = _mdx_from_answer(chat_result.content)
+    answered, cube_name = _mdx_from_answer(chat_result.content)
 
-    if not mdx:
-        mdx = await _last_working_mdx(db, chat_result.conversation_id)
+    # The query the answer names, then the agent's own queries newest
+    # first; the first that returns data is the one shown. If none does,
+    # the first is shown empty, with its MDX to edit.
+    candidates = [answered] if answered else []
+    for ran in await _ran_mdx(db, chat_result.conversation_id):
+        if ran not in candidates:
+            candidates.append(ran)
+    candidates = candidates[:_MAX_FALLBACK_QUERIES]
 
-    if not mdx:
+    if not candidates:
         raise ValidationException(
             "The analyst couldn't find data for this question. Name the cube "
             "or measure, and a period — for example 'Revenue by month for "
             "2026 in the Sales cube'."
         )
 
-    table = await run_mdx(
-        db, organization_id=organization_id, connection_id=connection_id, mdx=mdx
-    )
+    mdx, table = candidates[0], None
+    for candidate in candidates:
+        result = await run_mdx(
+            db,
+            organization_id=organization_id,
+            connection_id=connection_id,
+            mdx=candidate,
+        )
+        if table is None:
+            table = result
+        if result["rows"]:
+            mdx, table = candidate, result
+            break
+
+    if mdx != answered:
+        cube_name = ""
 
     summary = chat_result.content.split("```")[0].strip()
 

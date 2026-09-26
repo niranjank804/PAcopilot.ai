@@ -276,27 +276,29 @@ async def test_visualize_accepts_a_block_fenced_without_json(
 
 
 class ToolThenNoJsonProvider(AIProvider):
-    """Round 1 runs execute_mdx; round 2 answers without the JSON block."""
+    """Runs each query with execute_mdx, one per round, then answers
+    without the JSON block."""
 
-    def __init__(self, connection_id: str):
+    def __init__(self, connection_id: str, queries=("SELECT PROVEN FROM [Sales]",)):
         self.connection_id = connection_id
+        self.queries = list(queries)
         self.rounds = 0
 
     async def chat(self, request):
         self.rounds += 1
 
-        if self.rounds == 1:
+        if self.rounds <= len(self.queries):
             return ChatResponse(
                 content="",
                 model=request.model,
                 stop_reason="tool_use",
                 tool_calls=[
                     ToolCall(
-                        id="call-1",
+                        id=f"call-{self.rounds}",
                         name="execute_mdx",
                         input={
                             "connection_id": self.connection_id,
-                            "mdx": "SELECT PROVEN FROM [Sales]",
+                            "mdx": self.queries[self.rounds - 1],
                         },
                     )
                 ],
@@ -341,6 +343,44 @@ async def test_visualize_uses_the_query_the_agent_proved_when_it_forgets_the_blo
     body = resp.json()["data"]
     assert body["mdx"] == "SELECT PROVEN FROM [Sales]"
     assert body["cube_name"] == "Sales"
+
+
+@pytest.mark.asyncio
+async def test_visualize_skips_a_last_query_that_returned_nothing(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    # The agent found data (Plan), then explored a query that came back
+    # empty (Actual for a future year), and gave up without a block. The
+    # page must show the data it found, not the empty last attempt.
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    connection_id = (await _create_connection(client, headers)).json()["data"]["id"]
+
+    with_data = fake_tm1_client.cubes.cells.execute_mdx.return_value
+    fake_tm1_client.cubes.cells.execute_mdx.side_effect = lambda mdx, **_: (
+        with_data if "PLAN" in mdx else {}
+    )
+
+    original = PROVIDERS.get("anthropic")
+    PROVIDERS["anthropic"] = ToolThenNoJsonProvider(
+        connection_id,
+        queries=["SELECT PLAN FROM [Income]", "SELECT ACTUAL FROM [Financial Summary]"],
+    )
+    try:
+        resp = await client.post(
+            f"/tm1/connections/{connection_id}/visualize",
+            json={"query": "revenue by month, actual vs budget"},
+            headers=headers,
+        )
+    finally:
+        if original is not None:
+            PROVIDERS["anthropic"] = original
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()["data"]
+    assert body["mdx"] == "SELECT PLAN FROM [Income]"
+    assert body["cube_name"] == "Income"
+    assert body["table"]["rows"]
 
 
 @pytest.mark.asyncio
