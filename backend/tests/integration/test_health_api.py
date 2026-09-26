@@ -91,3 +91,27 @@ async def test_saturated_pool_is_reported_but_stays_ready(client, monkeypatch):
 
     assert body["status"] == "ready"
     assert body["checks"]["db_pool"]["status"] == "saturated"
+
+
+@pytest.mark.asyncio
+async def test_readiness_works_without_a_local_pool(client, monkeypatch):
+    # On Vercel the engine uses NullPool (Neon's pgbouncer pools instead),
+    # which has no size() — the probe once crashed with a 500 there.
+    from sqlalchemy.pool import NullPool
+
+    real_engine = health_module.engine
+
+    class NullPoolEngine:
+        pool = NullPool(lambda: None)
+
+        def connect(self):
+            return real_engine.connect()
+
+    monkeypatch.setattr(health_module, "engine", NullPoolEngine())
+
+    response = await client.get("/health/ready")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["checks"]["db_pool"] == {"status": "ok", "pooling": "external"}

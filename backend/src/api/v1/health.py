@@ -57,19 +57,24 @@ async def readiness(response: Response):
         checks["database"] = {"status": "error", "error": type(exc).__name__}
 
     pool = engine.pool
-    capacity = pool.size() + pool._max_overflow
-    in_use = pool.checkedout()
+    if hasattr(pool, "size"):
+        capacity = pool.size() + pool._max_overflow
+        in_use = pool.checkedout()
 
-    # Reported, but deliberately NOT a readiness failure. Saturation is
-    # transient backpressure; failing the probe would have the load
-    # balancer pull this instance out and push its traffic onto the others,
-    # saturating them in turn. Only a dependency that cannot answer at all
-    # makes this instance unfit to serve.
-    checks["db_pool"] = {
-        "status": "ok" if in_use < capacity else "saturated",
-        "in_use": in_use,
-        "capacity": capacity,
-    }
+        # Reported, but deliberately NOT a readiness failure. Saturation is
+        # transient backpressure; failing the probe would have the load
+        # balancer pull this instance out and push its traffic onto the
+        # others, saturating them in turn. Only a dependency that cannot
+        # answer at all makes this instance unfit to serve.
+        checks["db_pool"] = {
+            "status": "ok" if in_use < capacity else "saturated",
+            "in_use": in_use,
+            "capacity": capacity,
+        }
+    else:
+        # NullPool (Neon's pooled endpoint, on Vercel): pgbouncer does the
+        # pooling, so this process holds no pool to measure.
+        checks["db_pool"] = {"status": "ok", "pooling": "external"}
 
     if not ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
