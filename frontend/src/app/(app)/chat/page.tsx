@@ -30,6 +30,7 @@ import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
 import { ChangeActionCard } from "@/components/change-action-card";
+import { ChatChartCard } from "@/components/chat-chart";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +65,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { directUpload } from "@/lib/uploads";
+import { newCharts, placeCharts, type ChatChart } from "@/lib/chat-charts";
 import { useVoice } from "@/lib/voice";
 import type {
   AgentInfo,
@@ -75,6 +77,12 @@ import type {
 } from "@/lib/types";
 
 const NO_AGENT = "none";
+
+// A request to see data drawn. General chat has no TM1 access, so such a
+// request goes to the Analyst, which can query the model and chart it.
+const CHART_REQUEST =
+  /\b(chart|graph|plot|visuali[sz]e|visuali[sz]ation|dashboard|trend line)\b/i;
+const CHART_AGENT = "analyst";
 
 /**
  * The engineering jobs this assistant is for.
@@ -184,6 +192,10 @@ interface ThreadMessage {
   // and save the answer, so the thread offers a reload rather than a retry.
   interrupted?: boolean;
   attachmentNames?: string[];
+  // Charts the analyst showed during this turn (show_chart).
+  charts?: ChatChart[];
+  // When the server saved it; places charts in a reopened conversation.
+  createdAt?: string;
 }
 
 const number = new Intl.NumberFormat("en-US").format;
@@ -352,6 +364,8 @@ export default function ChatPage() {
     [],
   );
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  // The answer being read aloud from its speaker button.
+  const [readingIndex, setReadingIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -398,6 +412,58 @@ export default function ChatPage() {
 
   const isListening =
     voice.state === "listening" || voice.state === "requesting-permission";
+
+  // Any answer can be read aloud on request, typed question or not; the
+  // automatic read-out stays for dictated questions only.
+  // Only while speech is actually playing: when it ends, no button
+  // stays in its "stop" state.
+  const readingNow = voice.state === "speaking" ? readingIndex : null;
+
+  const toggleReadAloud = (content: string, index: number) => {
+    if (readingNow === index) {
+      voice.stopSpeaking();
+      setReadingIndex(null);
+      return;
+    }
+
+    voice.speak(content, { explicit: true });
+    setReadingIndex(index);
+  };
+
+  // After a turn: charts the analyst showed go on the answer just given.
+  const attachNewCharts = async (id: string) => {
+    try {
+      const executions = await queryClient.fetchQuery({
+        queryKey: ["ai-tool-executions", id],
+        queryFn: () =>
+          apiRequest<ToolExecutionResponse[]>(
+            `/ai/conversations/${id}/tool-executions`,
+          ),
+      });
+
+      setMessages((previous) => {
+        const shown = new Set(
+          previous.flatMap((m) => (m.charts ?? []).map((c) => c.executionId)),
+        );
+        const charts = newCharts(executions, shown);
+        const lastIndex = previous.length - 1;
+
+        if (!charts.length || previous[lastIndex]?.role !== "assistant") {
+          return previous;
+        }
+
+        const next = [...previous];
+        next[lastIndex] = {
+          ...next[lastIndex],
+          charts: [...(next[lastIndex].charts ?? []), ...charts],
+        };
+        return next;
+      });
+    } catch {
+      // The chart is extra: the answer stands, and the tool timeline
+      // still lists the call.
+    }
+  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -548,16 +614,26 @@ export default function ChatPage() {
     setConversationId(id);
 
     try {
-      const history = await apiRequest<MessageResponse[]>(
-        `/ai/conversations/${id}/messages`,
-      );
+      const [history, executions] = await Promise.all([
+        apiRequest<MessageResponse[]>(`/ai/conversations/${id}/messages`),
+        // Only for redrawing charts; the conversation opens without them.
+        apiRequest<ToolExecutionResponse[]>(
+          `/ai/conversations/${id}/tool-executions`,
+        ).catch(() => [] as ToolExecutionResponse[]),
+      ]);
+
+      const thread: ThreadMessage[] = history.map((m) => ({
+        id: m.id,
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.content,
+        createdAt: m.created_at,
+      }));
+      const placed = placeCharts(thread, executions);
 
       setMessages(
-        history.map((m) => ({
-          id: m.id,
-          role: m.role === "user" ? "user" : "assistant",
-          content: m.content,
-        })),
+        thread.map((m, index) =>
+          placed.has(index) ? { ...m, charts: placed.get(index) } : m,
+        ),
       );
       scrollToBottom();
     } catch (error) {
@@ -604,6 +680,19 @@ export default function ChatPage() {
 
     const attachmentsForThisMessage = pendingAttachments;
 
+    const routeToAnalyst =
+      agent === NO_AGENT &&
+      CHART_REQUEST.test(message) &&
+      (agentsQuery.data ?? []).some((a) => a.name === CHART_AGENT);
+    const turnAgent = routeToAnalyst ? CHART_AGENT : agent;
+
+    if (routeToAnalyst) {
+      setAgent(CHART_AGENT);
+      toast.info(
+        "Switched to the Analyst agent: it reads your TM1 data and draws the chart.",
+      );
+    }
+
     setMessages((previous) => [
       ...previous,
       {
@@ -629,8 +718,8 @@ export default function ChatPage() {
       const stream = streamRequest<StreamEvent>("/ai/chat/stream", {
         message,
         conversation_id: conversationId ?? undefined,
-        agent: agent === NO_AGENT ? undefined : agent,
-        enable_tools: agent !== NO_AGENT,
+        agent: turnAgent === NO_AGENT ? undefined : turnAgent,
+        enable_tools: turnAgent !== NO_AGENT,
         model,
         attachments: attachmentsForThisMessage.length
           ? attachmentsForThisMessage
@@ -720,6 +809,7 @@ export default function ChatPage() {
           queryClient.invalidateQueries({
             queryKey: ["ai-tool-executions", event.conversation_id],
           });
+          void attachNewCharts(event.conversation_id);
 
           if (isNewConversation) {
             queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
@@ -1074,7 +1164,12 @@ export default function ChatPage() {
                       </button>
                     </div>
                   ) : null}
-                  <div className="max-w-[75%] space-y-1.5">
+                  <div
+                    className={cn(
+                      "space-y-1.5",
+                      message.charts?.length ? "min-w-0 flex-1" : "max-w-[75%]",
+                    )}
+                  >
                     {message.attachmentNames?.length ? (
                       <div className="flex flex-wrap justify-end gap-1">
                         {message.attachmentNames.map((name) => (
@@ -1151,7 +1246,30 @@ export default function ChatPage() {
                           {number(message.totalTokens)} tokens
                         </div>
                       ) : null}
+                      {message.role === "assistant" &&
+                      message.content &&
+                      voice.canSpeak &&
+                      !(isStreaming && index === messages.length - 1) ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleReadAloud(message.content, index)}
+                          className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          aria-label={
+                            readingNow === index ? "Stop reading aloud" : "Read aloud"
+                          }
+                        >
+                          {readingNow === index ? (
+                            <VolumeX className="h-3.5 w-3.5" />
+                          ) : (
+                            <Volume2 className="h-3.5 w-3.5" />
+                          )}
+                          {readingNow === index ? "Stop" : "Listen"}
+                        </button>
+                      ) : null}
                     </div>
+                    {message.charts?.map((chart) => (
+                      <ChatChartCard key={chart.executionId} chart={chart} />
+                    ))}
                   </div>
                   {message.role === "assistant" && message.content ? (
                     <button

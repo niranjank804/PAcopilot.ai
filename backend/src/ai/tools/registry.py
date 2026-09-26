@@ -7,6 +7,7 @@ from src.ai.tools.tm1.analysis import (
     FindUnusedObjectsTool,
 )
 from src.ai.tools.tm1.cells import ExecuteMDXTool
+from src.ai.tools.tm1.chart import ShowChartTool
 from src.ai.tools.tm1.changes import (
     ProposeProcessCopyTool,
     ProposeProcessUpdateTool,
@@ -67,6 +68,7 @@ TOOLS: dict[str, Tool] = {
         GetDimensionTool(),
         ListDimensionElementsTool(),
         ExecuteMDXTool(),
+        ShowChartTool(),
         ListProcessesTool(),
         GetProcessTool(),
         SearchProcessCodeTool(),

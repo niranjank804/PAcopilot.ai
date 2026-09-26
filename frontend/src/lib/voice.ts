@@ -260,10 +260,12 @@ export function useVoice(options: {
   }, []);
 
   const speak = useCallback(
-    (markdown: string) => {
+    // `explicit`: the person pressed a read-aloud button, so the mute —
+    // which silences answers read out automatically — does not apply.
+    (markdown: string, options?: { explicit?: boolean }) => {
       const synthesis = window.speechSynthesis;
 
-      if (!synthesis || mutedRef.current) return;
+      if (!synthesis || (mutedRef.current && !options?.explicit)) return;
 
       const text = speakableText(markdown).slice(0, MAX_SPEAK_CHARS);
 

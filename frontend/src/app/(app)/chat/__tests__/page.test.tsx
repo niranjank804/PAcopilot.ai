@@ -44,7 +44,12 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: mocks.toastError, success: vi.fn() },
+  toast: { error: mocks.toastError, success: vi.fn(), info: vi.fn() },
+}));
+
+// The chart builder reads the theme for its palette.
+vi.mock("next-themes", () => ({
+  useTheme: () => ({ resolvedTheme: "light" }),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -622,5 +627,140 @@ describe("engineering tasks", () => {
     // rather than the whole content.
     expect(screen.getByLabelText("Agent")).toHaveTextContent(/^Ti\b/i);
     expect(streamRequest).not.toHaveBeenCalled();
+  });
+});
+
+// ======================================================================
+// Charts in Chat, and reading any answer aloud.
+// ======================================================================
+
+const CHART_EXECUTION = {
+  id: "exec-chart",
+  tool_name: "show_chart",
+  arguments: {
+    connection_id: "conn1",
+    mdx: "SELECT {[Period].Members} ON 0 FROM [Income]",
+    title: "Revenue by month, 2026",
+    visual: "column",
+  },
+  status: "success",
+  result_summary: '{"shown": true}',
+  duration_ms: 50,
+  error_message: null,
+  created_at: "2026-09-26T10:00:05Z",
+};
+
+const CHART_RESULT = {
+  cube_name: "Income",
+  mdx: CHART_EXECUTION.arguments.mdx,
+  cells: [],
+  table: {
+    dimensions: ["Period", "Version"],
+    rows: [
+      { members: { Period: "202601", Version: "Plan" }, value: 4_500_000_000 },
+      { members: { Period: "202602", Version: "Plan" }, value: 4_800_000_000 },
+    ],
+    truncated: false,
+  },
+};
+
+const ANALYST = {
+  name: "analyst",
+  description: "Data questions",
+  max_tool_rounds: 10,
+  tool_names: ["execute_mdx", "show_chart"],
+  safety_notes: null,
+};
+
+function apiRoutes(routes: Record<string, unknown>) {
+  apiRequest.mockImplementation(async (path: string) =>
+    path in routes ? routes[path] : [],
+  );
+}
+
+describe("charts in chat", () => {
+  it("draws the chart the analyst showed under its answer", async () => {
+    const user = userEvent.setup();
+    apiRoutes({
+      "/ai/conversations/c1/tool-executions": [CHART_EXECUTION],
+      "/tm1/connections/conn1/visualize/run": CHART_RESULT,
+    });
+    streamRequest.mockReturnValue(
+      streamOf([
+        { type: "tool_call", tool_name: "execute_mdx", tool_status: "success" },
+        { type: "tool_call", tool_name: "show_chart", tool_status: "success" },
+        { type: "text_delta", text: "Plan revenue rises from 4.5 to 4.8 billion." },
+        DONE,
+      ]),
+    );
+
+    renderChat();
+    await sendMessage(user, "show revenue by month");
+
+    const chart = await screen.findByTestId("chat-chart");
+    expect(chart).toHaveTextContent("Revenue by month, 2026");
+    // The query is re-run for the full result, not read from the preview.
+    await waitFor(() =>
+      expect(apiRequest).toHaveBeenCalledWith("/tm1/connections/conn1/visualize/run", {
+        method: "POST",
+        body: { mdx: CHART_EXECUTION.arguments.mdx },
+      }),
+    );
+    expect(await screen.findByTestId("viz-builder")).toBeInTheDocument();
+  });
+
+  it("sends a chart request from general chat to the Analyst", async () => {
+    const user = userEvent.setup();
+    apiRoutes({ "/ai/agents": [ANALYST] });
+    streamRequest.mockReturnValue(streamOf([DONE]));
+
+    renderChat();
+    // The agent list must have loaded for the switch to be offered.
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/ai/agents"));
+    await sendMessage(user, "chart revenue by month for 2026");
+
+    await waitFor(() => expect(streamRequest).toHaveBeenCalled());
+    expect(streamRequest.mock.calls[0][1]).toMatchObject({
+      agent: "analyst",
+      enable_tools: true,
+    });
+  });
+
+  it("leaves other general questions in general chat", async () => {
+    const user = userEvent.setup();
+    apiRoutes({ "/ai/agents": [ANALYST] });
+    streamRequest.mockReturnValue(streamOf([DONE]));
+
+    renderChat();
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/ai/agents"));
+    await sendMessage(user, "what does CellPutN do");
+
+    await waitFor(() => expect(streamRequest).toHaveBeenCalled());
+    expect(streamRequest.mock.calls[0][1]).toMatchObject({
+      agent: undefined,
+      enable_tools: false,
+    });
+  });
+});
+
+describe("reading an answer aloud", () => {
+  it("reads a typed question's answer when its speaker is pressed", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    streamRequest.mockReturnValue(
+      streamOf([{ type: "text_delta", text: "Plan revenue **rises** all year." }, DONE]),
+    );
+
+    renderChat();
+    await sendMessage(user, "how is revenue trending");
+    await screen.findByText(/all year/);
+
+    // Typed question: nothing is spoken until asked.
+    expect(speech.utterances).toEqual([]);
+
+    await user.click(screen.getByRole("button", { name: "Read aloud" }));
+
+    // Spoken without the Markdown.
+    expect(speech.utterances).toEqual(["Plan revenue rises all year."]);
   });
 });

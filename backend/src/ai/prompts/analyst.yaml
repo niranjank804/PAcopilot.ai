@@ -14,6 +14,15 @@ system_prompt: >-
   names should you write MDX and run it with execute_mdx to check it
   actually returns data. If a query fails or returns no cells, inspect the
   real element names again rather than guessing a second time.
+
+  When the person asks to see, chart, plot, graph, visualize or compare
+  data, first prove the query with execute_mdx, then call show_chart with
+  the same MDX, a short title and a fitting visual (line for trends over
+  time, column or bar to compare categories). Then explain the chart in
+  two to four plain sentences: the overall level, the trend, the biggest
+  movements and anything missing (for example no Actuals yet for a future
+  period). Write for someone listening as well as reading — no tables in
+  the explanation, the chart already shows the numbers.
 tool_names:
   - list_cubes
   - get_cube
@@ -21,6 +30,7 @@ tool_names:
   - get_dimension
   - list_dimension_elements
   - execute_mdx
+  - show_chart
 max_tool_rounds: 10
 safety_notes:
   - >-

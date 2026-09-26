@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, ImageDown } from "lucide-react";
+import { Download, ImageDown, SlidersHorizontal } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -278,6 +278,10 @@ function Toggle({
 export interface ChartBuilderProps {
   table: VisualizeTable;
   title: string;
+  /** The visual to open with; otherwise chosen from the data. */
+  initialType?: ChartType;
+  /** Chart first, options behind a button — for narrow places like Chat. */
+  compact?: boolean;
 }
 
 /**
@@ -288,7 +292,13 @@ export interface ChartBuilderProps {
  * summed, then sort, keep the top N, format numbers, and export. Every
  * change re-pivots the same rows in the browser.
  */
-export function ChartBuilder({ table, title }: ChartBuilderProps) {
+export function ChartBuilder({
+  table,
+  title,
+  initialType,
+  compact = false,
+}: ChartBuilderProps) {
+  const [controlsOpen, setControlsOpen] = useState(false);
   const { resolvedTheme } = useTheme();
   const mode: Mode = resolvedTheme === "dark" ? "dark" : "light";
   const chartRef = useRef<HTMLDivElement>(null);
@@ -296,9 +306,10 @@ export function ChartBuilder({ table, title }: ChartBuilderProps) {
   const initial = useMemo(() => defaultView(table), [table]);
   // Time on the axis reads best as a line; anything else as columns.
   const [chartType, setChartType] = useState<ChartType>(
-    /period|month|year|time|date|week|quarter|day/i.test(initial.axis)
-      ? "line"
-      : "column",
+    initialType ??
+      (/period|month|year|time|date|week|quarter|day/i.test(initial.axis)
+        ? "line"
+        : "column"),
   );
   const [axis, setAxis] = useState(initial.axis);
   const [series, setSeries] = useState<string | null>(initial.series);
@@ -381,7 +392,10 @@ export function ChartBuilder({ table, title }: ChartBuilderProps) {
     <XAxis
       dataKey="category"
       tick={{ fontSize: 11, fill: AXIS_INK }}
-      interval={many ? "preserveStartEnd" : 0}
+      // Labels that would collide are skipped rather than overprinted —
+      // six months fit a desktop chart but not one in a phone's chat.
+      interval="preserveStartEnd"
+      minTickGap={4}
       angle={many ? -30 : 0}
       textAnchor={many ? "end" : "middle"}
       height={many ? 70 : 30}
@@ -832,141 +846,159 @@ export function ChartBuilder({ table, title }: ChartBuilderProps) {
 
   return (
     <div className="space-y-4" data-testid="viz-builder">
-      <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
-        <Picker
-          id="viz-type"
-          label="Visual"
-          value={chartType}
-          width="w-44"
-          choices={CHART_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-          onChange={(v) => setChartType(v as ChartType)}
-        />
-        <Picker
-          id="viz-axis"
-          label="Axis"
-          value={axis}
-          choices={dimensionChoices}
-          onChange={(v) => {
-            setAxis(v);
-            if (series === v) setSeries(null);
-            setFilters((current) => without(current, v));
-          }}
-        />
-        {/* One value per category: no legend to choose. The dimension it
+      {compact ? (
+        <Button
+          size="sm"
+          variant="outline"
+          aria-expanded={controlsOpen}
+          onClick={() => setControlsOpen((open) => !open)}
+        >
+          <SlidersHorizontal className="mr-2 h-3.5 w-3.5" />
+          {controlsOpen ? "Hide chart options" : "Customize chart"}
+        </Button>
+      ) : null}
+      {compact && !controlsOpen ? null : (
+        <>
+          <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
+            <Picker
+              id="viz-type"
+              label="Visual"
+              value={chartType}
+              width="w-44"
+              choices={CHART_TYPES.map((t) => ({
+                value: t.value,
+                label: t.label,
+              }))}
+              onChange={(v) => setChartType(v as ChartType)}
+            />
+            <Picker
+              id="viz-axis"
+              label="Axis"
+              value={axis}
+              choices={dimensionChoices}
+              onChange={(v) => {
+                setAxis(v);
+                if (series === v) setSeries(null);
+                setFilters((current) => without(current, v));
+              }}
+            />
+            {/* One value per category: no legend to choose. The dimension it
             held becomes a slicer instead. */}
-        {singleSeries ? null : (
-          <Picker
-            id="viz-legend"
-            label="Legend"
-            value={series ?? NONE}
-            choices={[
-              { value: NONE, label: "None" },
-              ...dimensionChoices.filter((c) => c.value !== axis),
-            ]}
-            onChange={(v) => {
-              const next = v === NONE ? null : v;
-              setSeries(next);
-              if (next) setFilters((current) => without(current, next));
-            }}
-          />
-        )}
-        {slicerDims.map((dimension) => (
-          <Picker
-            key={dimension}
-            id={`viz-slicer-${dimension}`}
-            label={`Slicer: ${dimension}`}
-            value={filters[dimension] ?? ALL}
-            choices={[
-              { value: ALL, label: "All (summed)" },
-              ...membersOf(table, dimension).map((m) => ({
-                value: m,
-                label: m,
-              })),
-            ]}
-            onChange={(v) =>
-              setFilters((current) => {
-                const next = { ...current };
-                if (v === ALL) delete next[dimension];
-                else next[dimension] = v;
-                return next;
-              })
-            }
-          />
-        ))}
-        <Picker
-          id="viz-sort"
-          label="Sort"
-          value={sort}
-          width="w-36"
-          choices={SORTS}
-          onChange={(v) => setSort(v as SortOrder)}
-        />
-        <Picker
-          id="viz-top"
-          label="Show"
-          value={topN}
-          width="w-28"
-          choices={TOP_N.map((n) => ({
-            value: n,
-            label: n === "all" ? "All" : `Top ${n}`,
-          }))}
-          onChange={(v) => setTopN(v as (typeof TOP_N)[number])}
-        />
-        <Picker
-          id="viz-format"
-          label="Numbers"
-          value={format}
-          width="w-36"
-          choices={FORMATS}
-          onChange={(v) => setFormat(v as NumberFormat)}
-        />
-        <Picker
-          id="viz-size"
-          label="Size"
-          value={height}
-          width="w-28"
-          choices={[
-            { value: "small", label: "Small" },
-            { value: "medium", label: "Medium" },
-            { value: "large", label: "Large" },
-          ]}
-          onChange={(v) => setHeight(v as HeightKey)}
-        />
-        {/* Chart styling only means something on a drawn chart; the
-            table-style views (KPI, matrix, heatmap) have none. */}
-        {SVG_TYPES.includes(chartType) ? (
-          <div className="flex flex-wrap items-center gap-3 pb-2">
-            {chartType !== "treemap" ? (
-              <Toggle
-                id="viz-labels"
-                label="Data labels"
-                checked={labels}
-                onChange={setLabels}
-              />
-            ) : null}
-            {["treemap", "waterfall"].includes(chartType) ? null : (
-              <Toggle
-                id="viz-legend-toggle"
+            {singleSeries ? null : (
+              <Picker
+                id="viz-legend"
                 label="Legend"
-                checked={showLegend}
-                onChange={setShowLegend}
+                value={series ?? NONE}
+                choices={[
+                  { value: NONE, label: "None" },
+                  ...dimensionChoices.filter((c) => c.value !== axis),
+                ]}
+                onChange={(v) => {
+                  const next = v === NONE ? null : v;
+                  setSeries(next);
+                  if (next) setFilters((current) => without(current, next));
+                }}
               />
             )}
-            {["pie", "donut", "treemap"].includes(chartType) ? null : (
-              <Toggle
-                id="viz-grid"
-                label="Gridlines"
-                checked={grid}
-                onChange={setGrid}
+            {slicerDims.map((dimension) => (
+              <Picker
+                key={dimension}
+                id={`viz-slicer-${dimension}`}
+                label={`Slicer: ${dimension}`}
+                value={filters[dimension] ?? ALL}
+                choices={[
+                  { value: ALL, label: "All (summed)" },
+                  ...membersOf(table, dimension).map((m) => ({
+                    value: m,
+                    label: m,
+                  })),
+                ]}
+                onChange={(v) =>
+                  setFilters((current) => {
+                    const next = { ...current };
+                    if (v === ALL) delete next[dimension];
+                    else next[dimension] = v;
+                    return next;
+                  })
+                }
               />
-            )}
+            ))}
+            <Picker
+              id="viz-sort"
+              label="Sort"
+              value={sort}
+              width="w-36"
+              choices={SORTS}
+              onChange={(v) => setSort(v as SortOrder)}
+            />
+            <Picker
+              id="viz-top"
+              label="Show"
+              value={topN}
+              width="w-28"
+              choices={TOP_N.map((n) => ({
+                value: n,
+                label: n === "all" ? "All" : `Top ${n}`,
+              }))}
+              onChange={(v) => setTopN(v as (typeof TOP_N)[number])}
+            />
+            <Picker
+              id="viz-format"
+              label="Numbers"
+              value={format}
+              width="w-36"
+              choices={FORMATS}
+              onChange={(v) => setFormat(v as NumberFormat)}
+            />
+            <Picker
+              id="viz-size"
+              label="Size"
+              value={height}
+              width="w-28"
+              choices={[
+                { value: "small", label: "Small" },
+                { value: "medium", label: "Medium" },
+                { value: "large", label: "Large" },
+              ]}
+              onChange={(v) => setHeight(v as HeightKey)}
+            />
+            {/* Chart styling only means something on a drawn chart; the
+            table-style views (KPI, matrix, heatmap) have none. */}
+            {SVG_TYPES.includes(chartType) ? (
+              <div className="flex flex-wrap items-center gap-3 pb-2">
+                {chartType !== "treemap" ? (
+                  <Toggle
+                    id="viz-labels"
+                    label="Data labels"
+                    checked={labels}
+                    onChange={setLabels}
+                  />
+                ) : null}
+                {["treemap", "waterfall"].includes(chartType) ? null : (
+                  <Toggle
+                    id="viz-legend-toggle"
+                    label="Legend"
+                    checked={showLegend}
+                    onChange={setShowLegend}
+                  />
+                )}
+                {["pie", "donut", "treemap"].includes(chartType) ? null : (
+                  <Toggle
+                    id="viz-grid"
+                    label="Gridlines"
+                    checked={grid}
+                    onChange={setGrid}
+                  />
+                )}
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
 
-      <p className="text-xs text-muted-foreground">
-        {CHART_TYPES.find((t) => t.value === chartType)?.help}
-      </p>
+          <p className="text-xs text-muted-foreground">
+            {CHART_TYPES.find((t) => t.value === chartType)?.help}
+          </p>
+        </>
+      )}
 
       <div
         ref={chartRef}
