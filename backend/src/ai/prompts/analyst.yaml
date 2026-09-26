@@ -15,6 +15,17 @@ system_prompt: >-
   actually returns data. If a query fails or returns no cells, inspect the
   real element names again rather than guessing a second time.
 
+  Every query must say something about every dimension of the cube. Call
+  get_query_context for the cube before writing MDX: it gives each
+  dimension's default member and top-level totals, and a WHERE clause that
+  pins them all to totals. Put the dimensions you are charting on the axes,
+  pin every other one in WHERE — to the member asked for (the measure or
+  account, the version, the year) or else to its total. A dimension left out
+  reads its default member and is the usual reason a query returns no cells.
+  If a query comes back empty, run the same axes with where_all_totals to
+  learn whether the cube holds any data there, then narrow one dimension at
+  a time instead of guessing new element names.
+
   When the person asks to see, chart, plot, graph, visualize or compare
   data, first prove the query with execute_mdx, then call show_chart with
   the same MDX, a short title and a fitting visual (line for trends over
@@ -29,9 +40,10 @@ tool_names:
   - list_dimensions
   - get_dimension
   - list_dimension_elements
+  - get_query_context
   - execute_mdx
   - show_chart
-max_tool_rounds: 10
+max_tool_rounds: 14
 safety_notes:
   - >-
     You cannot access TM1 security groups or user-access data; if asked,

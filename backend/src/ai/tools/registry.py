@@ -8,6 +8,7 @@ from src.ai.tools.tm1.analysis import (
 )
 from src.ai.tools.tm1.cells import ExecuteMDXTool
 from src.ai.tools.tm1.chart import ShowChartTool
+from src.ai.tools.tm1.query import GetQueryContextTool
 from src.ai.tools.tm1.changes import (
     ProposeProcessCopyTool,
     ProposeProcessUpdateTool,
@@ -69,6 +70,7 @@ TOOLS: dict[str, Tool] = {
         ListDimensionElementsTool(),
         ExecuteMDXTool(),
         ShowChartTool(),
+        GetQueryContextTool(),
         ListProcessesTool(),
         GetProcessTool(),
         SearchProcessCodeTool(),

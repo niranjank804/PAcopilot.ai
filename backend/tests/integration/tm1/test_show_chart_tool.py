@@ -123,3 +123,21 @@ def test_the_analyst_can_show_charts():
     from src.ai.agents.registry import get_agent
 
     assert "show_chart" in get_agent("analyst").tool_names
+
+
+@pytest.mark.asyncio
+async def test_query_context_needs_tm1_read(
+    client, db_session, tm1_credentials_key, fake_tm1_client
+):
+    org, admin = await create_org_admin(db_session)
+    connection_id = await _connection_id(client, admin)
+    viewer = await create_user(db_session, org.id)
+
+    with pytest.raises(PermissionDeniedException):
+        await get_tool("get_query_context").execute(
+            db_session,
+            organization_id=org.id,
+            user_id=viewer.id,
+            connection_id=connection_id,
+            cube_name="Income",
+        )
