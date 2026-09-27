@@ -10,20 +10,32 @@ Two windows are enforced on every guarded request — one for the user, one
 for their organization — so one runaway client cannot consume the whole
 organization's budget, and one organization cannot starve the others.
 
-**Single-process only.** State lives in this process's memory, so the
-effective limit is multiplied by the number of worker processes. The
-current deployment runs `gunicorn --workers 2` (render.yaml), so real
-limits today are **twice** the configured values, and adding instances
-multiplies them further. That is a deliberate first step, not a finished
-design: it removes the unbounded case without adding Redis to the
-deployment. Move `_WINDOWS` to a shared store before scaling out.
+**Shared when Upstash is configured.** On Vercel every warm instance is a
+separate process, so windows kept in memory multiply the limit by the
+instance count — and the login throttle, the one standing between
+/auth/login and credential stuffing, stops limiting without an error.
+With UPSTASH_REDIS_REST_URL and _TOKEN set (the Vercel Marketplace
+integration sets them, as KV_REST_API_URL and _TOKEN), every window lives
+in Redis and all instances share it.
+
+Without them, or if Redis cannot be reached, the windows fall back to
+this process's memory: the previous behaviour, limits per instance. A
+Redis outage therefore loosens limits rather than failing every request —
+the failure mode chosen on purpose, since refusing all logins because the
+limiter's store is down would be an outage of its own.
 """
 
+import logging
 import time
+import uuid
 from collections import defaultdict, deque
+
+import httpx
 
 from src.core.config import settings
 from src.core.exceptions import RateLimitedException
+
+logger = logging.getLogger(__name__)
 
 # key -> timestamps of the hits still inside the window
 _WINDOWS: dict[str, deque[float]] = defaultdict(deque)
@@ -50,17 +62,12 @@ def _sweep(now: float) -> None:
         del _WINDOWS[key]
 
 
-def _check(
+def _check_memory(
     key: str,
     limit: int,
     now: float,
-    window: float | None = None,
+    window: float,
 ) -> float | None:
-    """Record a hit. Returns seconds until retry if the limit is exceeded."""
-
-    window = (
-        window if window is not None else settings.RATE_LIMIT_WINDOW_SECONDS
-    )
     hits = _WINDOWS[key]
 
     while hits and now - hits[0] >= window:
@@ -75,7 +82,100 @@ def _check(
     return None
 
 
-def enforce(
+# The same sliding-window log, in a Redis sorted set, in one atomic step:
+# drop hits older than the window, count, and either refuse (with the time
+# until the oldest ages out) or record this hit. Atomic so two instances
+# cannot both see room for the last slot.
+_SLIDING_WINDOW = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+if redis.call('ZCARD', key) >= limit then
+  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  return tostring(window - (now - tonumber(oldest[2])))
+end
+redis.call('ZADD', key, now, ARGV[4])
+redis.call('PEXPIRE', key, math.ceil(window * 1000))
+return ''
+"""
+
+_SHARED_TIMEOUT = 1.5
+# One warning per this many seconds while Redis is failing, not one per
+# request.
+_WARN_EVERY = 60.0
+_last_warning = 0.0
+_client: httpx.AsyncClient | None = None
+
+
+def _shared_store() -> tuple[str, str] | None:
+    url, token = settings.UPSTASH_REDIS_REST_URL, settings.UPSTASH_REDIS_REST_TOKEN
+    return (url.rstrip("/"), token) if url and token else None
+
+
+async def _check_shared(
+    store: tuple[str, str],
+    key: str,
+    limit: int,
+    window: float,
+) -> float | None:
+    global _client
+
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=_SHARED_TIMEOUT)
+
+    url, token = store
+    now = time.time()  # wall clock: shared across instances
+    response = await _client.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        json=[
+            "EVAL", _SLIDING_WINDOW, "1", f"ratelimit:{key}",
+            repr(now), repr(float(window)), str(limit), f"{now}:{uuid.uuid4().hex}",
+        ],
+    )
+    response.raise_for_status()
+    body = response.json()
+    if "error" in body:
+        raise RuntimeError(body["error"])
+
+    result = body.get("result") or ""
+    return max(0.0, float(result)) if result else None
+
+
+async def _check(
+    key: str,
+    limit: int,
+    window: float | None = None,
+) -> float | None:
+    """Record a hit. Returns seconds until retry if the limit is exceeded."""
+
+    global _last_warning
+
+    window = (
+        window if window is not None else settings.RATE_LIMIT_WINDOW_SECONDS
+    )
+
+    store = _shared_store()
+    if store:
+        try:
+            return await _check_shared(store, key, limit, window)
+        except Exception as exc:
+            now = time.monotonic()
+            if now - _last_warning > _WARN_EVERY:
+                _last_warning = now
+                # The type only: an HTTP error can echo the request URL.
+                logger.warning(
+                    "Shared rate-limit store unavailable (%s); limiting per "
+                    "instance until it answers again.",
+                    type(exc).__name__,
+                )
+
+    return _check_memory(key, limit, time.monotonic(), window)
+
+
+async def enforce(
     *,
     scope: str,
     user_id,
@@ -100,9 +200,7 @@ def enforce(
 
     # Organization first: if the org is over budget, the user's own
     # allowance should not be spent on a request that cannot proceed.
-    retry_after = _check(
-        f"{scope}:org:{organization_id}", organization_limit, now
-    )
+    retry_after = await _check(f"{scope}:org:{organization_id}", organization_limit)
 
     if retry_after is not None:
         raise RateLimitedException(
@@ -111,7 +209,7 @@ def enforce(
             retry_after=retry_after,
         )
 
-    retry_after = _check(f"{scope}:user:{user_id}", user_limit, now)
+    retry_after = await _check(f"{scope}:user:{user_id}", user_limit)
 
     if retry_after is not None:
         raise RateLimitedException(
@@ -120,7 +218,7 @@ def enforce(
         )
 
 
-def enforce_ip(
+async def enforce_ip(
     *,
     scope: str,
     client_ip: str | None,
@@ -144,15 +242,14 @@ def enforce_ip(
     if not settings.RATE_LIMIT_ENABLED or not client_ip:
         return
 
-    now = time.monotonic()
     effective_window = (
         window
         if window is not None
         else settings.AUTH_RATE_LIMIT_WINDOW_SECONDS
     )
 
-    retry_after = _check(
-        f"{scope}:ip:{client_ip}", limit, now, window=effective_window
+    retry_after = await _check(
+        f"{scope}:ip:{client_ip}", limit, window=effective_window
     )
 
     if retry_after is not None:

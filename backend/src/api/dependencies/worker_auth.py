@@ -64,7 +64,7 @@ async def get_current_worker(
     # Keyed on the worker rather than a user: the worker *is* the
     # principal here, and one runaway machine must not consume its
     # organization's whole budget.
-    rate_limit.enforce(
+    await rate_limit.enforce(
         scope="worker",
         user_id=worker.id,
         organization_id=worker.organization_id,
@@ -75,7 +75,7 @@ async def get_current_worker(
     return worker
 
 
-def worker_credential_throttle(request: Request) -> None:
+async def worker_credential_throttle(request: Request) -> None:
     """IP throttle for the unauthenticated credential endpoints.
 
     `/worker/token` and `/worker/enroll` accept a secret and answer
@@ -89,7 +89,7 @@ def worker_credential_throttle(request: Request) -> None:
     which is the one that is otherwise free.
     """
 
-    rate_limit.enforce_ip(
+    await rate_limit.enforce_ip(
         scope="worker_credential",
         client_ip=rate_limit.client_ip_of(request),
         limit=settings.RATE_LIMIT_WORKER_CREDENTIAL_IP_PER_WINDOW,

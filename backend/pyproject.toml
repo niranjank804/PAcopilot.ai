@@ -23,6 +23,7 @@ dependencies = [
     "fastapi==0.139.2",
     "google-auth==2.56.2",
     "greenlet==3.5.3",
+    "httpx==0.28.1",
     "gunicorn==26.0.0",
     "idna==3.18",
     "ijson==3.5.1",

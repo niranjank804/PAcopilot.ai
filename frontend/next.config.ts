@@ -27,7 +27,7 @@ if (process.env.VERCEL && !process.env.NEXT_PUBLIC_API_URL) {
   throw new Error(
     `NEXT_PUBLIC_API_URL is not set for the "${environment}" environment.\n\n` +
       "Add it in Vercel under Settings > Environment Variables, pointing " +
-      "at the backend, e.g. https://pa-copilot-backend.onrender.com\n\n" +
+      "at the backend, e.g. https://pa-copilot-api.vercel.app\n\n" +
       "Tick Production, Preview AND Development. A value set for " +
       "Production only builds the live site fine and fails every preview " +
       "and pull request build here.\n\n" +

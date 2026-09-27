@@ -1,8 +1,15 @@
 # Migrating from Render to Vercel
 
-Status (2026-09-20): **database on Neon (done), frontend on Vercel (done),
-backend code ready for Vercel (done, `cd03d1a` + `686c82d`), Vercel project
-`pa-copilot-api` created — secrets and first deploy pending, then cutover.**
+Status (2026-09-28): **done.** The frontend calls `pa-copilot-api` on
+Vercel (cut over 2026-09-26); the project is Git-connected, so a push to
+`main` deploys it and its build runs the migrations. `render.yaml` and the
+keep-alive workflow are removed. Left to do by hand: delete the Render
+service `pa-copilot-backend` (see step 5 — while it exists, every push
+also makes Render build and migrate the same database), the S3 CORS rule
+(step 4), and Upstash for shared rate limits (`UPSTASH_REDIS_REST_URL` /
+`_TOKEN`, or the Marketplace's `KV_REST_API_URL` / `_TOKEN`).
+
+The steps below are kept as the record of how it was done.
 
 ## Procedure from here
 

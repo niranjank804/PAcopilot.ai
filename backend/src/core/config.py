@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -213,10 +213,24 @@ class Settings(BaseSettings):
     # there is no authenticated identity yet.
     RATE_LIMIT_WORKER_CREDENTIAL_IP_PER_WINDOW: int = 20
 
+    # Shared rate-limit windows (Upstash Redis, REST). Unset: windows are
+    # per process, which on Vercel means per instance. The Vercel
+    # Marketplace integration names them KV_REST_API_URL / _TOKEN; either
+    # name works.
+    UPSTASH_REDIS_REST_URL: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"),
+    )
+    UPSTASH_REDIS_REST_TOKEN: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"),
+    )
+
     # Number of proxies in front of the app whose X-Forwarded-For entries
-    # can be trusted. Render terminates TLS and appends the real client IP,
-    # so 1 is correct there. Set 0 when the app is directly exposed —
-    # otherwise a caller can spoof the header and dodge the limit entirely.
+    # can be trusted. Vercel (like Render before it) sets X-Forwarded-For
+    # to the client address it saw, so 1 is correct. Set 0 when the app is
+    # directly exposed — otherwise a caller can spoof the header and dodge
+    # the limit entirely.
     TRUSTED_PROXY_COUNT: int = 1
 
     # Client ID only — not secret, meant to be exposed client-side (the

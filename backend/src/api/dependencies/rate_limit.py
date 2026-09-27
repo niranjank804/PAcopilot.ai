@@ -25,7 +25,7 @@ def rate_limited(scope: str):
 
         # Resolved per request rather than captured, so a test (or an
         # operator) can change a limit without rebuilding the app.
-        rate_limit.enforce(
+        await rate_limit.enforce(
             scope=scope,
             user_id=current_user.id,
             organization_id=current_user.organization_id,
@@ -60,7 +60,7 @@ def auth_throttle(scope: str, limit_setting: str):
     """
 
     async def checker(request: Request) -> None:
-        rate_limit.enforce_ip(
+        await rate_limit.enforce_ip(
             scope=f"auth:{scope}",
             # Not request.client.host: behind a proxy that is the
             # proxy's address, which collapses every client into one
