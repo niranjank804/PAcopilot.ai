@@ -127,3 +127,41 @@ describe("ConnectionFormFields", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+describe("reached through a gateway", () => {
+  function WithGateways({ authType }: { authType: "native" | "pa_cloud" }) {
+    const { register, control, formState } = useForm<ConnectionFormValues>({
+      defaultValues: { authentication_type: authType, port: 8010, ssl: true, gateway_id: "direct" },
+    });
+    return (
+      <ConnectionFormFields
+        register={register}
+        control={control}
+        errors={formState.errors}
+        authType={authType}
+        passwordLabel="Password"
+        gateways={[
+          {
+            id: "g1", name: "Head office", online: true, last_seen_at: null,
+            version: null, hostname: null, created_at: "", connection_count: 0,
+          },
+        ]}
+      />
+    );
+  }
+
+  it("offers the organization's gateways for an on-premises server", async () => {
+    const user = userEvent.setup();
+    render(<WithGateways authType="native" />);
+
+    const picker = screen.getByLabelText("Reached through");
+    expect(picker).toHaveTextContent(/directly/i);
+    await user.click(picker);
+    expect(await screen.findByRole("option", { name: /Gateway: Head office/ })).toBeInTheDocument();
+  });
+
+  it("does not offer a gateway for Planning Analytics in IBM's cloud", () => {
+    render(<WithGateways authType="pa_cloud" />);
+    expect(screen.queryByLabelText("Reached through")).not.toBeInTheDocument();
+  });
+});

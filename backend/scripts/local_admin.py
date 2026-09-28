@@ -23,7 +23,9 @@ from src.database.models.user import User
 from src.database.session import AsyncSessionLocal
 from src.services.password_service import password_service
 
-EMAIL = "admin@local.test"
+# A reserved domain such as .test or .local fails the app's email check
+# on every request after sign-in; example.com is reserved for exactly this.
+EMAIL = "local-admin@example.com"
 
 
 async def main() -> None:

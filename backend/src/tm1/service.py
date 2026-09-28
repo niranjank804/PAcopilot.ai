@@ -131,7 +131,31 @@ def _check_address_reachable_by_policy(address: str) -> None:
         raise ValidationException(PRIVATE_ADDRESS_REFUSED)
 
 
+# update_connection: "gateway_id not given", as distinct from None
+# ("move this connection off its gateway").
+_UNSET = object()
+
+
 class TM1IntegrationService:
+
+    async def _check_gateway(
+        self,
+        db: AsyncSession,
+        gateway_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        authentication_type: str,
+    ) -> None:
+        # Imported here: the gateway service imports models this module's
+        # importers also load, and nothing else here needs it.
+        from src.tm1.gateway.service import tm1_gateway_service
+
+        if authentication_type != "native":
+            raise ValidationException(
+                "Only a Native (on-premises) connection can go through a "
+                "gateway; Planning Analytics in IBM's cloud is reached directly."
+            )
+        # Raises NotFound for a gateway of another organization.
+        await tm1_gateway_service.get(db, gateway_id, organization_id)
 
     async def create_connection(
         self,
@@ -148,6 +172,7 @@ class TM1IntegrationService:
         authentication_type: str = "native",
         tenant: str | None = None,
         database: str | None = None,
+        gateway_id: uuid.UUID | None = None,
     ) -> TM1Connection:
 
         parsed = parse_address(address)
@@ -158,7 +183,13 @@ class TM1IntegrationService:
         if not address:
             raise ValidationException("Address is required.")
 
-        _check_address_reachable_by_policy(address)
+        # Through a gateway, the address is resolved inside the company's
+        # network — a private address is the normal case, and the
+        # gateway's own allow-list decides what it may reach.
+        if gateway_id is not None:
+            await self._check_gateway(db, gateway_id, organization_id, authentication_type)
+        else:
+            _check_address_reachable_by_policy(address)
 
         if is_saas_host(address) and authentication_type != "v12_saas":
             raise ValidationException(SAAS_NEEDS_SAAS_TYPE)
@@ -182,6 +213,7 @@ class TM1IntegrationService:
             authentication_type=authentication_type,
             tenant=tenant,
             database=database,
+            gateway_id=gateway_id,
         )
 
         return await tm1_connection_repository.create(db, connection)
@@ -239,9 +271,11 @@ class TM1IntegrationService:
         authentication_type: str | None = None,
         tenant: str | None = None,
         database: str | None = None,
+        gateway_id: object = _UNSET,
     ) -> TM1Connection:
 
         connection = await self.get_connection(db, connection_id, organization_id)
+        next_gateway = connection.gateway_id if gateway_id is _UNSET else gateway_id
 
         if address is not None:
             parsed = parse_address(address)
@@ -252,7 +286,8 @@ class TM1IntegrationService:
             if not address:
                 raise ValidationException("Address is required.")
 
-            _check_address_reachable_by_policy(address)
+            if next_gateway is None:
+                _check_address_reachable_by_policy(address)
 
         next_address = address if address is not None else connection.address
         next_auth_type = authentication_type or connection.authentication_type
@@ -291,6 +326,15 @@ class TM1IntegrationService:
             connection.tenant = tenant
         if database is not None:
             connection.database = database
+        if gateway_id is not _UNSET:
+            if gateway_id is None:
+                # Off the gateway: the address must now be reachable directly.
+                _check_address_reachable_by_policy(connection.address)
+            else:
+                await self._check_gateway(
+                    db, gateway_id, organization_id, connection.authentication_type
+                )
+            connection.gateway_id = gateway_id
 
         # Credentials or endpoint may have changed — never reuse a stale
         # cached TM1py client against the new configuration.

@@ -115,6 +115,7 @@ def test_build_tm1_kwargs_native_mode():
     connection.port = 8010
     connection.ssl = True
     connection.username = "admin"
+    connection.gateway_id = None
 
     kwargs = build_tm1_kwargs(connection, "secret")
 
@@ -129,6 +130,28 @@ def test_build_tm1_kwargs_native_mode():
         "timeout": settings.TM1_REQUEST_TIMEOUT_SECONDS,
         "cancel_at_timeout": True,
     }
+
+
+def test_build_tm1_kwargs_through_a_gateway():
+    # A TM1 server inside a company network: TM1py is told which gateway
+    # carries its requests (src/tm1/gateway/relay.py).
+    import uuid
+
+    from src.tm1.client.connection_manager import build_tm1_kwargs
+
+    gateway_id = uuid.uuid4()
+    connection = MagicMock()
+    connection.authentication_type = "native"
+    connection.address = "192.168.1.17"
+    connection.port = 8010
+    connection.ssl = True
+    connection.username = "admin"
+    connection.gateway_id = gateway_id
+
+    kwargs = build_tm1_kwargs(connection, "secret")
+
+    assert kwargs["pa_gateway"] == str(gateway_id)
+    assert kwargs["address"] == "192.168.1.17"
 
 
 def test_build_tm1_kwargs_v12_saas_mode():

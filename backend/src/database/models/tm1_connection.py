@@ -86,3 +86,12 @@ class TM1Connection(BaseModel, OrganizationScoped):
         String(255),
         nullable=True,
     )
+
+    # Set when the TM1 server is inside a company network and is reached
+    # through a PA-Copilot gateway there, instead of directly.
+    gateway_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tm1_gateways.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )

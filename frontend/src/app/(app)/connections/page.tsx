@@ -41,7 +41,9 @@ import {
   ConnectionFormFields,
   databaseFromBaseUrl,
 } from "@/components/connection-form-fields";
+import { GatewaysPanel } from "@/components/gateways-panel";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { DIRECT, type ConnectionWithGateway, type TM1Gateway } from "@/lib/gateways";
 import type { TM1Connection } from "@/lib/types";
 
 const connectionSchema = z
@@ -55,6 +57,7 @@ const connectionSchema = z
     password: z.string().min(1, "Password is required"),
     tenant: z.string().optional(),
     database: z.string().optional(),
+    gateway_id: z.string().optional(),
   })
   .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
@@ -91,6 +94,7 @@ const editSchema = z
     password: z.string().optional(),
     tenant: z.string().optional(),
     database: z.string().optional(),
+    gateway_id: z.string().optional(),
   })
   .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
@@ -127,8 +131,17 @@ export default function ConnectionsPage() {
 
   const connectionsQuery = useQuery({
     queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryFn: () => apiRequest<ConnectionWithGateway[]>("/tm1/connections"),
   });
+
+  // Shared with the Gateways panel below (same query key).
+  const gatewaysQuery = useQuery({
+    queryKey: ["tm1-gateways"],
+    queryFn: () => apiRequest<TM1Gateway[]>("/tm1/gateways"),
+  });
+  const gateways = gatewaysQuery.data ?? [];
+  const gatewayName = (id?: string | null) =>
+    id ? (gateways.find((g) => g.id === id)?.name ?? "a gateway") : null;
 
   const {
     register,
@@ -139,7 +152,7 @@ export default function ConnectionsPage() {
     formState: { errors },
   } = useForm<ConnectionValues>({
     resolver: zodResolver(connectionSchema),
-    defaultValues: { authentication_type: "native", port: 8010, ssl: true },
+    defaultValues: { authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT },
   });
 
   const authType = watch("authentication_type");
@@ -166,6 +179,10 @@ export default function ConnectionsPage() {
           username: values.authentication_type === "v12_saas" ? "apikey" : values.username,
           tenant: values.authentication_type === "v12_saas" ? values.tenant : undefined,
           database: values.authentication_type === "native" ? undefined : values.database,
+          gateway_id:
+            values.authentication_type === "native" && values.gateway_id && values.gateway_id !== DIRECT
+              ? values.gateway_id
+              : undefined,
           // PA on Cloud is always HTTPS on 443 behind IBM's gateway.
           ...(values.authentication_type === "pa_cloud" ? { port: 443, ssl: true } : {}),
         },
@@ -173,7 +190,7 @@ export default function ConnectionsPage() {
     onSuccess: (created) => {
       toast.success(`Connection "${created.name}" created.`);
       setCreateOpen(false);
-      reset({ authentication_type: "native", port: 8010, ssl: true });
+      reset({ authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT });
       queryClient.invalidateQueries({ queryKey: ["tm1-connections"] });
       queryClient.invalidateQueries({ queryKey: ["monitoring-tm1-status"] });
     },
@@ -192,6 +209,11 @@ export default function ConnectionsPage() {
           username: values.authentication_type === "v12_saas" ? "apikey" : values.username,
           tenant: values.authentication_type === "v12_saas" ? values.tenant : undefined,
           database: values.authentication_type === "native" ? undefined : values.database,
+          // Explicit null: "reached directly" moves it off a gateway.
+          gateway_id:
+            values.authentication_type === "native" && values.gateway_id && values.gateway_id !== DIRECT
+              ? values.gateway_id
+              : null,
           // PA on Cloud is always HTTPS on 443 behind IBM's gateway.
           ...(values.authentication_type === "pa_cloud" ? { port: 443, ssl: true } : {}),
         },
@@ -206,7 +228,7 @@ export default function ConnectionsPage() {
     onError: (error) => toast.error(errorMessage(error)),
   });
 
-  const openEdit = (connection: TM1Connection) => {
+  const openEdit = (connection: ConnectionWithGateway) => {
     setEditTarget(connection);
     editReset({
       name: connection.name,
@@ -218,6 +240,7 @@ export default function ConnectionsPage() {
       password: "",
       tenant: connection.tenant ?? "",
       database: connection.database ?? "",
+      gateway_id: connection.gateway_id ?? DIRECT,
     });
   };
 
@@ -320,6 +343,7 @@ export default function ConnectionsPage() {
                     <>
                       {connection.address}:{connection.port}
                       {connection.ssl ? " · SSL" : ""} · {connection.username}
+                      {connection.gateway_id ? ` · via ${gatewayName(connection.gateway_id)}` : ""}
                     </>
                   )}
                 </CardDescription>
@@ -373,6 +397,8 @@ export default function ConnectionsPage() {
         </Card>
       )}
 
+      <GatewaysPanel />
+
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
@@ -392,6 +418,7 @@ export default function ConnectionsPage() {
               errors={errors}
               authType={authType}
               passwordLabel={authType === "v12_saas" ? "API key" : "Password"}
+              gateways={gateways}
             />
             <DialogFooter>
               <Button
@@ -433,6 +460,7 @@ export default function ConnectionsPage() {
               authType={editAuthType}
               passwordLabel={editAuthType === "v12_saas" ? "API key" : "Password"}
               passwordPlaceholder="Leave blank to keep current"
+              gateways={gateways}
             />
             <DialogFooter>
               <Button

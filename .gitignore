@@ -81,3 +81,6 @@ database-backup.dump
 /frontend/test-results/
 /frontend/playwright-report/
 /frontend/blob-report/
+
+# Gateway build artefacts (gateway/build.ps1)
+gateway/.build/

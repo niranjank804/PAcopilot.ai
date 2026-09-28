@@ -7,7 +7,11 @@ from src.core.config import settings
 from src.database.models.tm1_connection import TM1Connection
 from src.tm1.addressing import parse_address
 from src.tm1.crypto import decrypt_password
+from src.tm1.gateway.relay import install as install_gateway_transport
 from src.tm1.resilience import call_with_resilience, remove_circuit_breaker
+
+# Gateway connections route TM1py through the gateway; others are untouched.
+install_gateway_transport()
 
 
 def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
@@ -62,7 +66,7 @@ def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
             **_timeout_kwargs(),
         }
 
-    return {
+    kwargs = {
         "address": connection.address,
         "port": connection.port,
         "ssl": connection.ssl,
@@ -70,6 +74,11 @@ def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
         "password": password,
         **_timeout_kwargs(),
     }
+    if getattr(connection, "gateway_id", None):
+        # Inside a company network: TM1py's requests travel through the
+        # PA-Copilot gateway there (src/tm1/gateway/relay.py).
+        kwargs["pa_gateway"] = str(connection.gateway_id)
+    return kwargs
 
 
 PA_CLOUD = "pa_cloud"

@@ -123,6 +123,7 @@ async def create_connection(
         authentication_type=request.authentication_type,
         tenant=request.tenant,
         database=request.database,
+        gateway_id=request.gateway_id,
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)

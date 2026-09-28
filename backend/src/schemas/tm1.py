@@ -19,6 +19,9 @@ class ConnectionCreate(BaseModel):
     authentication_type: Literal["native", "v12_saas", "pa_cloud"] = "native"
     tenant: str | None = None
     database: str | None = None
+    # A TM1 server inside a company network: reached through the
+    # PA-Copilot gateway installed there (native connections only).
+    gateway_id: uuid.UUID | None = None
 
 
 class ConnectionUpdate(BaseModel):
@@ -34,6 +37,8 @@ class ConnectionUpdate(BaseModel):
     authentication_type: Literal["native", "v12_saas", "pa_cloud"] | None = None
     tenant: str | None = None
     database: str | None = None
+    # Explicit null moves the connection off its gateway.
+    gateway_id: uuid.UUID | None = None
 
 
 class ConnectionResponse(BaseModel):
@@ -49,6 +54,7 @@ class ConnectionResponse(BaseModel):
     authentication_type: str
     tenant: str | None
     database: str | None
+    gateway_id: uuid.UUID | None = None
 
 
 class TestConnectionResponse(BaseModel):

@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DIRECT, type TM1Gateway } from "@/lib/gateways";
 
 // Every PA as a Service region is a subdomain of this. Mirrors
 // backend/src/tm1/addressing.py, which refuses the same mistake on save.
@@ -56,6 +57,7 @@ export interface ConnectionFormValues {
   password?: string;
   tenant?: string;
   database?: string;
+  gateway_id?: string;
 }
 
 interface ConnectionFormFieldsProps<T extends FieldValues> {
@@ -65,6 +67,8 @@ interface ConnectionFormFieldsProps<T extends FieldValues> {
   authType: AuthType;
   passwordLabel: string;
   passwordPlaceholder?: string;
+  /** Gateways a Native connection may be reached through. */
+  gateways?: TM1Gateway[];
 }
 
 // Shared by the "New Connection" and "Edit Connection" dialogs so the two
@@ -79,6 +83,7 @@ export function ConnectionFormFields<T extends FieldValues>({
   authType,
   passwordLabel,
   passwordPlaceholder,
+  gateways = [],
 }: ConnectionFormFieldsProps<T>) {
   const address = useWatch({ control, name: "address" as Path<T> }) as
     | string
@@ -171,6 +176,46 @@ export function ConnectionFormFields<T extends FieldValues>({
           </p>
         ) : null}
       </div>
+
+      {authType === "native" ? (
+        <div className="space-y-2">
+          <Label htmlFor="gateway_id">Reached through</Label>
+          <Controller
+            control={control}
+            name={"gateway_id" as Path<T>}
+            render={({ field }) => (
+              <Select value={field.value ?? DIRECT} onValueChange={field.onChange}>
+                <SelectTrigger id="gateway_id" className="w-full min-w-0 [&>span]:truncate">
+                  <SelectValue>
+                    {(value: string) =>
+                      value === DIRECT || !value
+                        ? "Directly — the address is reachable from the internet"
+                        : `Gateway: ${gateways.find((g) => g.id === value)?.name ?? "…"}`
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={DIRECT}>
+                    Directly — the address is reachable from the internet
+                  </SelectItem>
+                  {gateways.map((gateway) => (
+                    <SelectItem key={gateway.id} value={gateway.id}>
+                      Gateway: {gateway.name}
+                      {gateway.online ? "" : " (offline)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-xs text-muted-foreground">
+            A TM1 server on a company network (192.168.x.x, or a name only
+            that network knows) is reached through a gateway installed there —
+            add one under Gateways on this page. Enter the address as the
+            gateway&rsquo;s machine sees it.
+          </p>
+        </div>
+      ) : null}
 
       {/* Keyed by type: without a key React reuses the same <input>
           elements when the type changes, and the port's 8010 stayed on
