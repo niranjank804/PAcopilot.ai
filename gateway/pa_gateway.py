@@ -68,20 +68,35 @@ def load_config() -> dict:
 def save_config(cfg: dict) -> Path:
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    if os.name == "nt":
-        # The key is a credential: readable by administrators, SYSTEM (the
-        # startup task) and the person who ran setup — nobody else.
-        grants = ["*S-1-5-32-544:F", "*S-1-5-18:F"]
-        if os.environ.get("USERNAME"):
-            domain = os.environ.get("USERDOMAIN", ".")
-            grants.append(domain + "\\" + os.environ["USERNAME"] + ":F")
-        subprocess.run(
-            ["icacls", str(path), "/inheritance:r", "/grant:r", *grants],
-            capture_output=True, check=False,
-        )
-    else:
-        path.chmod(0o600)
+    # The key is a credential. Lock down an empty file first, write the key
+    # into it, then move it into place — it is never readable by others,
+    # not even for a moment.
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.unlink(missing_ok=True)
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        if os.name == "nt":
+            # Readable by administrators, SYSTEM (the startup task) and the
+            # person who ran setup — nobody else.
+            grants = ["*S-1-5-32-544:F", "*S-1-5-18:F"]
+            if os.environ.get("USERNAME"):
+                domain = os.environ.get("USERDOMAIN", ".")
+                grants.append(domain + "\\" + os.environ["USERNAME"] + ":F")
+            locked = subprocess.run(
+                ["icacls", str(tmp), "/inheritance:r", "/grant:r", *grants],
+                capture_output=True, check=False,
+            )
+            if locked.returncode != 0:
+                raise OSError("Could not restrict access to " + str(tmp))
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            fd = -1
+            f.write(json.dumps(cfg, indent=2))
+        os.replace(tmp, path)
+    except BaseException:
+        if fd != -1:
+            os.close(fd)
+        tmp.unlink(missing_ok=True)
+        raise
     return path
 
 
