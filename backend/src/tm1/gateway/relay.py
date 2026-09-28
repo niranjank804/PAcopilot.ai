@@ -63,6 +63,15 @@ def decode(text: str) -> bytes:
     return zlib.decompress(base64.b64decode(text))
 
 
+class GatewayError(requests.exceptions.ConnectionError):
+    """The gateway reported a failure, or did not answer at all.
+
+    The message is written here or by the gateway program, never taken
+    from what TM1 answered, so it is safe to show the user — and it is
+    the only thing that tells them what to fix on the gateway machine.
+    """
+
+
 # ---------------------------------------------------------------- brokers
 
 
@@ -256,9 +265,11 @@ def relay(
     broker = get_broker()
     broker.push_request(gateway_id, message)
     try:
-        parts = broker.pop_answer(request_id, timeout + 5.0)
+        # The gateway gives TM1 the same timeout and reports its own
+        # failure, so a little over it is enough.
+        parts = broker.pop_answer(request_id, timeout + 2.0)
     except TimeoutError:
-        raise requests.exceptions.ReadTimeout(
+        raise GatewayError(
             f"The gateway did not answer within {int(timeout)} seconds. "
             "Check that the PA-Copilot gateway is running inside the TM1 "
             "server's network."
@@ -267,7 +278,7 @@ def relay(
     parts.sort(key=lambda p: int(p.get("index", 0)))
     meta = parts[0]
     if meta.get("error"):
-        raise requests.exceptions.ConnectionError(f"Gateway: {meta['error']}")
+        raise GatewayError(f"The gateway reported: {meta['error']}")
 
     data = "".join(p.get("data", "") for p in parts)
     body_bytes = decode(data) if data else b""

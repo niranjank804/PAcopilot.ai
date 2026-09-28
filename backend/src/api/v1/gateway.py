@@ -11,6 +11,7 @@ Two audiences, two routers:
 
 import asyncio
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import func, select
@@ -40,6 +41,16 @@ agent_router = APIRouter(prefix="/gateway", tags=["TM1 Gateway (agent)"])
 
 # Wrong keys allowed per address per auth window before 429.
 _BAD_KEYS_PER_WINDOW = 20
+
+# The broker's blocking calls get threads of their own. On the default
+# pool (a handful of threads on a small instance) a gateway's idle long
+# polls would take every thread, and the TM1 request they exist to carry
+# — and the gateway's answer to it — would queue behind them.
+_broker_threads = ThreadPoolExecutor(max_workers=64, thread_name_prefix="tm1-gateway")
+
+
+async def _in_broker_thread(function, *args):
+    return await asyncio.get_running_loop().run_in_executor(_broker_threads, function, *args)
 
 
 async def _connection_counts(db: AsyncSession, organization_id: uuid.UUID) -> dict:
@@ -175,7 +186,7 @@ async def poll(
     # connection for its whole duration.
     await db.commit()
 
-    message = await asyncio.to_thread(get_broker().pop_request, gateway_id, body.wait)
+    message = await _in_broker_thread(get_broker().pop_request, gateway_id, body.wait)
     if message is None:
         return Response(status_code=204)
     return {"request": message}
@@ -189,6 +200,6 @@ async def answer(
     """One part of what TM1 answered (or why it could not be asked)."""
 
     payload = part.model_dump(exclude_none=True)
-    await asyncio.to_thread(get_broker().push_answer_part, part.id, payload)
+    await _in_broker_thread(get_broker().push_answer_part, part.id, payload)
     return ApiResponse(success=True, data={"received": part.index})
 

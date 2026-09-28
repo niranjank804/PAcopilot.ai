@@ -132,7 +132,7 @@ def test_the_gateway_refuses_a_tm1_server_it_was_not_given(broker):
 
 
 def test_no_gateway_running_is_a_timeout_that_says_so(broker):
-    with pytest.raises(requests.exceptions.ReadTimeout, match="gateway is running"):
+    with pytest.raises(relay.GatewayError, match="gateway is running"):
         relay.relay(uuid.uuid4().hex, method="GET", url="https://tm1.corp.local:8010/x",
                     headers={}, body=None, timeout=0.3)
 
@@ -167,6 +167,47 @@ def test_tm1py_logs_in_and_queries_through_the_gateway(broker):
         assert any("Authorization" in s["headers"] for s in tm1.seen)
     finally:
         stop.set()
+
+
+async def test_a_gateway_failure_reaches_the_user_at_once_and_names_the_fix(broker):
+    # The allow-list refusal must come back as the explanation — not as
+    # "accepts connections from the internet" after four retries.
+    from TM1py import TM1Service
+
+    from src.tm1.exceptions import TM1ConnectionError
+    from src.tm1.resilience import call_with_resilience, remove_circuit_breaker
+
+    relay.install()
+    gateway_id = uuid.uuid4().hex
+    tm1 = FakeTM1(lambda *_: tm1_response(200, b"{}"))
+    stop = serve(broker, gateway_id, tm1, allow=("other-host:8010",))
+    connection_id = uuid.uuid4()
+    try:
+        with pytest.raises(TM1ConnectionError, match="allow-list") as caught:
+            await call_with_resilience(
+                connection_id, TM1Service,
+                address="tm1.corp.local", port=8010, ssl=True, user="u", password="p",
+                pa_gateway=gateway_id, timeout=5, max_retries=3,
+            )
+        assert "pa-gateway setup --allow tm1.corp.local:8010" in caught.value.message
+        assert tm1.seen == []
+    finally:
+        stop.set()
+        remove_circuit_breaker(connection_id)
+
+
+def test_a_gateway_connection_is_explained_as_one():
+    from types import SimpleNamespace
+
+    from src.tm1.service import UNREACHABLE, _explain
+
+    connection = SimpleNamespace(
+        authentication_type="native", address="192.168.1.17", port=8010,
+        gateway_id=uuid.uuid4(), tenant=None, database=None, username="u",
+    )
+    message = _explain(UNREACHABLE, connection, "The gateway reported: nope.")
+    assert "through the gateway" in message and "The gateway reported: nope." in message
+    assert "internet" not in message
 
 
 def test_the_two_halves_share_one_answer_format():

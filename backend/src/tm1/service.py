@@ -53,7 +53,7 @@ class ConnectionDiagnosis:
     message: str | None = None
 
 
-def _explain(problem: str, connection: TM1Connection) -> str:
+def _explain(problem: str, connection: TM1Connection, detail: str = "") -> str:
     saas = connection.authentication_type == "v12_saas"
     cloud = connection.authentication_type == "pa_cloud"
 
@@ -99,6 +99,13 @@ def _explain(problem: str, connection: TM1Connection) -> str:
 
     if saas:
         return f"Could not reach {connection.address}. Check the hostname."
+    if connection.gateway_id is not None:
+        # "From the internet" is the wrong advice here: say what the
+        # gateway reported, which names the fix.
+        return (
+            f"Could not reach {connection.address}:{connection.port} through "
+            f"the gateway. {detail}"
+        ).strip()
     return (
         f"Could not reach {connection.address}:{connection.port}. Check the "
         "address, port and SSL setting, and that the server accepts "
@@ -367,6 +374,7 @@ class TM1IntegrationService:
         """
 
         connection = await self.get_connection(db, connection_id, organization_id)
+        detail = ""
 
         try:
             client = await tm1_connection_manager.get_client(connection)
@@ -379,8 +387,9 @@ class TM1IntegrationService:
             problem = CREDENTIALS_REJECTED
         except TM1NotFoundError:
             problem = NOT_FOUND
-        except TM1ConnectionError:
+        except TM1ConnectionError as exc:
             problem = UNREACHABLE
+            detail = exc.message
         else:
             return ConnectionDiagnosis(connected=True)
 
@@ -389,7 +398,7 @@ class TM1IntegrationService:
         return ConnectionDiagnosis(
             connected=False,
             problem=problem,
-            message=_explain(problem, connection),
+            message=_explain(problem, connection, detail),
         )
 
     async def list_cubes(

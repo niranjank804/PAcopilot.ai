@@ -16,6 +16,7 @@ from TM1py.Exceptions import (
 
 from src.core.config import settings
 from src.core.logging import app_logger
+from src.tm1.gateway.relay import GatewayError
 from src.tm1.exceptions import (
     TM1AuthenticationError,
     TM1ConnectionError,
@@ -75,6 +76,9 @@ def describe_failure(exc: BaseException) -> str:
     is a way to read whatever answered. The detail goes to the log, the
     caller gets the shape of the failure.
     """
+
+    if isinstance(exc, GatewayError):
+        return str(exc)
 
     if isinstance(exc, TM1pyRestException):
         return f"TM1 returned HTTP {exc.status_code} ({exc.reason})."
@@ -189,6 +193,16 @@ async def call_with_resilience(
                 _run_in_tm1_thread(func, *args, **kwargs),
                 timeout=resolved_timeout + TIMEOUT_GRACE_SECONDS,
             )
+        except GatewayError as exc:
+            # Not retried: the gateway already tried TM1 and said why it
+            # failed, or is not answering at all — four more rounds would
+            # only hide that behind minutes of waiting.
+            breaker.record_failure()
+            app_logger.warning(
+                f"TM1 call {getattr(func, '__name__', func)!s} on connection "
+                f"{connection_id} failed at the gateway: {exc}"
+            )
+            raise TM1ConnectionError(describe_failure(exc)) from exc
         except (
             TM1pyNetworkException,
             TM1pyTimeout,
