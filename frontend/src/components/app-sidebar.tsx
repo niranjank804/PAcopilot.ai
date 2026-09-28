@@ -317,24 +317,27 @@ export function AppSidebar() {
         collapsed ? "w-14" : "w-64",
       )}
     >
-      <SidebarBrand collapsed={collapsed} />
+      {/* At the top, beside the logo: at the bottom it sat below the
+          fold on a short window and behind the taskbar. */}
+      <div className={cn("flex shrink-0 items-center", collapsed ? "flex-col" : "pr-2")}>
+        <SidebarBrand collapsed={collapsed} />
+        <Tip content={collapsed ? "Show the menu" : "Hide the menu to make room"} side="right">
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+            aria-expanded={!collapsed}
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150",
+              "hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              collapsed ? "mb-1" : "ml-auto",
+            )}
+          >
+            <Toggle className="size-4" aria-hidden />
+          </button>
+        </Tip>
+      </div>
       <SidebarNav collapsed={collapsed} />
-      <Tip content={collapsed ? "Show the menu" : "Hide the menu to make room"} side="right">
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-          aria-expanded={!collapsed}
-          className={cn(
-            "m-2 flex h-9 items-center gap-3 rounded-lg text-sm text-muted-foreground transition-colors duration-150",
-            "hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            collapsed ? "justify-center" : "px-3",
-          )}
-        >
-          <Toggle className="size-4 shrink-0" aria-hidden />
-          {collapsed ? null : <span>Collapse</span>}
-        </button>
-      </Tip>
     </aside>
   );
 }
