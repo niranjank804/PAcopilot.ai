@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { nextSpeakableChunk, speakableText } from "../voice";
+import { newSpeech, nextSpeakableChunk, speakableText } from "../voice";
 
 describe("speakableText", () => {
   it("does not read emphasis markers aloud", () => {
@@ -200,5 +200,45 @@ describe("how much sooner speech starts", () => {
     expect(after).toBe(1);
     // Audio now begins after 1/7th of the stream rather than all of it.
     expect(after).toBeLessThan(before);
+  });
+});
+
+describe("newSpeech — one sentence said once lands once", () => {
+  /** Feed results the way Chrome delivers them; collect what reaches the box. */
+  function dictate(results: string[]): string {
+    let heard = "";
+    const box: string[] = [];
+    for (const latest of results) {
+      const next = newSpeech(heard, latest);
+      heard = next.heard;
+      if (next.added) box.push(next.added);
+    }
+    return box.join(" ");
+  }
+
+  it("keeps only the growth when Android reports the sentence as it grows", () => {
+    // The screenshot's case: every partial guess, then the final one twice.
+    expect(
+      dictate([
+        "Hi",
+        "Hi can",
+        "Hi can you",
+        "Hi can you hear",
+        "Hi can you hear me",
+        "Hi can you hear me",
+      ]),
+    ).toBe("Hi can you hear me");
+  });
+
+  it("ignores a repeat that differs only in case or punctuation", () => {
+    expect(dictate(["hi can you hear me", "Hi, can you hear me?"])).toBe("hi can you hear me");
+  });
+
+  it("adds a genuinely new phrase in full", () => {
+    expect(dictate(["show revenue", "by month for 2025"])).toBe("show revenue by month for 2025");
+  });
+
+  it("a single desktop result is passed through unchanged", () => {
+    expect(dictate(["Can you hear me"])).toBe("Can you hear me");
   });
 });

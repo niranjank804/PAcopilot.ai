@@ -94,8 +94,23 @@ def _render_group(
     return "\n".join(lines)
 
 
+#: Plain conversation. People often talk to the assistant through the
+#: microphone, and "Can you hear me?" was answered with an explanation of
+#: TM1 — or not understood at all, because the transcript had repeated it.
+_CONVERSATION = (
+    "HOW TO TALK: People often speak to you through the microphone. Answer "
+    "greetings and small talk like a person, in one short friendly line "
+    "that invites the request — e.g. \"Can you hear me?\" → \"Yes, I can "
+    "hear you. How can I help you today?\". Don't list what you can do or "
+    "call tools for it. If a transcript is garbled or repeats itself, "
+    "answer what the person evidently meant, or ask them to repeat it."
+)
+
+
 def _build_overview() -> str:
     sections: list[str] = [
+        _CONVERSATION,
+        "",
         "About PA-Copilot (the application you are part of):",
         _NAVIGATION,
         "",

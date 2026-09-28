@@ -391,3 +391,11 @@ class TestRegistryHygiene:
     def test_no_capability_is_left_unclassified(self):
         for capability in CAPABILITIES:
             assert capability.status in CapabilityStatus
+
+
+def test_every_chat_is_told_to_answer_small_talk_like_a_person():
+    # "Can you hear me?" over the microphone got a TM1 explanation.
+    from src.ai.product_knowledge import PRODUCT_OVERVIEW
+
+    assert PRODUCT_OVERVIEW.startswith("HOW TO TALK:")
+    assert "Yes, I can hear you. How can I help you today?" in PRODUCT_OVERVIEW

@@ -129,6 +129,42 @@ export function nextSpeakableChunk(
   return { text, consumedTo: alreadyConsumed + end };
 }
 
+/**
+ * What a new recognition result adds to what was already heard.
+ *
+ * Chrome on Android fires a result for every growing guess at the same
+ * sentence — "Hi", "Hi can", "Hi can you", "Hi can you hear me" — even
+ * with interim results off, and repeats the final one when the session
+ * ends. Appending each result as it came filled the composer with
+ * "Hi can you Hi can you hear Hi can you hear me …" for one sentence
+ * said once.
+ *
+ * `heard` is everything taken from this listening session so far; the
+ * return value is the new `heard` and only the words to add. A result
+ * that extends what was heard adds its tail; one already contained in it
+ * adds nothing; anything else is a genuinely new phrase and is added whole.
+ */
+export function newSpeech(
+  heard: string,
+  latest: string,
+): { heard: string; added: string } {
+  const text = latest.trim().replace(/\s+/g, " ");
+  if (!text) return { heard, added: "" };
+
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").trim();
+  const past = norm(heard);
+  const now = norm(text);
+
+  if (!past) return { heard: text, added: text };
+  if (past.includes(now)) return { heard, added: "" };
+  if (now.startsWith(past)) {
+    // The same sentence, grown: keep the new wording, add only the tail.
+    const tail = text.split(" ").slice(heard.trim().split(/\s+/).length).join(" ");
+    return { heard: text, added: tail };
+  }
+  return { heard: `${heard} ${text}`, added: text };
+}
+
 /** Longest utterance we will start. */
 const MAX_SPEAK_CHARS = 4000;
 
@@ -155,6 +191,9 @@ export function useVoice(options: {
   // How much of the streaming answer has already been queued for
   // speech. Reset per answer, so a new reply never re-speaks the old.
   const spokenUpToRef = useRef(0);
+  // Everything already taken from the current listening session; see
+  // newSpeech. Reset each time the microphone starts.
+  const heardRef = useRef("");
   const onTranscriptRef = useRef(onTranscript);
 
   useEffect(() => {
@@ -183,10 +222,12 @@ export function useVoice(options: {
     recognition.interimResults = false;
 
     recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
+      const latest = event.results[event.results.length - 1][0].transcript;
+      const next = newSpeech(heardRef.current, latest);
 
+      heardRef.current = next.heard;
       setState("idle");
-      onTranscriptRef.current(transcript);
+      if (next.added) onTranscriptRef.current(next.added);
     };
 
     recognition.onerror = (event) => {
@@ -243,6 +284,8 @@ export function useVoice(options: {
     // The browser may prompt; the label has to admit that rather than
     // claiming to be listening while a dialog is up.
     setState("requesting-permission");
+
+    heardRef.current = "";
 
     try {
       recognition.start();
