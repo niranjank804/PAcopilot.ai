@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import uuid
@@ -58,6 +59,11 @@ def _mdx_from_answer(content: str) -> tuple[str | None, str]:
 # How many of the agent's own queries to re-run, newest first, looking for
 # one that returns data.
 _MAX_FALLBACK_QUERIES = 5
+
+# How long the analyst may work before Visualize stops it and charts the
+# best query it already ran. The platform ends a request at 300 s; this
+# leaves time to read the candidates and answer.
+_AGENT_SECONDS = 200.0
 
 
 async def _ran_mdx(db: AsyncSession, conversation_id: uuid.UUID) -> list[str]:
@@ -148,6 +154,9 @@ async def generate_visualization(
     prompt = (
         f"Use connection_id={connection_id} for every tool call. "
         f"Visualization request: {query}\n\n"
+        "Be quick: aim for five tool calls or fewer. Skip list_dimensions, "
+        "get_dimension and get_query_context — find_data and query_cube "
+        "already know every dimension of the cube.\n"
         "Steps: find the right cube (list_cubes, get_cube). Call find_data "
         "on it with the members the request names as filters (the account "
         "or measure, a version or year). Then call query_cube with the "
@@ -181,56 +190,92 @@ async def generate_visualization(
         ),
     )
 
-    chat_result = await ai_orchestrator.chat(
-        db,
-        organization_id=organization_id,
-        user_id=user_id,
-        message=prompt,
-        conversation_id=conversation.id,
-        agent="analyst",
-        model=(
-            _PREFERRED_MODEL
-            if _PREFERRED_MODEL in settings.AI_ALLOWED_MODELS
-            else None
-        ),
-    )
+    # The request dies at the platform's 300 s limit with nothing to show.
+    # Stopping the analyst first leaves time to chart the best query it had
+    # already run — its tool calls are committed round by round, so they
+    # survive the cancellation.
+    timed_out = False
+    try:
+        chat_result = await asyncio.wait_for(
+            ai_orchestrator.chat(
+                db,
+                organization_id=organization_id,
+                user_id=user_id,
+                message=prompt,
+                conversation_id=conversation.id,
+                agent="analyst",
+                model=(
+                    _PREFERRED_MODEL
+                    if _PREFERRED_MODEL in settings.AI_ALLOWED_MODELS
+                    else None
+                ),
+            ),
+            timeout=_AGENT_SECONDS,
+        )
+        content = chat_result.content
+    except TimeoutError:
+        timed_out = True
+        content = ""
+        # Whatever the cancelled round had half-written is discarded; the
+        # rounds before it were committed.
+        await db.rollback()
 
-    answered, cube_name = _mdx_from_answer(chat_result.content)
+    answered, cube_name = _mdx_from_answer(content)
 
     # The query the answer names, then the agent's own queries newest
     # first; the first that returns data is the one shown. If none does,
     # the first is shown empty, with its MDX to edit.
     candidates = [answered] if answered else []
-    for ran in await _ran_mdx(db, chat_result.conversation_id):
+    for ran in await _ran_mdx(db, conversation.id):
         if ran not in candidates:
             candidates.append(ran)
     candidates = candidates[:_MAX_FALLBACK_QUERIES]
 
     if not candidates:
         raise ValidationException(
-            "The analyst couldn't find data for this question. Name the cube "
-            "or measure, and a period — for example 'Revenue by month for "
-            "2026 in the Sales cube'."
+            (
+                "This question took longer than the page can wait, before any "
+                "query had been tried. "
+                if timed_out
+                else "The analyst couldn't find data for this question. "
+            )
+            + "Name the cube or measure and a period — for example "
+            "'Headcount by department for 2025 in the Workforce Planning "
+            "Summary cube'."
         )
 
-    mdx, table = candidates[0], None
+    mdx, table, refusal = candidates[0], None, None
     for candidate in candidates:
-        result = await run_mdx(
-            db,
-            organization_id=organization_id,
-            connection_id=connection_id,
-            mdx=candidate,
-        )
+        try:
+            result = await run_mdx(
+                db,
+                organization_id=organization_id,
+                connection_id=connection_id,
+                mdx=candidate,
+            )
+        except ValidationException as exc:
+            # Too large to read: try the next one, and say why only if
+            # none can be read.
+            refusal = refusal or exc
+            continue
         if table is None:
-            table = result
+            mdx, table = candidate, result
         if result["rows"]:
             mdx, table = candidate, result
             break
 
+    if table is None:
+        raise refusal  # every candidate was refused
+
     if mdx != answered:
         cube_name = ""
 
-    summary = chat_result.content.split("```")[0].strip()
+    summary = content.split("```")[0].strip()
+    if timed_out:
+        summary = (
+            "The analyst ran out of time before writing its summary, so this "
+            "is the last query it had working."
+        )
 
     return VisualizationResult(
         cube_name=cube_name or _cube_from_mdx(mdx),

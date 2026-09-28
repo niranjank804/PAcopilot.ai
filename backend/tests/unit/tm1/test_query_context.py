@@ -82,3 +82,17 @@ def test_the_analyst_uses_it_and_has_room_to_recover():
     analyst = get_agent("analyst")
     assert "get_query_context" in analyst.tool_names
     assert analyst.max_tool_rounds >= 14
+
+
+@pytest.mark.asyncio
+async def test_a_cubes_structure_is_read_once_and_reused():
+    # find_data, query_cube and get_query_context each described the cube
+    # afresh — dozens of TM1 calls per step on PA Cloud.
+    client = fake_client()
+    connection = uuid.uuid4()
+
+    first = await cube_query_context(client, connection, "Workforce Planning Summary")
+    again = await cube_query_context(client, connection, "workforce planning summary")
+
+    assert again is first
+    assert client.cubes.get.call_count == 1

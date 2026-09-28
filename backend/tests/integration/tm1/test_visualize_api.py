@@ -422,3 +422,48 @@ async def test_edited_mdx_needs_tm1_read(
     )
 
     assert resp.status_code == 403
+
+
+class StallsAfterQueryingProvider(ToolThenNoJsonProvider):
+    """Runs one query, then thinks for longer than Visualize will wait."""
+
+    async def chat(self, request):
+        if self.rounds >= len(self.queries):
+            import asyncio
+
+            await asyncio.sleep(30)
+        return await super().chat(request)
+
+
+@pytest.mark.asyncio
+async def test_a_slow_analyst_is_stopped_and_its_query_still_charted(
+    client, db_session, tm1_credentials_key, fake_tm1_client, monkeypatch
+):
+    # The request used to run into the platform's 300 s limit and return
+    # nothing at all (504).
+    import src.ai.visualization as visualization
+
+    monkeypatch.setattr(visualization, "_AGENT_SECONDS", 0.5)
+    org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    connection_id = (await _create_connection(client, headers)).json()["data"]["id"]
+
+    original = PROVIDERS.get("anthropic")
+    PROVIDERS["anthropic"] = StallsAfterQueryingProvider(
+        connection_id, queries=["SELECT PROVEN FROM [Sales]"]
+    )
+    try:
+        resp = await client.post(
+            f"/tm1/connections/{connection_id}/visualize",
+            json={"query": "headcount by department"},
+            headers=headers,
+        )
+    finally:
+        if original is not None:
+            PROVIDERS["anthropic"] = original
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()["data"]
+    assert body["mdx"] == "SELECT PROVEN FROM [Sales]"
+    assert body["table"]["rows"]
+    assert "ran out of time" in body["summary"]

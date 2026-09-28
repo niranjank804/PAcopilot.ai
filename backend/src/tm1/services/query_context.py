@@ -73,15 +73,43 @@ async def _describe_dimension(
     }
 
 
+# A cube's structure barely changes within a conversation, and find_data,
+# query_cube and get_query_context each needed it: on a nine-dimension cube
+# on PA Cloud that was dozens of TM1 calls per step, several times per
+# question — a large share of a Visualize run that hit the 300 s limit.
+_CONTEXT_TTL_SECONDS = 600.0
+_context_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+# TM1 calls in flight at once while describing a cube. Unbounded, every
+# dimension's three calls went out together, overflowed the HTTP pool (10)
+# and each overflow opened a fresh TLS connection to PA Cloud.
+_PARALLEL_TM1_CALLS = 4
+
+
+def clear_context_cache() -> None:
+    """For tests, and after a model change."""
+    _context_cache.clear()
+
+
 async def cube_query_context(
     client: TM1Service, connection_id: uuid.UUID, cube_name: str
 ) -> dict:
+    key = (str(connection_id), cube_name.lower())
+    cached = _context_cache.get(key)
+    now = asyncio.get_running_loop().time()
+    if cached and now - cached[0] < _CONTEXT_TTL_SECONDS:
+        return cached[1]
+
     cube = await call_with_resilience(connection_id, client.cubes.get, cube_name)
     dimensions = list(cube.dimensions)
 
-    described = await asyncio.gather(
-        *(_describe_dimension(client, connection_id, d) for d in dimensions)
-    )
+    gate = asyncio.Semaphore(_PARALLEL_TM1_CALLS)
+
+    async def describe(dimension: str) -> dict:
+        async with gate:
+            return await _describe_dimension(client, connection_id, dimension)
+
+    described = await asyncio.gather(*(describe(d) for d in dimensions))
 
     # A total where there is one, else the default member: the starting
     # point most likely to hold data.
@@ -96,12 +124,14 @@ async def cube_query_context(
         if element:
             totals[dimension["name"]] = element
 
-    return {
+    context = {
         "cube": cube_name,
         "dimensions": described,
         "totals": totals,
         "where_all_totals": where_clause(totals),
     }
+    _context_cache[key] = (now, context)
+    return context
 
 
 def where_clause(pins: dict[str, str]) -> str:
