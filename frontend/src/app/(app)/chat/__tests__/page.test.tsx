@@ -7,7 +7,7 @@
  * machine is exercised for real.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -762,5 +762,93 @@ describe("reading an answer aloud", () => {
 
     // Spoken without the Markdown.
     expect(speech.utterances).toEqual(["Plan revenue rises all year."]);
+  });
+});
+
+// ======================================================================
+// Hands-free: talk, it sends, answers aloud, and listens again.
+// ======================================================================
+
+describe("hands-free conversation", () => {
+  function say(speech: ReturnType<typeof installSpeech>, words: string) {
+    act(() => {
+      speech.recognition.onresult?.({
+        results: { length: 1, 0: { 0: { transcript: words } } },
+      });
+      // The recogniser ends by itself when the speaker pauses.
+      (speech.recognition as unknown as { onend: () => void }).onend();
+    });
+  }
+
+  it("sends what was said, reads the answer aloud and listens again", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    streamRequest.mockReturnValue(
+      streamOf([
+        { type: "text_delta", text: "Yes, I can hear you. How can I help you today?" },
+        DONE,
+      ]),
+    );
+
+    renderChat();
+    await user.click(
+      await screen.findByRole("button", { name: /start hands-free conversation/i }),
+    );
+    expect(speech.recognition.started).toBe(true);
+    const startSpy = vi.spyOn(speech.recognition, "start");
+
+    say(speech, "Can you hear me");
+
+    // Sent without a Send button.
+    await waitFor(() => expect(streamRequest).toHaveBeenCalled());
+    expect(streamRequest.mock.calls[0][1]).toMatchObject({ message: "Can you hear me" });
+
+    // Read aloud even though nothing was typed.
+    await waitFor(() =>
+      expect(speech.utterances.join(" ")).toContain("Yes, I can hear you."),
+    );
+    expect(startSpy).not.toHaveBeenCalled();
+
+    // When the last sentence finishes, the microphone opens again.
+    act(() => {
+      for (const [utterance] of speech.synthesis.speak.mock.calls) {
+        (utterance as unknown as { onend?: () => void }).onend?.();
+      }
+    });
+    await waitFor(() => expect(startSpy).toHaveBeenCalled(), { timeout: 2000 });
+    expect(screen.getByText(/hands-free on/i)).toBeInTheDocument();
+  });
+
+  it("saying stop ends it instead of being sent", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    renderChat();
+    await user.click(
+      await screen.findByRole("button", { name: /start hands-free conversation/i }),
+    );
+
+    say(speech, "Stop");
+
+    expect(
+      await screen.findByRole("button", { name: /start hands-free conversation/i }),
+    ).toBeInTheDocument();
+    expect(streamRequest).not.toHaveBeenCalled();
+  });
+
+  it("typing and the normal mic still wait for Send", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+
+    renderChat();
+    await user.click(await screen.findByRole("button", { name: /start voice input/i }));
+    say(speech, "list the sales cubes");
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/what do you want to accomplish/i)).toHaveValue(
+        "list the sales cubes",
+      ),
+    );
+    expect(streamRequest).not.toHaveBeenCalled();
   });
 });

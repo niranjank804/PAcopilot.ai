@@ -169,8 +169,15 @@ export function newSpeech(
 const MAX_SPEAK_CHARS = 4000;
 
 export function useVoice(options: {
-  /** Called with the final transcript. */
+  /** Called with each new piece of what was said (see newSpeech). */
   onTranscript: (text: string) => void;
+  /** Called once when the microphone stops, with everything it heard in
+   *  that session — what hands-free mode sends. */
+  onFinal?: (text: string) => void;
+  /** Called when every queued spoken sentence has finished playing. */
+  onSpeechDone?: () => void;
+  /** Called when the microphone heard nothing at all. */
+  onNoSpeech?: () => void;
 }) {
   const { onTranscript } = options;
 
@@ -195,10 +202,45 @@ export function useVoice(options: {
   // newSpeech. Reset each time the microphone starts.
   const heardRef = useRef("");
   const onTranscriptRef = useRef(onTranscript);
+  const optionsRef = useRef(options);
+  // Utterances queued and not yet finished. `speechGenRef` changes on
+  // every cancel, so the end events of cancelled utterances — which the
+  // browser still fires — cannot count down the new queue.
+  const pendingSpeechRef = useRef(0);
+  const speechGenRef = useRef(0);
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
-  }, [onTranscript]);
+    optionsRef.current = options;
+  });
+
+  /** Queue an utterance and report when the whole queue has played. */
+  const playUtterance = useCallback((utterance: SpeechSynthesisUtterance) => {
+    const synthesis = window.speechSynthesis;
+    const generation = speechGenRef.current;
+
+    const finished = () => {
+      if (generation !== speechGenRef.current) return;
+      pendingSpeechRef.current = Math.max(0, pendingSpeechRef.current - 1);
+      if (pendingSpeechRef.current === 0) {
+        setState((current) => (current === "speaking" ? "idle" : current));
+        optionsRef.current.onSpeechDone?.();
+      }
+    };
+    utterance.onend = finished;
+    utterance.onerror = finished;
+
+    pendingSpeechRef.current += 1;
+    setState("speaking");
+    synthesis.speak(utterance);
+  }, []);
+
+  /** Drop everything queued, without reporting it as finished. */
+  const cancelSpeech = useCallback(() => {
+    speechGenRef.current += 1;
+    pendingSpeechRef.current = 0;
+    window.speechSynthesis?.cancel();
+  }, []);
 
   useEffect(() => {
     mutedRef.current = isMuted;
@@ -242,10 +284,16 @@ export function useVoice(options: {
             ? "Didn't catch anything — try again."
             : "Couldn't hear that — try again.",
       );
+      if (event.error === "no-speech") optionsRef.current.onNoSpeech?.();
     };
 
-    recognition.onend = () =>
+    recognition.onend = () => {
       setState((current) => (current === "error" ? current : "idle"));
+      // Everything this session heard, once: hands-free mode sends it.
+      const heard = heardRef.current.trim();
+      heardRef.current = "";
+      if (heard) optionsRef.current.onFinal?.(heard);
+    };
 
     recognitionRef.current = recognition;
     setSupport({ listen: true, speak: canSpeak });
@@ -264,12 +312,12 @@ export function useVoice(options: {
   }, []);
 
   const stopSpeaking = useCallback(() => {
-    window.speechSynthesis?.cancel();
+    cancelSpeech();
     // Interrupting abandons the rest of this answer rather than
     // resuming it on the next delta.
     spokenUpToRef.current = Number.MAX_SAFE_INTEGER;
     setState((current) => (current === "speaking" ? "idle" : current));
-  }, []);
+  }, [cancelSpeech]);
 
   const start = useCallback(() => {
     const recognition = recognitionRef.current;
@@ -278,7 +326,7 @@ export function useVoice(options: {
 
     // Dictating over the assistant's own voice would feed it back into
     // the microphone.
-    window.speechSynthesis?.cancel();
+    cancelSpeech();
 
     setErrorMessage(null);
     // The browser may prompt; the label has to admit that rather than
@@ -295,7 +343,7 @@ export function useVoice(options: {
       // rather than leaving the button stuck.
       setState("idle");
     }
-  }, []);
+  }, [cancelSpeech]);
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
@@ -316,19 +364,13 @@ export function useVoice(options: {
 
       // Without this, a second answer queues behind the first and the
       // user hears a stale one.
-      synthesis.cancel();
+      cancelSpeech();
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-US";
-      utterance.onend = () =>
-        setState((current) => (current === "speaking" ? "idle" : current));
-      utterance.onerror = () =>
-        setState((current) => (current === "speaking" ? "idle" : current));
-
-      setState("speaking");
-      synthesis.speak(utterance);
+      playUtterance(utterance);
     },
-    [],
+    [cancelSpeech, playUtterance],
   );
 
   /** Speak whole sentences as a streamed answer arrives.
@@ -357,11 +399,7 @@ export function useVoice(options: {
         chunk.text.slice(0, MAX_SPEAK_CHARS),
       );
       utterance.lang = "en-US";
-      utterance.onend = () =>
-        setState((current) => (current === "speaking" ? "idle" : current));
-
-      setState("speaking");
-      synthesis.speak(utterance);
+      playUtterance(utterance);
     }
 
     // The last sentence of an answer often has no trailing space, and
@@ -378,16 +416,15 @@ export function useVoice(options: {
           remainder.slice(0, MAX_SPEAK_CHARS),
         );
         utterance.lang = "en-US";
-        utterance.onend = () =>
-          setState((current) => (current === "speaking" ? "idle" : current));
-
-        setState("speaking");
-        synthesis.speak(utterance);
+        playUtterance(utterance);
       }
     }
   },
-    [],
+    [playUtterance],
   );
+
+  /** Whether any queued sentence is still to be played. */
+  const isSpeaking = useCallback(() => pendingSpeechRef.current > 0, []);
 
   /** Start of a new answer: forget what was spoken for the last one. */
   const resetStream = useCallback(() => {
@@ -396,10 +433,10 @@ export function useVoice(options: {
 
   const toggleMuted = useCallback(() => {
     setIsMuted((previous) => {
-      if (!previous) window.speechSynthesis?.cancel();
+      if (!previous) cancelSpeech();
       return !previous;
     });
-  }, []);
+  }, [cancelSpeech]);
 
   return {
     state,
@@ -414,5 +451,6 @@ export function useVoice(options: {
     resetStream,
     stopSpeaking,
     toggleMuted,
+    isSpeaking,
   };
 }

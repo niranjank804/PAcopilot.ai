@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   FileText,
+  Headphones,
   History,
   Loader2,
   MessageSquarePlus,
@@ -77,6 +78,11 @@ import type {
 } from "@/lib/types";
 
 const NO_AGENT = "none";
+
+/** Saying one of these ends hands-free instead of being sent. */
+const HANDS_FREE_STOP = /^(stop|stop listening|that's all|thats all|goodbye|bye|thank you,? that's all)[.!]?$/i;
+/** Silent listens in a row before hands-free pauses itself. */
+const HANDS_FREE_SILENT_LIMIT = 3;
 
 // A request to see data drawn. General chat has no TM1 access, so such a
 // request goes to the Analyst, which can query the model and chart it.
@@ -375,13 +381,51 @@ export default function ChatPage() {
   // text, so RBAC, tool permissions, approval gates, audit logging and
   // usage accounting are inherited rather than reimplemented. See
   // src/lib/voice.ts.
+  // Hands-free conversation: speak, it sends when you stop, the answer
+  // is read aloud, and it listens again. Refs as well as state, because
+  // the voice callbacks run between renders.
+  const [handsFree, setHandsFree] = useState(false);
+  const handsFreeRef = useRef(false);
+  const isStreamingRef = useRef(false);
+  // Consecutive listens that heard nothing; hands-free pauses after a
+  // few rather than keeping a microphone open in an empty room.
+  const silentListensRef = useRef(0);
+  const sendRef = useRef<(text?: string) => Promise<void>>(async () => {});
+
   const voice = useVoice({
     onTranscript: (transcript) => {
       setLastInputWasVoice(true);
+      // Hands-free sends the whole sentence when the microphone stops
+      // (onFinal) instead of filling the box piece by piece.
+      if (handsFreeRef.current) return;
       setInput((previous) =>
         previous ? `${previous} ${transcript}` : transcript,
       );
       inputRef.current?.focus();
+    },
+    onFinal: (text) => {
+      if (!handsFreeRef.current) return;
+      silentListensRef.current = 0;
+      if (HANDS_FREE_STOP.test(text.trim())) {
+        endHandsFree();
+        return;
+      }
+      void sendRef.current(text);
+    },
+    onSpeechDone: () => {
+      // Also fires in the pauses between streamed sentences; only an
+      // answer that has finished arriving hands the turn back.
+      if (handsFreeRef.current && !isStreamingRef.current) listenAgain();
+    },
+    onNoSpeech: () => {
+      if (!handsFreeRef.current) return;
+      silentListensRef.current += 1;
+      if (silentListensRef.current >= HANDS_FREE_SILENT_LIMIT) {
+        endHandsFree();
+        toast.info("Hands-free paused — I didn't hear anything. Tap the headphones to continue.");
+        return;
+      }
+      listenAgain();
     },
   });
 
@@ -472,6 +516,32 @@ export default function ChatPage() {
     }
 
     voice.start();
+  };
+
+  // A short pause first: starting the microphone the instant speech
+  // ends can catch the speaker's last syllable.
+  function listenAgain() {
+    window.setTimeout(() => {
+      if (handsFreeRef.current && !isStreamingRef.current) voice.start();
+    }, 400);
+  }
+
+  function endHandsFree() {
+    handsFreeRef.current = false;
+    setHandsFree(false);
+    voice.stop();
+  }
+
+  const toggleHandsFree = () => {
+    if (handsFreeRef.current) {
+      endHandsFree();
+      voice.stopSpeaking();
+      return;
+    }
+    handsFreeRef.current = true;
+    silentListensRef.current = 0;
+    setHandsFree(true);
+    if (!isStreamingRef.current) voice.start();
   };
 
   const readFileAsBase64 = (file: File): Promise<string> =>
@@ -673,8 +743,12 @@ export default function ChatPage() {
     toast.error("The connection dropped before the answer finished.");
   };
 
-  const send = async () => {
-    const message = input.trim();
+  const send = async (spoken?: string) => {
+    const message = (typeof spoken === "string" ? spoken : input).trim();
+    // Read the answer aloud after a dictated question, and always in
+    // hands-free — where the question arrives before the state that
+    // says it was spoken has re-rendered.
+    const speakReply = lastInputWasVoice || handsFreeRef.current;
 
     if ((!message && pendingAttachments.length === 0) || isStreaming) return;
 
@@ -705,6 +779,7 @@ export default function ChatPage() {
     setInput("");
     setPendingAttachments([]);
     setIsStreaming(true);
+    isStreamingRef.current = true;
     setStreamActivity("Thinking…");
     scrollToBottom();
 
@@ -764,7 +839,7 @@ export default function ChatPage() {
           // answer. With a tool-using model the first sentence is ready
           // seconds before the last one, and the user previously sat in
           // silence for all of it.
-          if (lastInputWasVoice) {
+          if (speakReply) {
             voice.speakStreaming(assistantText);
           }
 
@@ -818,7 +893,7 @@ export default function ChatPage() {
           // Most of the answer has already been spoken while it
           // streamed; this flushes a trailing fragment with no closing
           // punctuation so the last words are not dropped.
-          if (lastInputWasVoice) {
+          if (speakReply) {
             voice.speakStreaming(assistantText, { final: true });
             setLastInputWasVoice(false);
           }
@@ -857,9 +932,17 @@ export default function ChatPage() {
       }
     } finally {
       setIsStreaming(false);
+      isStreamingRef.current = false;
       scrollToBottom();
+      // Hands the turn back: at once if nothing is being read aloud
+      // (muted, or an error), otherwise when the speech finishes.
+      if (handsFreeRef.current && !voice.isSpeaking()) listenAgain();
     }
   };
+
+  useEffect(() => {
+    sendRef.current = send;
+  });
 
   const selectedAgent = agentsQuery.data?.find((a) => a.name === agent);
   const referenced = referencedObjects(toolExecutionsQuery.data);
@@ -1314,7 +1397,19 @@ export default function ChatPage() {
                 states; without rendering them a blocked microphone was
                 silent — the button simply did nothing and the user had
                 no way to learn why. Caught by a test, not by reading. */}
-            {voice.errorMessage ? (
+            {handsFree ? (
+              <p aria-live="polite" className="mb-2 text-xs font-medium text-primary">
+                Hands-free on —{" "}
+                {isStreaming
+                  ? "thinking…"
+                  : voice.state === "speaking"
+                    ? "speaking…"
+                    : isListening
+                      ? "listening…"
+                      : "one moment…"}{" "}
+                Say “stop” to end.
+              </p>
+            ) : voice.errorMessage ? (
               <p role="alert" className="mb-2 text-xs text-destructive">
                 {voice.errorMessage}
               </p>
@@ -1385,7 +1480,7 @@ export default function ChatPage() {
                   type="button"
                   variant={isListening ? "destructive" : "outline"}
                   onClick={toggleListening}
-                  disabled={isStreaming}
+                  disabled={isStreaming || handsFree}
                   data-tour="voice-input"
                   aria-label={isListening ? "Stop voice input" : "Start voice input"}
                 >
@@ -1394,6 +1489,28 @@ export default function ChatPage() {
                   ) : (
                     <Mic className="h-4 w-4" />
                   )}
+                </Button>
+              </Tip>
+            ) : null}
+
+            {voice.isSupported ? (
+              <Tip
+                content={
+                  handsFree
+                    ? "Hands-free is on: I send when you stop talking, read the answer aloud and listen again. Say \u201cstop\u201d or click to end."
+                    : "Hands-free conversation: just talk. I send when you stop, answer aloud and listen again — no Send button."
+                }
+              >
+                <Button
+                  type="button"
+                  variant={handsFree ? "default" : "outline"}
+                  onClick={toggleHandsFree}
+                  aria-pressed={handsFree}
+                  aria-label={
+                    handsFree ? "Stop hands-free conversation" : "Start hands-free conversation"
+                  }
+                >
+                  <Headphones className={cn("h-4 w-4", handsFree && "animate-pulse")} />
                 </Button>
               </Tip>
             ) : null}
@@ -1442,7 +1559,7 @@ export default function ChatPage() {
             ) : null}
             <Tip content="Send (Enter). Shift+Enter starts a new line.">
             <Button
-              onClick={send}
+              onClick={() => send()}
               disabled={isStreaming || (!input.trim() && pendingAttachments.length === 0)}
               aria-label="Send message"
             >
