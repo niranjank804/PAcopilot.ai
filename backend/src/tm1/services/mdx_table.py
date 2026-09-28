@@ -15,11 +15,15 @@ import uuid
 
 from TM1py import TM1Service
 
+from src.core.exceptions import ValidationException
 from src.tm1.resilience import call_with_resilience
 
 # Cells returned per query. Higher than the 500 the assistant's own tool
 # reads, because the page pivots and aggregates rather than listing.
 MAX_TABLE_CELLS = 2000
+# Cells a query may span (empty ones included) before it is refused
+# rather than read. Counted before any values are fetched.
+MAX_QUERY_CELLS = 200_000
 
 # "[Dim].[Hier].[Elem]" (v11 with hierarchies, v12) or "[Dim].[Elem]".
 # "]]" is an escaped "]" inside a name.
@@ -85,14 +89,39 @@ async def execute_mdx_table(
     mdx: str,
     **resilience_kwargs,
 ) -> dict:
-    """Run read-only MDX and return it as a table."""
+    """Run read-only MDX and return it as a table.
+
+    No `top` is passed to TM1py. With `top` it fetches only the first
+    `top` tuples of each axis, and with `skip_zeros` the non-empty cells
+    it then returns can lie beyond them — so any axis longer than the
+    limit (a department dimension, TM1SUBSETALL of anything large) failed
+    in TM1py with IndexError. That broke Visualize outright, and inside
+    find_data every such probe read as "no data here".
+
+    Instead the size is checked first — a cell count is cheap — and the
+    result is trimmed to MAX_TABLE_CELLS by to_table.
+    """
+
+    total = int(
+        await call_with_resilience(
+            connection_id,
+            client.cubes.cells.execute_mdx_cellcount,
+            mdx,
+            **resilience_kwargs,
+        )
+    )
+    if total > MAX_QUERY_CELLS:
+        raise ValidationException(
+            f"This query covers {total:,} cells — too many to read at once. "
+            "Narrow it: fewer members on an axis, or a filter on another "
+            "dimension (a year, a version, one account)."
+        )
 
     cellset = await call_with_resilience(
         connection_id,
         client.cubes.cells.execute_mdx,
         mdx,
         cell_properties=["Value"],
-        top=MAX_TABLE_CELLS + 1,
         skip_zeros=True,
         skip_contexts=True,
         element_unique_names=True,
