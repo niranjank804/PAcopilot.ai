@@ -33,9 +33,9 @@ _PROBE_CELLS = 200
 # Members reported per dimension that turned out to hold data.
 _MEMBERS_REPORTED = 12
 # A probe is a question, not the answer: fail fast and move on.
-_PROBE_TIMEOUT = 30.0
+_PROBE_TIMEOUT = 15.0
 # The whole search. Past it, report what was tried instead of trying more.
-_SEARCH_SECONDS = 90.0
+_SEARCH_SECONDS = 45.0
 # Combinations of top-level members tried as single-cell checks.
 _MAX_COMBOS = 24
 # Combinations under which one pin at a time is repaired.

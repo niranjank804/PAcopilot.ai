@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BarChart3, Code2, Loader2, Play, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Markdown } from "@/components/markdown";
@@ -75,6 +75,7 @@ export default function VisualizePage() {
       apiRequest<VisualizeResult>(`/tm1/connections/${connectionId}/visualize`, {
         method: "POST",
         body: { query },
+        timeoutMs: VISUALIZE_TIMEOUT_MS,
       }),
     onSuccess: (data) => {
       show(data, data.summary ?? "");
@@ -88,6 +89,7 @@ export default function VisualizePage() {
       apiRequest<VisualizeResult>(`/tm1/connections/${connectionId}/visualize/run`, {
         method: "POST",
         body: { mdx: mdxDraft },
+        timeoutMs: VISUALIZE_TIMEOUT_MS,
       }),
     onSuccess: (data) => {
       show(data, "Your edited query, run directly against TM1.");
@@ -175,12 +177,7 @@ export default function VisualizePage() {
             )}
             {visualizeMutation.isPending ? "Finding the data…" : "Visualize"}
           </Button>
-          {visualizeMutation.isPending ? (
-            <p role="status" className="text-xs text-muted-foreground">
-              The agent is reading the cube and testing the query. This
-              usually takes 15–45 seconds.
-            </p>
-          ) : null}
+          {visualizeMutation.isPending ? <WorkingHint /> : null}
         </CardContent>
       </Card>
 
@@ -258,5 +255,35 @@ export default function VisualizePage() {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * How long Visualize waits. The agent reads the cube, searches for where
+ * the data is and tests the query — on a large cube that ran past the
+ * API client's default 120 s and ended in "the server did not respond",
+ * while the server was still working. The backend function may run for
+ * 300 s, so the page waits almost that long.
+ */
+const VISUALIZE_TIMEOUT_MS = 295_000;
+
+/** Elapsed time while Visualize works, so a long wait reads as progress. */
+function WorkingHint() {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const seconds = Math.floor((now - startedAt) / 1000);
+
+  return (
+    <p role="status" className="text-xs text-muted-foreground">
+      The agent is reading the cube, finding where the data is and testing the
+      query — {seconds}s so far. Most questions take under a minute; a large
+      cube can take a few, and the page will wait.
+    </p>
   );
 }
