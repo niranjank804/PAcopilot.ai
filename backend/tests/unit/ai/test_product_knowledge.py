@@ -343,9 +343,10 @@ class TestFPromptCacheStability:
             assert forbidden not in PRODUCT_OVERVIEW.lower(), forbidden
 
     def test_generation_is_deterministic(self):
-        from src.ai.product_knowledge import _build_overview
+        from src.ai.product_knowledge import CAPABILITY_OVERVIEW, _build_overview
 
-        assert _build_overview() == _build_overview() == PRODUCT_OVERVIEW
+        assert _build_overview() == _build_overview() == CAPABILITY_OVERVIEW
+        assert PRODUCT_OVERVIEW.endswith(CAPABILITY_OVERVIEW)
 
 
 # ======================================================================
@@ -386,16 +387,22 @@ class TestRegistryHygiene:
         # unbounded registry would eventually crowd out the user's own
         # context, and because a capability needing a paragraph is a
         # capability whose summary is wrong.
-        assert len(PRODUCT_OVERVIEW) < 8000
+        # The capability registry only; how to talk is budgeted separately.
+        from src.ai.product_knowledge import CAPABILITY_OVERVIEW
+
+        assert len(CAPABILITY_OVERVIEW) < 8000
 
     def test_no_capability_is_left_unclassified(self):
         for capability in CAPABILITIES:
             assert capability.status in CapabilityStatus
 
 
-def test_every_chat_is_told_to_answer_small_talk_like_a_person():
-    # "Can you hear me?" over the microphone got a TM1 explanation.
-    from src.ai.product_knowledge import PRODUCT_OVERVIEW
+def test_every_chat_is_told_to_talk_like_a_person():
+    # Replies read like reports; "Can you hear me?" got a TM1 explanation.
+    from src.ai.product_knowledge import CONVERSATION_STYLE, PRODUCT_OVERVIEW
 
     assert PRODUCT_OVERVIEW.startswith("HOW TO TALK:")
     assert "Yes, I can hear you. How can I help you today?" in PRODUCT_OVERVIEW
+    assert "plain sentences" in PRODUCT_OVERVIEW
+    # Tone is a paragraph, not a second registry.
+    assert len(CONVERSATION_STYLE) < 1200

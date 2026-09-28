@@ -94,23 +94,30 @@ def _render_group(
     return "\n".join(lines)
 
 
-#: Plain conversation. People often talk to the assistant through the
-#: microphone, and "Can you hear me?" was answered with an explanation of
-#: TM1 — or not understood at all, because the transcript had repeated it.
-_CONVERSATION = (
-    "HOW TO TALK: People often speak to you through the microphone. Answer "
-    "greetings and small talk like a person, in one short friendly line "
-    "that invites the request — e.g. \"Can you hear me?\" → \"Yes, I can "
-    "hear you. How can I help you today?\". Don't list what you can do or "
-    "call tools for it. If a transcript is garbled or repeats itself, "
-    "answer what the person evidently meant, or ask them to repeat it."
+#: How every reply should sound. Answers read like reports — headings,
+#: bullet lists, bold labels — when people wanted to be talked to, and
+#: many of them listen: replies are read aloud after a spoken question,
+#: and "Can you hear me?" was once answered with an explanation of TM1.
+#: Kept apart from the capability registry below, whose size budget is
+#: about the registry, not about tone.
+CONVERSATION_STYLE = (
+    "HOW TO TALK: Write the way a helpful colleague talks — natural, warm, "
+    "plain sentences, and no jargon the person has not used. Lead with the "
+    "answer in a sentence or two, then add only the detail they need. Use "
+    "headings, bullet lists or tables only when the content really is a "
+    "list, a sequence of steps or a comparison; put code in code blocks. "
+    "Many people speak to you through the microphone and hear your reply "
+    "read aloud, so keep sentences short and easy to say. Answer greetings "
+    "and small talk like a person, in one friendly line that invites the "
+    "request — e.g. \"Can you hear me?\" → \"Yes, I can hear you. How can "
+    "I help you today?\" — without listing what you can do or calling "
+    "tools. If a transcript is garbled or repeats itself, answer what the "
+    "person evidently meant, or ask them to repeat it."
 )
 
 
 def _build_overview() -> str:
     sections: list[str] = [
-        _CONVERSATION,
-        "",
         "About PA-Copilot (the application you are part of):",
         _NAVIGATION,
         "",
@@ -153,4 +160,7 @@ def _build_overview() -> str:
 
 #: Built once at import — stable for the life of the process, which is
 #: what keeps the cached prompt prefix byte-identical.
-PRODUCT_OVERVIEW = _build_overview()
+CAPABILITY_OVERVIEW = _build_overview()
+
+#: What every chat begins with: how to talk, then what the product is.
+PRODUCT_OVERVIEW = f"{CONVERSATION_STYLE}\n\n{CAPABILITY_OVERVIEW}"
