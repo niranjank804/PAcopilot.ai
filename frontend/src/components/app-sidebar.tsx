@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   MessageSquare,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   Rocket,
   Ruler,
   Server,
@@ -21,6 +23,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Tip } from "@/components/ui/tooltip";
+import { useRememberedFlag } from "@/lib/use-remembered-flag";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -190,14 +193,21 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav({
+  onNavigate,
+  collapsed = false,
+}: {
+  onNavigate?: () => void;
+  /** Icons only: the label moves into the hover tip. */
+  collapsed?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+    <nav className={cn("flex-1 overflow-y-auto py-4", collapsed ? "space-y-4 px-2" : "space-y-6 px-3")}>
       {NAV_GROUPS.map((group, index) => (
         <div key={group.label ?? index} className="space-y-1">
-          {group.label ? (
+          {group.label && !collapsed ? (
             <p className="px-3 pb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-tertiary-foreground">
               {group.label}
             </p>
@@ -209,14 +219,16 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
             return (
               <div key={item.href}>
-                <Tip content={item.help} side="right">
+                <Tip content={collapsed ? `${item.label} — ${item.help}` : item.help} side="right">
                 <Link
                   href={item.href}
                   data-tour={item.tour}
                   aria-current={active ? "page" : undefined}
+                  aria-label={collapsed ? item.label : undefined}
                   onClick={onNavigate}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
+                    "flex items-center gap-3 rounded-lg py-2 text-sm transition-colors duration-150",
+                    collapsed ? "justify-center px-0" : "px-3",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active
                       ? "bg-secondary font-medium text-foreground"
@@ -230,11 +242,11 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                     )}
                     aria-hidden
                   />
-                  <span className="truncate">{item.label}</span>
+                  {collapsed ? null : <span className="truncate">{item.label}</span>}
                 </Link>
                 </Tip>
 
-                {item.children && active ? (
+                {item.children && active && !collapsed ? (
                   <div className="mt-1 space-y-1 border-l border-border pl-3 ml-5">
                     {item.children.map((child) => (
                       <Tip key={child.href} content={child.help} side="right">
@@ -267,11 +279,15 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function SidebarBrand() {
+export function SidebarBrand({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <Link
       href="/dashboard"
-      className="flex h-14 shrink-0 items-center gap-2.5 px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={collapsed ? "PA Copilot — overview" : undefined}
+      className={cn(
+        "flex h-14 shrink-0 items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        collapsed ? "justify-center px-0" : "px-5",
+      )}
     >
       <span
         className="flex size-6 items-center justify-center rounded-md bg-foreground text-[0.625rem] font-semibold tracking-tight text-background"
@@ -279,18 +295,46 @@ export function SidebarBrand() {
       >
         PA
       </span>
-      <span className="text-[0.8125rem] font-semibold uppercase tracking-[0.08em]">
-        Copilot
-      </span>
+      {collapsed ? null : (
+        <span className="text-[0.8125rem] font-semibold uppercase tracking-[0.08em]">
+          Copilot
+        </span>
+      )}
     </Link>
   );
 }
 
 export function AppSidebar() {
+  // Collapsed to icons, the page gets the width back — most wanted in the
+  // assistant, where the conversation is the work.
+  const [collapsed, setCollapsed] = useRememberedFlag("pa-copilot-sidebar-collapsed", false);
+  const Toggle = collapsed ? PanelLeftOpen : PanelLeftClose;
+
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
-      <SidebarBrand />
-      <SidebarNav />
+    <aside
+      className={cn(
+        "hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-150 md:flex",
+        collapsed ? "w-14" : "w-64",
+      )}
+    >
+      <SidebarBrand collapsed={collapsed} />
+      <SidebarNav collapsed={collapsed} />
+      <Tip content={collapsed ? "Show the menu" : "Hide the menu to make room"} side="right">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+          aria-expanded={!collapsed}
+          className={cn(
+            "m-2 flex h-9 items-center gap-3 rounded-lg text-sm text-muted-foreground transition-colors duration-150",
+            "hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            collapsed ? "justify-center" : "px-3",
+          )}
+        >
+          <Toggle className="size-4 shrink-0" aria-hidden />
+          {collapsed ? null : <span>Collapse</span>}
+        </button>
+      </Tip>
     </aside>
   );
 }

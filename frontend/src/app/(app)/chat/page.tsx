@@ -12,6 +12,10 @@ import {
   MessageSquarePlus,
   Mic,
   MicOff,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Paperclip,
   Pencil,
   Search,
@@ -64,6 +68,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
+import { useRememberedFlag } from "@/lib/use-remembered-flag";
 import { cn } from "@/lib/utils";
 import { directUpload } from "@/lib/uploads";
 import { newCharts, placeCharts, type ChatChart } from "@/lib/chat-charts";
@@ -338,6 +343,10 @@ export default function ChatPage() {
   const [agent, setAgent] = useState<string>(() => searchParams.get("agent") ?? NO_AGENT);
   const [model, setModel] = useState<string>(readStoredModel);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Either side pane can be put away so the conversation gets the room;
+  // remembered per browser.
+  const [showHistory, setShowHistory] = useRememberedFlag("pa-copilot-chat-history", true);
+  const [showContext, setShowContext] = useRememberedFlag("pa-copilot-chat-context", true);
 
   const chooseModel = (id: string) => {
     setModel(id);
@@ -1092,7 +1101,12 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full gap-4">
-      <aside className="hidden w-64 shrink-0 flex-col gap-3 border-r pr-4 md:flex">
+      <aside
+        className={cn(
+          "hidden w-64 shrink-0 flex-col gap-3 border-r pr-4",
+          showHistory && "md:flex",
+        )}
+      >
         {conversationList}
       </aside>
 
@@ -1106,6 +1120,36 @@ export default function ChatPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+          <Tip content={showHistory ? "Hide conversations" : "Show conversations"} side="bottom">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              aria-label={showHistory ? "Hide conversations" : "Show conversations"}
+              aria-pressed={showHistory}
+              className="hidden size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+            >
+              {showHistory ? (
+                <PanelLeftClose className="size-4" aria-hidden />
+              ) : (
+                <PanelLeftOpen className="size-4" aria-hidden />
+              )}
+            </button>
+          </Tip>
+          <Tip content={showContext ? "Hide the agent panel" : "Show the agent panel"} side="bottom">
+            <button
+              type="button"
+              onClick={() => setShowContext(!showContext)}
+              aria-label={showContext ? "Hide the agent panel" : "Show the agent panel"}
+              aria-pressed={showContext}
+              className="hidden size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring xl:inline-flex"
+            >
+              {showContext ? (
+                <PanelRightClose className="size-4" aria-hidden />
+              ) : (
+                <PanelRightOpen className="size-4" aria-hidden />
+              )}
+            </button>
+          </Tip>
           <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
             <Tip content="Earlier conversations. Threads are kept, so you can return to what an agent proposed last week and carry on." side="bottom">
               <DialogTrigger
@@ -1576,7 +1620,12 @@ export default function ChatPage() {
       </div>
 
       {/* Context panel: secondary, so it yields first as the screen narrows. */}
-      <aside className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l pl-4 xl:block">
+      <aside
+        className={cn(
+          "hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l pl-4",
+          showContext && "xl:block",
+        )}
+      >
         <div>
           <h2 className="mb-2 text-sm font-semibold">Agent</h2>
           {selectedAgent ? (

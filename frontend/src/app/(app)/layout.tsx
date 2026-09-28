@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { AppHeader } from "@/components/app-header";
@@ -9,10 +9,15 @@ import { KeepAwake } from "@/components/backend-warmup";
 import { Onboarding } from "@/components/onboarding";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
+import { cn } from "@/lib/utils";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  // The assistant is a workspace, not a document: it takes the whole width
+  // and less padding, so a long answer or a draft has room.
+  const workspace = pathname === "/chat" || pathname.startsWith("/chat/");
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -37,7 +42,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader />
-        <main className="mx-auto min-h-0 w-full max-w-[1400px] flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
+        <main
+          className={cn(
+            "mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4",
+            workspace ? "max-w-none py-4 md:px-6 md:py-5" : "max-w-[1400px] py-6 md:px-8 md:py-8",
+          )}
+        >
           {isLoading ? (
             <div className="space-y-4" aria-busy="true">
               <Skeleton className="h-8 w-64" />
