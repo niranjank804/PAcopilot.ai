@@ -13,7 +13,7 @@ that can reach the TM1 servers — often the TM1 server itself.
 
 1. In PA-Copilot: **Connections → Gateways → Add gateway**. Copy the commands
    it shows — the key is displayed only once.
-2. On the gateway machine, download `pa-copilot-gateway.exe` (linked there),
+2. On the gateway machine, download `pa-copilot-gateway.zip` (linked there), extract it,
    open a Command Prompt **as Administrator** in the download folder, and run:
 
    ```

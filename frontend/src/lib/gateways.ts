@@ -26,7 +26,7 @@ export type ConnectionWithGateway = TM1Connection & { gateway_id?: string | null
 export const DIRECT = "direct";
 
 /** Where the Windows gateway program is downloaded from (served by this site). */
-export const GATEWAY_DOWNLOAD = "/downloads/pa-copilot-gateway.exe";
+export const GATEWAY_DOWNLOAD = "/downloads/pa-copilot-gateway.zip";
 export const GATEWAY_EXE = "pa-copilot-gateway.exe";
 
 /** The commands shown to whoever installs the gateway. */

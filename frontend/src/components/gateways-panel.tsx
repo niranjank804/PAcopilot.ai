@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import {
   GATEWAY_DOWNLOAD,
+  GATEWAY_EXE,
   setupCommands,
   type GatewayKey,
   type TM1Gateway,
@@ -223,8 +224,13 @@ export function GatewaysPanel() {
                   className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"
                 >
                   <Download className="h-4 w-4" />
-                  pa-copilot-gateway.exe
+                  pa-copilot-gateway.zip
                 </a>
+                <p className="text-xs text-muted-foreground">
+                  If the browser asks, choose &ldquo;Keep&rdquo;. Then right-click the
+                  zip, &ldquo;Extract All&rdquo;, and open the extracted folder &mdash;
+                  it holds {GATEWAY_EXE}.
+                </p>
               </li>
               <li className="space-y-2">
                 <p className="font-medium">
@@ -240,7 +246,7 @@ export function GatewaysPanel() {
               </li>
               <li className="space-y-2">
                 <p className="font-medium">
-                  3. In a Command Prompt opened as Administrator, in the download
+                  3. In a Command Prompt opened as Administrator, in the extracted
                   folder, run:
                 </p>
                 {setupCommands(issued, target.trim() || "localhost:8010").map((command) => (

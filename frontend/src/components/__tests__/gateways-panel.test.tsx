@@ -60,9 +60,9 @@ describe("gateways", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByText("pa-copilot-gateway.exe install")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /pa-copilot-gateway.exe/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /pa-copilot-gateway.zip/ })).toHaveAttribute(
       "href",
-      "/downloads/pa-copilot-gateway.exe",
+      "/downloads/pa-copilot-gateway.zip",
     );
   });
 });

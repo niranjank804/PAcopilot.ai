@@ -1,6 +1,7 @@
 <#
   Build pa-copilot-gateway.exe (one file, no Python needed on the target)
-  and copy it to frontend\public\downloads, where the Gateways page links it.
+  and zip it into frontend\public\downloads, where the Gateways page links it.
+  A zip, because browsers hold back a bare unsigned .exe as "unconfirmed".
 
       powershell -ExecutionPolicy Bypass -File .\gateway\build.ps1
 #>
@@ -25,5 +26,7 @@ Pop-Location
 
 $Target = Join-Path (Split-Path -Parent $Here) "frontend\public\downloads"
 New-Item -ItemType Directory -Force -Path $Target | Out-Null
-Copy-Item (Join-Path $Build "dist\pa-copilot-gateway.exe") $Target -Force
-Write-Host "Built $Target\pa-copilot-gateway.exe"
+Remove-Item (Join-Path $Target "pa-copilot-gateway.exe") -ErrorAction SilentlyContinue
+Compress-Archive -Path (Join-Path $Build "dist\pa-copilot-gateway.exe") `
+    -DestinationPath (Join-Path $Target "pa-copilot-gateway.zip") -Force
+Write-Host "Built $Target\pa-copilot-gateway.zip"
