@@ -60,3 +60,42 @@ async def test_breaker_open_connections_are_pruned_from_tool_prompt(
         assert str(dead.id) not in volatile
     finally:
         remove_circuit_breaker(dead.id)
+
+
+@pytest.mark.asyncio
+async def test_the_server_chosen_in_the_chat_is_the_only_one_offered(
+    db_session, tm1_credentials_key
+):
+    # With two servers listed the model picked one itself, and could read
+    # one while the user asked about the other.
+    org = await create_organization(db_session)
+    user = await create_user(db_session, org.id)
+
+    async def make_connection(name):
+        return await tm1_integration_service.create_connection(
+            db_session,
+            organization_id=org.id,
+            created_by=user.id,
+            name=name,
+            address=f"{name}.example.com",
+            port=8010,
+            ssl=True,
+            username="admin",
+            password="secret",
+        )
+
+    chosen = await make_connection("onprem")
+    other = await make_connection("saas-trial")
+
+    _stable, volatile = await ai_orchestrator._build_tool_system_prompt(
+        db_session, org.id, None, None, chosen.id
+    )
+    assert str(chosen.id) in volatile
+    assert str(other.id) not in volatile
+    assert "working on this TM1 connection" in volatile
+
+    # Not given (or not this organization's): every connection, as before.
+    _stable, volatile = await ai_orchestrator._build_tool_system_prompt(
+        db_session, org.id, None, None
+    )
+    assert str(chosen.id) in volatile and str(other.id) in volatile

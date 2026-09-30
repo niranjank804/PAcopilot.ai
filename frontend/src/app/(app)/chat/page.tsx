@@ -68,13 +68,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
-import { useRememberedFlag } from "@/lib/use-remembered-flag";
+import { useRememberedChoice, useRememberedFlag } from "@/lib/use-remembered-flag";
 import { cn } from "@/lib/utils";
 import { directUpload } from "@/lib/uploads";
 import { newCharts, placeCharts, type ChatChart } from "@/lib/chat-charts";
 import { useVoice } from "@/lib/voice";
 import type {
   AgentInfo,
+  TM1Connection,
   ChatAttachmentInput,
   ConversationSummary,
   MessageResponse,
@@ -629,6 +630,19 @@ export default function ChatPage() {
     queryFn: () => apiRequest<AgentInfo[]>("/ai/agents"),
   });
 
+  // Which TM1 server the agent works on. Chosen here, not guessed by the
+  // model: with two connections it could read one and answer as if it
+  // were the other. The last choice is remembered; until one is made,
+  // the first active connection.
+  const connectionsQuery = useQuery({
+    queryKey: ["tm1-connections"],
+    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+  });
+  const servers = (connectionsQuery.data ?? []).filter((c) => c.is_active);
+  const [rememberedServer, setServer] = useRememberedChoice("pa-copilot-chat-connection");
+  const server =
+    servers.find((c) => c.id === rememberedServer) ?? servers[0] ?? null;
+
   const conversationsQuery = useQuery({
     queryKey: ["ai-conversations"],
     queryFn: () => apiRequest<ConversationSummary[]>("/ai/conversations"),
@@ -804,6 +818,7 @@ export default function ChatPage() {
         conversation_id: conversationId ?? undefined,
         agent: turnAgent === NO_AGENT ? undefined : turnAgent,
         enable_tools: turnAgent !== NO_AGENT,
+        connection_id: server?.id,
         model,
         attachments: attachmentsForThisMessage.length
           ? attachmentsForThisMessage
@@ -1150,6 +1165,31 @@ export default function ChatPage() {
               )}
             </button>
           </Tip>
+          {servers.length > 1 ? (
+            <Select value={server?.id ?? null} onValueChange={(value) => value && setServer(value)}>
+              <Tip content="The TM1 server the agent reads and answers about." side="bottom">
+                <SelectTrigger className="w-44" aria-label="TM1 server">
+                  <SelectValue>
+                    {(value: string) =>
+                      servers.find((c) => c.id === value)?.name ?? "TM1 server"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+              </Tip>
+              <SelectContent className="w-72 max-w-[calc(100vw-2rem)]">
+                {servers.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    <span className="block whitespace-normal">
+                      <span className="block">{c.name}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {c.address}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
             <Tip content="Earlier conversations. Threads are kept, so you can return to what an agent proposed last week and carry on." side="bottom">
               <DialogTrigger

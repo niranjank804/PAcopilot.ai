@@ -366,6 +366,7 @@ class AIOrchestrator:
         organization_id: uuid.UUID,
         system: str | None,
         persona: AgentPersona | None = None,
+        connection_id: uuid.UUID | None = None,
     ) -> tuple[str | None, str | None]:
         """Returns (stable, volatile) halves of the system prompt.
 
@@ -399,6 +400,14 @@ class AIOrchestrator:
             )
         ]
 
+        # The server the user chose in the chat. Shown several, the model
+        # picked one itself and could answer about the wrong server. The
+        # choice stands even with its circuit open: then the tool says it
+        # is unreachable, rather than the agent quietly using another.
+        chosen = [c for c in connections if c.id == connection_id] if connection_id else []
+        if chosen:
+            reachable = chosen
+
         if reachable:
             connection_lines = "\n".join(
                 f"- id={connection.id}, name={connection.name}, "
@@ -406,8 +415,16 @@ class AIOrchestrator:
                 for connection in reachable
             )
             connection_context = (
-                "Available TM1 connections (use these ids as the "
+                (
+                    "The user is working on this TM1 connection. Use its id as "
+                    "the connection_id for every TM1 tool call, and answer only "
+                    "about this server:\n"
+                    f"{connection_lines}\n\n"
+                )
+                if chosen
+                else "Available TM1 connections (use these ids as the "
                 f"connection_id tool argument):\n{connection_lines}\n\n"
+            ) + (
                 "For survey-style questions (e.g. 'which processes update "
                 "cube X', 'what depends on Y'), prefer one graph query "
                 "(get_object_relationships, find_dependents) over iterating "
@@ -943,6 +960,7 @@ class AIOrchestrator:
         enable_tools: bool = False,
         agent: str | None = None,
         attachments: list[AttachmentInput] | None = None,
+        connection_id: uuid.UUID | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> ChatResult:
@@ -965,6 +983,7 @@ class AIOrchestrator:
                 enable_tools=enable_tools,
                 agent=agent,
                 attachments=attachments,
+                connection_id=connection_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
             )
@@ -984,6 +1003,7 @@ class AIOrchestrator:
         enable_tools: bool,
         agent: str | None,
         attachments: list[AttachmentInput] | None,
+        connection_id: uuid.UUID | None,
         ip_address: str | None,
         user_agent: str | None,
     ) -> ChatResult:
@@ -1042,6 +1062,7 @@ class AIOrchestrator:
                 organization_id,
                 system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
                 persona,
+                connection_id,
             )
         )
         response, usage = await self._run_tool_loop(
@@ -1137,6 +1158,7 @@ class AIOrchestrator:
         enable_tools: bool = False,
         agent: str | None = None,
         attachments: list[AttachmentInput] | None = None,
+        connection_id: uuid.UUID | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> AsyncIterator[OrchestratedStreamEvent]:
@@ -1159,6 +1181,7 @@ class AIOrchestrator:
                 enable_tools=enable_tools,
                 agent=agent,
                 attachments=attachments,
+                connection_id=connection_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
             ):
@@ -1179,6 +1202,7 @@ class AIOrchestrator:
         enable_tools: bool,
         agent: str | None,
         attachments: list[AttachmentInput] | None,
+        connection_id: uuid.UUID | None,
         ip_address: str | None,
         user_agent: str | None,
     ) -> AsyncIterator[OrchestratedStreamEvent]:
@@ -1245,6 +1269,7 @@ class AIOrchestrator:
                 organization_id,
                 system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
                 persona,
+                connection_id,
             )
         )
 

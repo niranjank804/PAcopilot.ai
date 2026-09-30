@@ -35,3 +35,30 @@ export function useRememberedFlag(key: string, initial: boolean) {
 
   return [value, update] as const;
 }
+
+/** The same, for a choice from a list (an id). `null` until one is made. */
+export function useRememberedChoice(key: string) {
+  const [value, setValue] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setValue(window.localStorage.getItem(key));
+    } catch {
+      // Not remembered.
+    }
+  }, [key]);
+
+  const update = useCallback(
+    (next: string) => {
+      setValue(next);
+      try {
+        window.localStorage.setItem(key, next);
+      } catch {
+        // Not remembered; it still applies for this visit.
+      }
+    },
+    [key],
+  );
+
+  return [value, update] as const;
+}

@@ -28,6 +28,9 @@ class ChatRequest(BaseModel):
     enable_tools: bool = False
     agent: str | None = None
     attachments: list[AttachmentInput] | None = None
+    # The TM1 server chosen in the chat. Its tools go there and nowhere
+    # else; without it the agent is shown every connection and picks.
+    connection_id: uuid.UUID | None = None
 
 
 class UsageResponse(BaseModel):

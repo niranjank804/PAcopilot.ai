@@ -89,6 +89,7 @@ async def chat(
         model=request.model,
         enable_tools=request.enable_tools,
         agent=request.agent,
+        connection_id=request.connection_id,
         attachments=await resolve_uploaded_attachments(
                 request.attachments, current_user.organization_id
             ),
@@ -258,6 +259,7 @@ async def chat_stream(
                 model=request.model,
                 enable_tools=request.enable_tools,
                 agent=request.agent,
+                connection_id=request.connection_id,
                 attachments=await resolve_uploaded_attachments(
                 request.attachments, current_user.organization_id
             ),
