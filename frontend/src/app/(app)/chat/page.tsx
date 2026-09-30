@@ -9,9 +9,11 @@ import {
   Headphones,
   History,
   Loader2,
+  Maximize2,
   MessageSquarePlus,
   Mic,
   MicOff,
+  Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -348,6 +350,20 @@ export default function ChatPage() {
   // remembered per browser.
   const [showHistory, setShowHistory] = useRememberedFlag("pa-copilot-chat-history", true);
   const [showContext, setShowContext] = useRememberedFlag("pa-copilot-chat-context", true);
+  // Maximized, the chat covers the app menu and header and drops both
+  // side panes: the whole window is the conversation. Esc restores it.
+  const [expanded, setExpanded] = useRememberedFlag("pa-copilot-chat-expanded", false);
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent) => {
+      // An open dialog or menu takes Esc for itself first.
+      if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("[role=dialog],[role=listbox],[role=menu]")) {
+        setExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded, setExpanded]);
 
   const chooseModel = (id: string) => {
     setModel(id);
@@ -1115,11 +1131,16 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex h-full gap-4">
+    <div
+      className={cn(
+        "flex h-full gap-4",
+        expanded && "fixed inset-0 z-40 bg-background p-3 md:p-5",
+      )}
+    >
       <aside
         className={cn(
           "hidden w-64 shrink-0 flex-col gap-3 border-r pr-4",
-          showHistory && "md:flex",
+          showHistory && !expanded && "md:flex",
         )}
       >
         {conversationList}
@@ -1135,6 +1156,23 @@ export default function ChatPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+          <Tip content={expanded ? "Restore (Esc)" : "Maximize the chat"} side="bottom">
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              aria-label={expanded ? "Restore chat size" : "Maximize chat"}
+              aria-pressed={expanded}
+              className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {expanded ? (
+                <Minimize2 className="size-4" aria-hidden />
+              ) : (
+                <Maximize2 className="size-4" aria-hidden />
+              )}
+            </button>
+          </Tip>
+          {expanded ? null : (
+          <>
           <Tip content={showHistory ? "Hide conversations" : "Show conversations"} side="bottom">
             <button
               type="button"
@@ -1165,6 +1203,8 @@ export default function ChatPage() {
               )}
             </button>
           </Tip>
+          </>
+          )}
           {servers.length > 1 ? (
             <Select value={server?.id ?? null} onValueChange={(value) => value && setServer(value)}>
               <Tip content="The TM1 server the agent reads and answers about." side="bottom">
@@ -1663,7 +1703,7 @@ export default function ChatPage() {
       <aside
         className={cn(
           "hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l pl-4",
-          showContext && "xl:block",
+          showContext && !expanded && "xl:block",
         )}
       >
         <div>
