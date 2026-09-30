@@ -1,5 +1,6 @@
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.exceptions import (
@@ -15,7 +16,26 @@ from src.repositories.user_repository import user_repository
 from src.repositories.user_role_repository import user_role_repository
 
 
+# The platform owner's role. A system role (no organization), so a role an
+# organization creates under the same name is not it.
+SUPER_ADMIN_ROLE = "Super Admin"
+
+
 class RoleService:
+
+    async def is_super_admin(self, db: AsyncSession, user_id: uuid.UUID) -> bool:
+        result = await db.execute(
+            select(UserRole.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(
+                UserRole.user_id == user_id,
+                Role.name == SUPER_ADMIN_ROLE,
+                Role.is_system.is_(True),
+                Role.organization_id.is_(None),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
 
     async def get_role(
         self,
@@ -140,6 +160,7 @@ class RoleService:
         user_id: uuid.UUID,
         role_id: uuid.UUID,
         caller_organization_id: uuid.UUID,
+        caller_user_id: uuid.UUID | None = None,
     ) -> UserRole:
 
         user = await user_repository.get_by_id(
@@ -160,6 +181,18 @@ class RoleService:
         if not role or role.organization_id not in (caller_organization_id, None):
             raise PermissionDeniedException(
                 "Cannot assign a role outside your organization."
+            )
+
+        # Every sign-up administers a workspace of its own, and a workspace
+        # admin may hand out system roles — so without this, anyone could
+        # make themselves the platform's Super Admin.
+        if (
+            role.is_system
+            and role.name == SUPER_ADMIN_ROLE
+            and not (caller_user_id and await self.is_super_admin(db, caller_user_id))
+        ):
+            raise PermissionDeniedException(
+                "Only a Super Admin can grant the Super Admin role."
             )
 
         existing = await user_role_repository.get_by_user_and_role(

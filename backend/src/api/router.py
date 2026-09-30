@@ -17,6 +17,7 @@ from src.api.v1.internal import router as internal_router
 from src.api.v1.system import router as system_router
 from src.api.v1.uploads import router as uploads_router
 from src.api.v1.tm1 import router as tm1_router
+from src.api.v1.signups import router as signups_router
 from src.api.v1.users import router as users_router
 from src.api.v1.worker import router as worker_router
 
@@ -28,6 +29,7 @@ api_router.include_router(database_router)
 api_router.include_router(auth_router)
 api_router.include_router(roles_router)
 api_router.include_router(users_router)
+api_router.include_router(signups_router)
 api_router.include_router(permissions_router)
 api_router.include_router(ai_router)
 api_router.include_router(knowledge_router)

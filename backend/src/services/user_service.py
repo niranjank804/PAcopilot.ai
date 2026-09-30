@@ -48,6 +48,7 @@ class UserService:
         user_id: uuid.UUID,
         caller_organization_id: uuid.UUID,
         role_id: uuid.UUID | None,
+        caller_user_id: uuid.UUID | None = None,
     ) -> User:
 
         user = await self._get_pending_user(db, user_id, caller_organization_id)
@@ -61,6 +62,7 @@ class UserService:
                 user.id,
                 role_id,
                 caller_organization_id,
+                caller_user_id=caller_user_id,
             )
 
         return user

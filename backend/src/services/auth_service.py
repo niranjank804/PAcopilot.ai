@@ -38,9 +38,13 @@ from src.services.password_service import password_service
 from src.services.token_revocation_service import token_revocation_service
 
 
-# Matches scripts/seed_admin.py's DEFAULT_ORG_CODE - both create the same
-# org on first use, whichever runs first.
+# Matches scripts/seed_admin.py's DEFAULT_ORG_CODE - the platform owner's
+# organization. Sign-ups no longer land in it (see _new_workspace).
 DEFAULT_ORGANIZATION_CODE = "default"
+
+# The role a person holds in the private workspace their sign-up creates:
+# it is theirs, so they manage its connections, knowledge and members.
+WORKSPACE_OWNER_ROLE = "Organization Admin"
 
 
 def _hash_reset_token(raw_token: str) -> str:
@@ -84,6 +88,7 @@ class AuthService:
         self,
         db: AsyncSession,
         user: User,
+        role_name: str | None = None,
     ) -> None:
         """Give a newly self-registered account a usable starting role.
 
@@ -98,7 +103,7 @@ class AuthService:
         through the Users page.
         """
 
-        role_name = settings.DEFAULT_SIGNUP_ROLE.strip()
+        role_name = (role_name or settings.DEFAULT_SIGNUP_ROLE).strip()
 
         if not role_name:
             return
@@ -121,7 +126,14 @@ class AuthService:
         self,
         db: AsyncSession,
         organization_code: str | None,
-    ) -> Organization:
+        email: str,
+    ) -> tuple[Organization, str | None]:
+        """The organization a new account joins, and the role it holds there.
+
+        With a code: that organization — a colleague invited them — and
+        DEFAULT_SIGNUP_ROLE, pending approval by its admin. Without one: a
+        new private workspace of their own, which they administer.
+        """
 
         if organization_code is not None:
             organization = await organization_repository.get_by_code(
@@ -135,28 +147,22 @@ class AuthService:
                     "your administrator."
                 )
 
-            return organization
+            return organization, None
 
-        # Testing-phase default (user's explicit choice, no invite code
-        # required): every signup with no code lands in one shared org,
-        # created on first use rather than depending on a seed script
-        # having run first.
-        organization = await organization_repository.get_by_code(
+        return await self._new_workspace(db, email), WORKSPACE_OWNER_ROLE
+
+    async def _new_workspace(self, db: AsyncSession, email: str) -> Organization:
+        # Every sign-up used to join one shared organization, so everyone
+        # saw everyone's TM1 connections. Now each starts alone.
+        local_part = email.split("@")[0][:60] or "New"
+        return await organization_repository.create(
             db,
-            DEFAULT_ORGANIZATION_CODE,
+            Organization(
+                name=f"{local_part}'s workspace",
+                code=f"ws-{secrets.token_hex(8)}",
+                is_active=True,
+            ),
         )
-
-        if organization is None:
-            organization = await organization_repository.create(
-                db,
-                Organization(
-                    name="PA-Copilot",
-                    code=DEFAULT_ORGANIZATION_CODE,
-                    is_active=True,
-                ),
-            )
-
-        return organization
 
     async def _unique_username_from_email(
         self,
@@ -180,9 +186,10 @@ class AuthService:
         request: RegisterRequest,
     ) -> UserResponse:
 
-        organization = await self._resolve_registration_organization(
+        organization, role_name = await self._resolve_registration_organization(
             db,
             request.organization_code,
+            request.email,
         )
 
         existing_user = await user_repository.get_by_username(
@@ -219,7 +226,7 @@ class AuthService:
 
         user = await user_repository.create(db, user)
 
-        await self._grant_default_role(db, user)
+        await self._grant_default_role(db, user, role_name)
 
         return UserResponse.model_validate(user)
 
@@ -417,14 +424,14 @@ class AuthService:
         user = await user_repository.get_by_email(db, email)
 
         # A first-time Google sign-in provisions an account the same way a
-        # plain self-registration does — in the shared default organization,
-        # holding DEFAULT_SIGNUP_ROLE — and it waits for the same approval:
+        # plain self-registration without a code does — a private workspace
+        # of its own, which it administers — and it waits for the same approval:
         # `_check_can_authenticate` below refuses the token while the
         # account is pending, so the person sees the "pending approval"
         # message and the admin sees the request under Users.
         if user is None:
-            organization = await self._resolve_registration_organization(
-                db, None
+            organization, role_name = await self._resolve_registration_organization(
+                db, None, email
             )
 
             username = await self._unique_username_from_email(db, email)
@@ -447,7 +454,7 @@ class AuthService:
 
             user = await user_repository.create(db, user)
 
-            await self._grant_default_role(db, user)
+            await self._grant_default_role(db, user, role_name)
 
             if user.registration_status != "approved":
                 # The refusal below is an exception, and the request

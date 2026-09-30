@@ -109,7 +109,7 @@ async def test_register_auto_approves_only_when_the_deployment_opts_in(
 
 
 @pytest.mark.asyncio
-async def test_register_without_organization_code_uses_default_org(
+async def test_register_without_a_code_gets_a_private_workspace(
     client, db_session
 ):
     suffix = uuid.uuid4().hex[:8]
@@ -127,8 +127,8 @@ async def test_register_without_organization_code_uses_default_org(
     assert register_resp.status_code == 201
     assert register_resp.json()["data"]["registration_status"] == "pending"
 
-    # Registering a second user with no code lands in the same default org
-    # rather than creating a new one each time.
+    # Everyone who signs up without a code used to share one organization,
+    # and so saw each other's TM1 connections. Each now gets their own.
     suffix2 = uuid.uuid4().hex[:8]
     second_resp = await client.post(
         "/auth/register",
@@ -144,7 +144,7 @@ async def test_register_without_organization_code_uses_default_org(
 
     first_user = await user_repository.get_by_username(db_session, f"user_{suffix}")
     second_user = await user_repository.get_by_username(db_session, f"user_{suffix2}")
-    assert first_user.organization_id == second_user.organization_id
+    assert first_user.organization_id != second_user.organization_id
 
 
 @pytest.mark.asyncio
@@ -575,7 +575,11 @@ async def test_registration_grants_the_default_role(client, db_session):
 
 @pytest.mark.asyncio
 async def test_default_role_does_not_grant_write_or_admin(client, db_session):
+    # DEFAULT_SIGNUP_ROLE is what someone joining a colleague's
+    # organization (with its code) holds; a private workspace's owner
+    # administers it instead.
     await _seed_analyst_role(db_session)
+    org = await create_organization(db_session)
 
     await client.post(
         "/auth/register",
@@ -585,6 +589,7 @@ async def test_default_role_does_not_grant_write_or_admin(client, db_session):
             "password": "Str0ngPassw0rd!",
             "first_name": "Limited",
             "last_name": "User",
+            "organization_code": org.code,
         },
     )
 
@@ -630,6 +635,7 @@ async def test_default_role_can_be_disabled(client, db_session, monkeypatch):
     monkeypatch.setattr(settings, "DEFAULT_SIGNUP_ROLE", "")
 
     await _seed_analyst_role(db_session)
+    org = await create_organization(db_session)
 
     response = await client.post(
         "/auth/register",
@@ -639,6 +645,7 @@ async def test_default_role_can_be_disabled(client, db_session, monkeypatch):
             "password": "Str0ngPassw0rd!",
             "first_name": "Un",
             "last_name": "Privileged",
+            "organization_code": org.code,
         },
     )
 

@@ -82,6 +82,7 @@ async def approve_user(
         user_id,
         current_user.organization_id,
         request.role_id,
+        caller_user_id=current_user.id,
     )
 
     await audit_service.log(
@@ -210,6 +211,7 @@ async def assign_role(
         user_id,
         request.role_id,
         current_user.organization_id,
+        caller_user_id=current_user.id,
     )
 
     role = await role_service.get_role(

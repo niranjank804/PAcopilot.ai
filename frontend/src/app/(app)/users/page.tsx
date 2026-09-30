@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SignupRequests } from "@/components/signup-requests";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -291,13 +292,13 @@ export default function UsersPage() {
         </p>
       </div>
 
+      <SignupRequests />
+
       <Card>
         <CardHeader>
           <CardTitle>Pending requests</CardTitle>
           <CardDescription>
-            New signups are auto-approved right now, so this is normally
-            empty — it&apos;s only populated by manually setting an account
-            back to pending.
+            People who asked to join this organization with its code.
           </CardDescription>
         </CardHeader>
         <CardContent>
