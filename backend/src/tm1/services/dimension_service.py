@@ -15,12 +15,13 @@ class DimensionInfo:
 async def list_dimensions(
     client: TM1Service,
     connection_id: uuid.UUID,
+    include_control: bool = False,
     **resilience_kwargs,
 ) -> list[str]:
     return await call_with_resilience(
         connection_id,
         client.dimensions.get_all_names,
-        skip_control_dims=True,
+        skip_control_dims=not include_control,
         **resilience_kwargs,
     )
 

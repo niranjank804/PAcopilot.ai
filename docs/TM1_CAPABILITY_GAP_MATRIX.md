@@ -4,7 +4,73 @@ Benchmark: the 114 capabilities in the PA-Copilot Enterprise TM1 brief (2026-09-
 
 **Baseline** is the repository as found on 2026-09-24, including uncommitted work from 2026-09-23 (17 read tools in `backend/src/ai/tools/tm1/{logs,rules,structure,health}.py`). That work was implemented and unit-tested but on no specialist agent's allowlist, so no agent could call it. Rows depending on it are PARTIAL at baseline for that reason.
 
-## Summary
+## Current status (2026-10-03, phase 1)
+
+Re-audited row by row against the working tree on 2026-10-03, by reading the
+implementation and checking that each tool is registered **and** on at least
+one specialist agent's allowlist. The per-row tables below still show the
+24 September baseline; this section records what changed since.
+
+| Status | Baseline (2026-09-24) | Current (2026-10-03) |
+|---|---|---|
+| EXISTS | 40 | 103 |
+| PARTIAL | 52 | 10 |
+| MISSING | 22 | 0 |
+| BLOCKED_BY_TM1_API | 0 | 1 |
+
+"Exists" means implemented and reachable by an agent. It does not mean
+tested: phase 1 added tests for the change flow, runs, classification, TI
+review and the diagnostic tools, but several discovery tools (get_subset,
+get_view, get_cell_values comparisons, include_control, attribute values)
+still have none. Nor does it mean verified against a live TM1 server for
+every row; see "Live verification" below.
+
+### Still partial
+
+| # | Capability | What is missing |
+|---|---|---|
+| 21 | Feeders | Static analysis only. Whether a cell is fed at runtime is not exposed by TM1 REST. |
+| 25 | Application metadata | The TM1 Applications folder is not read (out of scope so far). |
+| 52 | Export analytical results | No CSV/XLSX export of MDX or cell results. |
+| 57 | Transaction / audit info | The TM1 audit log (AuditLog=T) is not read; the transaction log is on the Troubleshooter only. |
+| 59, 88 | Process statistics | TM1 REST has no per-process statistics entity. Elapsed time comes from the message log and from runs PA-Copilot made; a customer "Process Stats" cube is not mapped. |
+| 78, 108 | Naming conventions | Only consistent parameter prefixes inside one process; names are not checked against the organization's learned standards. |
+| 79 | Maintainability | No detection of hard-coded literals. |
+| 102 | Compare versions | Diff is server vs supplied text; two stored versions cannot be diffed. |
+
+### Blocked by the TM1 API
+
+| # | Capability | Why |
+|---|---|---|
+| 50 | Feeder relationships (runtime) | TM1 REST does not report whether a cell is fed. Reported as `unknown`, never guessed. |
+
+### Fixed in phase 1 (found by the re-audit)
+
+- **A run with a parameter TM1py reserves** (`timeout`, `process_name`, …) passed validation, was approved, then failed with a server error. Refused at draft time now.
+- **A run that could not start** (process deleted since approval, an unexpected TM1py error) produced a 500 and no result. Recorded on the change as `failed` / `NotStarted`.
+- **Create-process re-check.** A process created under the same name between draft and approval was overwritten, and its rollback then deleted it with no snapshot. Approval now refuses.
+- **A check that raises after an apply** (rule check, server compile) left the unchecked change on the server. The previous state is restored before the error is reported.
+- **Rollback over later edits.** A rollback restored its snapshot even if someone had edited the object since. Each applied change now records what it left on the server, and a rollback refuses if that no longer matches.
+- **Rejecting someone else's draft** needed only draft rights. It now needs the author, or someone who can deploy.
+
+### Tests added in phase 1
+
+`tests/unit/tm1/test_change_runs_and_guards.py` (runs and the guards above),
+`tests/unit/ai/test_tool_classification.py` (every tool classified; only
+`propose_*` tools draft writes or runs; no tool module calls TM1's mutating
+APIs), `tests/unit/tm1/test_ti_review.py`, `tests/unit/ai/test_engineering_tools.py`
+(diagnose, call tree, search, validate-without-saving), and
+`frontend/src/components/__tests__/run-plan.test.tsx`.
+
+### Live verification
+
+Unit and integration tests run against a faked TM1. Connecting, listing
+cubes and answering questions about a real on-premises server through the
+gateway were confirmed by the owner on 2026-09-28. Compile, save, run and
+rollback against a real Dev server are the remaining live checks before
+these rows can be called verified end to end.
+
+## Summary (baseline)
 
 | Status | Baseline |
 |---|---|

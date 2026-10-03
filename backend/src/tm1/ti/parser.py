@@ -219,6 +219,9 @@ class ObjectRef:
     access: str  # read | write | create | destroy | reference | calls
     section: str
     literal: bool  # False when the name came from a variable, not a literal
+    # The TI function that made the reference (upper case). Distinguishes an
+    # element insert from a DIMIX lookup, which share kind and access.
+    function: str = ""
 
 
 @dataclass
@@ -470,7 +473,7 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
     if not code.strip():
         return
 
-    def add(name_arg: str, kind: str, access: str) -> None:
+    def add(name_arg: str, kind: str, access: str, function: str = "") -> None:
         name, is_literal = _literal(name_arg)
         if not name:
             return
@@ -481,6 +484,7 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
                 access=access,
                 section=section,
                 literal=is_literal,
+                function=function,
             )
         )
 
@@ -537,7 +541,7 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
             if function in table:
                 value = arg(table[function])
                 if value is not None:
-                    add(value, kind, _access_for(function, access))
+                    add(value, kind, _access_for(function, access), function)
 
         # Families that name a container and the object inside it. Only the
         # object itself is created or destroyed; naming its container is a
@@ -567,7 +571,7 @@ def _collect(record: ProcessRecord, section: str, code: str) -> None:
                     if position == innermost
                     else "reference"
                 )
-                add(value, kind, access)
+                add(value, kind, access, function)
 
 
 def parse_process(text: str, source_file: str = "") -> ProcessRecord:
@@ -638,6 +642,56 @@ def parse_process(text: str, source_file: str = "") -> ProcessRecord:
     for section in SECTIONS:
         _collect(record, section, getattr(record, section))
 
+    _finalise(record)
+
+    return record
+
+
+def parse_process_code(
+    name: str,
+    *,
+    prolog: str = "",
+    metadata: str = "",
+    data: str = "",
+    epilog: str = "",
+    datasource_type: str = "none",
+    datasource_name: str = "",
+    parameters: list[dict] | None = None,
+    variables: list[dict] | None = None,
+) -> ProcessRecord:
+    """Parse a process as the TM1 REST API returns it: four code tabs and
+    a datasource, rather than a `.pro` export.
+
+    Same collection and the same finishing steps as `parse_process`, so a
+    live process and its export classify identically.
+    """
+
+    record = ProcessRecord(name=_clean_name(name))
+    record.datasource_type = (datasource_type or "none").lower()
+    record.datasource_name = datasource_name or ""
+    record.parameters = list(parameters or [])
+    record.variables = list(variables or [])
+
+    for section, code in (
+        ("prolog", prolog),
+        ("metadata", metadata),
+        ("data", data),
+        ("epilog", epilog),
+    ):
+        setattr(record, section, code or "")
+        record.line_counts[section] = len((code or "").splitlines())
+
+    for section in SECTIONS:
+        _collect(record, section, getattr(record, section))
+
+    _finalise(record)
+
+    return record
+
+
+def _finalise(record: ProcessRecord) -> None:
+    """Derived fields, computed the same way for every source."""
+
     all_code = "\n".join(getattr(record, section) for section in SECTIONS)
     record.comments = [
         line.strip()
@@ -671,5 +725,3 @@ def parse_process(text: str, source_file: str = "") -> ProcessRecord:
         record.parse_warnings.append("No process name (tag 602) found.")
     if not any(record.line_counts.get(s) for s in SECTIONS):
         record.parse_warnings.append("No TI code sections found.")
-
-    return record

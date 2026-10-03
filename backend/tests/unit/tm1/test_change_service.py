@@ -138,7 +138,9 @@ async def test_execute_update_rules_snapshots_and_applies(
     result = await change_service.execute_change(db_session, change, user.id)
 
     assert result.status == "executed"
-    assert result.previous_content == {"rules": "['A'] = N: 1;"}
+    assert result.previous_content["rules"] == "['A'] = N: 1;"
+    # What the change left on the server, for the rollback guard.
+    assert "applied" in result.previous_content
     fake_tm1_client.cubes.update_or_create_rules.assert_called_once_with(
         "Sales", "['A'] = N: 2;"
     )
@@ -192,9 +194,10 @@ async def test_create_process_execute_and_rollback(
 
     executed = await change_service.execute_change(db_session, change, user.id)
     assert executed.status == "executed"
-    assert executed.previous_content == {"existed": False}
+    assert executed.previous_content["existed"] is False
     fake_tm1_client.processes.update_or_create.assert_called_once()
 
+    fake_tm1_client.processes.exists.return_value = True  # it was created
     rolled_back = await change_service.rollback_change(db_session, executed)
     assert rolled_back.status == "rolled_back"
     fake_tm1_client.processes.delete.assert_called_once_with("zNew")

@@ -21,6 +21,7 @@ from src.core.exceptions import PermissionDeniedException
 from src.repositories.auth_repository import auth_repository
 from src.tm1.rules.analysis import analyze_rules, trace_cell
 from src.tm1.service import tm1_integration_service
+from src.tm1.services import cube_service
 
 CONNECTION_ID_SCHEMA = {
     "type": "string",
@@ -273,13 +274,19 @@ class AuditModelRulesTool(_RuleTool):
         truncated = len(cube_names) > MAX_AUDIT_CUBES
         cube_names = cube_names[:MAX_AUDIT_CUBES]
 
+        # Resolved once: the fan-out below runs on the client, never on the
+        # shared database session.
+        connection, client = await tm1_integration_service.connect(
+            db, connection_id, organization_id
+        )
+
         semaphore = asyncio.Semaphore(AUDIT_CONCURRENCY)
 
         async def analyse(cube_name: str) -> dict | None:
             async with semaphore:
                 try:
-                    rules = await tm1_integration_service.get_cube_rules(
-                        db, connection_id, organization_id, cube_name
+                    rules = await cube_service.get_cube_rules(
+                        client, connection.id, cube_name
                     )
                 except Exception as exc:  # noqa: BLE001
                     # One unreadable cube must not sink the whole audit.

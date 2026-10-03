@@ -14,7 +14,8 @@ from src.database.models.tm1_connection import TM1Connection
 from src.database.session import get_db
 from src.schemas.auth import UserResponse
 from src.schemas.response import ApiResponse
-from src.core.exceptions import NotFoundException
+from src.core.exceptions import NotFoundException, PermissionDeniedException
+from src.repositories.auth_repository import auth_repository
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.schemas.tm1 import (
     ChangeCreate,
@@ -660,6 +661,7 @@ async def extract_connection_metadata(
         data=ExtractionSummaryResponse(
             objects_created=summary.objects_created,
             relationships_created=summary.relationships_created,
+            unresolved_references=summary.unresolved_references,
         ),
     )
 
@@ -1449,6 +1451,17 @@ async def execute_change(
     change = await _get_change_checked(
         db, connection_id, change_id, current_user.organization_id
     )
+
+    # A run needs its own grant on top of tm1.deploy: it changes data, has
+    # no rollback, and is the one action an approver is separately trusted
+    # with. Checked before TM1 is contacted.
+    if change.change_type == "run_process" and not (
+        await auth_repository.user_has_permission(db, current_user.id, "tm1.execute")
+    ):
+        raise PermissionDeniedException(
+            "You do not have permission to run TM1 processes."
+        )
+
     connection = await tm1_integration_service.get_connection(
         db, connection_id, current_user.organization_id
     )
@@ -1491,6 +1504,16 @@ async def reject_change(
     change = await _get_change_checked(
         db, connection_id, change_id, current_user.organization_id
     )
+
+    # Withdrawing your own draft needs only the right to draft; turning down
+    # someone else's is a reviewer's decision, held by those who can deploy.
+    if change.created_by != current_user.id and not (
+        await auth_repository.user_has_permission(db, current_user.id, "tm1.deploy")
+    ):
+        raise PermissionDeniedException(
+            "Only its author or someone who can deploy changes can reject this draft."
+        )
+
     connection = await tm1_integration_service.get_connection(
         db, connection_id, current_user.organization_id
     )

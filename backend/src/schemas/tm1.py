@@ -78,6 +78,9 @@ class DimensionResponse(BaseModel):
 class ExtractionSummaryResponse(BaseModel):
     objects_created: int
     relationships_created: int
+    # References in process code whose object name is a variable: real
+    # dependencies the graph cannot draw.
+    unresolved_references: int = 0
 
 
 class ProcessResponse(BaseModel):
@@ -191,7 +194,11 @@ class VisualizeRunResponse(BaseModel):
 
 class ChangeCreate(BaseModel):
     change_type: Literal[
-        "update_rules", "create_process", "update_process", "delete_process"
+        "update_rules",
+        "create_process",
+        "update_process",
+        "delete_process",
+        "run_process",
     ]
     target_name: str = Field(min_length=1, max_length=255)
     new_content: dict | None = None
@@ -216,6 +223,7 @@ class ChangeResponse(BaseModel):
     created_at: datetime
     executed_at: datetime | None
     rolled_back_at: datetime | None
+    execution_result: dict | None = None
 
 
 class ChangeDetailResponse(BaseModel):

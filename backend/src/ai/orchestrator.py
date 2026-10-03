@@ -24,6 +24,7 @@ from src.ai.schemas import (
     ToolResult,
     Usage,
 )
+from src.ai.tools.classification import classification_for
 from src.ai.tools.registry import get_tool, list_tools
 from src.core.config import settings
 from src.core.logging import app_logger
@@ -37,6 +38,7 @@ from src.database.models.ai_conversation import AIConversation
 from src.database.models.ai_message import AIMessage
 from src.database.models.ai_tool_execution import AIToolExecution
 from src.database.models.ai_usage import AIUsage
+from src.middleware.request_context import current_request_id
 from src.repositories.ai_conversation_repository import ai_conversation_repository
 from src.repositories.ai_message_repository import ai_message_repository
 from src.repositories.ai_tool_execution_repository import (
@@ -69,6 +71,30 @@ async def _release_db(db: AsyncSession) -> None:
     """
 
     await db.commit()
+
+
+def _tool_call_details(tool_call: ToolCall, duration_ms: int) -> dict:
+    """What the chat timeline shows for a call: its class, category,
+    target, evidence source and duration. Taken from the application's
+    classification, never from the model."""
+
+    tool = get_tool(tool_call.name)
+    classification = classification_for(tool_call.name)
+
+    # Display metadata must never cost the turn: an unclassified tool (a
+    # test double, a tool added without its classification — which
+    # test_tool_classification.py fails the build over) shows timing only.
+    if tool is None or classification is None:
+        return {"tool_duration_ms": duration_ms}
+
+    return {
+        "tool_access": classification.access.value,
+        "tool_category": classification.category,
+        "tool_target": tool.describe_target(tool_call.input or {}) or None,
+        "tool_evidence": classification.evidence,
+        "tool_requires_approval": classification.requires_confirmation,
+        "tool_duration_ms": duration_ms,
+    }
 
 
 def _outcome_status(exc: AppException) -> str:
@@ -173,6 +199,35 @@ PLAIN_CHAT_TOOL_NAMES = [
     "check_tm1_code",
     "search_knowledge_base",
 ]
+
+# Stable, so it caches with the persona. Applies whenever tools can reach
+# a TM1 server: the difference between what TM1 said and what the model
+# concluded is the thing a TM1 developer most needs to see, and the thing
+# a fluent answer most easily blurs.
+EVIDENCE_RULES = (
+    "Evidence rules — these override style preferences:\n"
+    "1. Live TM1 evidence outranks everything. What a tool read from the "
+    "server beats the knowledge base, which beats general TM1 knowledge. "
+    "Never state a cube, dimension, element, process, view, subset or "
+    "attribute name you have not seen in a tool result this conversation; "
+    "find it with search_model_objects instead of guessing.\n"
+    "2. Label what you assert. Say 'Verified from TM1:' for facts a tool "
+    "returned, 'Inferred:' for conclusions you drew from them (a likely "
+    "cause, a recommendation), and 'Unknown:' for what the tools could not "
+    "establish. Many tool results carry an 'evidence' block with exactly "
+    "these three lists — carry its 'unknown' items into your answer "
+    "rather than dropping them.\n"
+    "3. Where TM1 cannot provide evidence (runtime feeder state, the data "
+    "a run read), say so. Do not fill the gap with a plausible story.\n"
+    "4. You never change a TM1 server and never run a process. Changes and "
+    "runs are proposed as drafts (propose_* tools) that a person approves. "
+    "After proposing, say it is waiting for approval; never say it has "
+    "been applied or has run.\n"
+    "5. For 'why did X fail', call diagnose_process_failure first; for "
+    "'what writes to / reads from cube X', call get_cube_data_flow; for "
+    "'is this code right', call validate_process_code and "
+    "review_process_code before answering."
+)
 
 PLAIN_CHAT_SYSTEM_PROMPT = (
     "You are an assistant for IBM Planning Analytics (TM1). No TM1 server "
@@ -451,6 +506,7 @@ class AIOrchestrator:
             # tool schemas rather than costing a lookup per request.
             PRODUCT_OVERVIEW,
             persona.system_prompt if persona is not None else None,
+            EVIDENCE_RULES if persona is not None else None,
             safety_notes_block,
         ]
 
@@ -512,6 +568,7 @@ class AIOrchestrator:
         result_summary: str | None,
         duration_ms: int,
         error_message: str | None,
+        agent: str | None = None,
     ) -> None:
 
         await ai_tool_execution_repository.create(
@@ -526,6 +583,10 @@ class AIOrchestrator:
                 result_summary=result_summary,
                 duration_ms=duration_ms,
                 error_message=error_message,
+                # Which specialist asked, and which HTTP request — so one
+                # audit row leads to every log line of the same turn.
+                agent=agent,
+                request_id=current_request_id(),
             ),
         )
 
@@ -538,6 +599,7 @@ class AIOrchestrator:
         user_id: uuid.UUID,
         conversation_id: uuid.UUID,
         allowed_tools: list[str] | None = None,
+        agent: str | None = None,
     ) -> ToolResult:
 
         start = time.monotonic()
@@ -558,6 +620,7 @@ class AIOrchestrator:
                 result_summary=None,
                 duration_ms=int((time.monotonic() - start) * 1000),
                 error_message=error_message,
+                agent=agent,
             )
 
             return ToolResult(
@@ -582,6 +645,7 @@ class AIOrchestrator:
                 result_summary=None,
                 duration_ms=int((time.monotonic() - start) * 1000),
                 error_message=error_message,
+                agent=agent,
             )
 
             return ToolResult(
@@ -609,6 +673,7 @@ class AIOrchestrator:
                 result_summary=None,
                 duration_ms=int((time.monotonic() - start) * 1000),
                 error_message=exc.message,
+                agent=agent,
             )
 
             return ToolResult(
@@ -644,6 +709,7 @@ class AIOrchestrator:
                 # a connection string, a path, or a TM1 credential, and
                 # this row is shown in the monitoring UI.
                 error_message=f"{type(exc).__name__}",
+                agent=agent,
             )
 
             app_logger.error(
@@ -674,6 +740,7 @@ class AIOrchestrator:
             result_summary=_summarise_result(result),
             duration_ms=int((time.monotonic() - start) * 1000),
             error_message=None,
+            agent=agent,
         )
 
         return ToolResult(
@@ -696,6 +763,7 @@ class AIOrchestrator:
         system_context: str | None = None,
         allowed_tools: list[str] | None = None,
         max_rounds: int = MAX_TOOL_ROUNDS,
+        agent: str | None = None,
     ) -> tuple[ChatResponse, Usage]:
 
         available_tools = list_tools()
@@ -751,6 +819,7 @@ class AIOrchestrator:
                     user_id=user_id,
                     conversation_id=conversation_id,
                     allowed_tools=allowed_tools,
+                    agent=agent,
                 )
                 for tool_call in response.tool_calls
             ]
@@ -1079,6 +1148,7 @@ class AIOrchestrator:
                 persona, caller_requested_all_tools
             ),
             max_rounds=_resolve_max_tool_rounds(persona),
+            agent=persona.name if persona is not None else None,
         )
 
         latency_ms = int((time.monotonic() - start) * 1000)
@@ -1370,6 +1440,7 @@ class AIOrchestrator:
                 tool_results: list[ToolResult] = []
 
                 for tool_call in round_tool_calls:
+                    called_at = time.monotonic()
                     result = await self._execute_tool_call(
                         db,
                         tool_call,
@@ -1377,6 +1448,7 @@ class AIOrchestrator:
                         user_id=user_id,
                         conversation_id=conversation.id,
                         allowed_tools=allowed_tools,
+                        agent=persona.name if persona is not None else None,
                     )
                     tool_results.append(result)
 
@@ -1384,6 +1456,10 @@ class AIOrchestrator:
                         type="tool_call",
                         tool_name=tool_call.name,
                         tool_status="error" if result.is_error else "success",
+                        **_tool_call_details(
+                            tool_call,
+                            int((time.monotonic() - called_at) * 1000),
+                        ),
                     )
 
                 history.append(

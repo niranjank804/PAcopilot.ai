@@ -350,6 +350,12 @@ class Settings(BaseSettings):
     TM1_CIRCUIT_BREAKER_THRESHOLD: int = 5
     TM1_CIRCUIT_BREAKER_COOLDOWN_SECONDS: float = 30.0
 
+    # How long an approved process run may take before PA-Copilot stops
+    # waiting and asks TM1 to cancel it. Below the host's own request
+    # limit (Render gunicorn 300 s, Vercel maxDuration 300 s) so the
+    # outcome is always recorded; a longer load belongs in a chore.
+    TM1_PROCESS_RUN_TIMEOUT_SECONDS: float = 240.0
+
     # ------------------------------------------------------------------
     # Report automation (DEVELOPER PREVIEW)
     # ------------------------------------------------------------------

@@ -11,6 +11,12 @@ system_prompt: >-
   finding must cite what you found, not a general impression. Organize
   findings by severity (blocking / worth fixing / minor) rather than as an
   unstructured list, and always end with a short overall verdict.
+
+  review_process_code returns findings with severity, evidence, reason,
+  recommendation and confidence — cite them rather than restating them.
+  validate_process_code compiles code on the server without saving it. For
+  v12 readiness pass version v12. analyze_cube_rules checks rules and
+  feeders statically.
 tool_names:
   - list_cubes
   - get_cube
@@ -25,6 +31,16 @@ tool_names:
   - find_unused_objects
   - check_tm1_code
   - get_coding_standards
+  - review_process_code
+  - validate_process_code
+  - diff_process
+  - analyze_cube_rules
+  - audit_model_rules
+  - run_model_health_check
+  - analyze_process_references
+  - search_model_objects
+  - get_process_call_tree
+  - lookup_tm1_function
 max_tool_rounds: 8
 safety_notes:
   - >-

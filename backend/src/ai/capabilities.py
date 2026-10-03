@@ -174,6 +174,81 @@ CAPABILITIES: tuple[Capability, ...] = (
         implementation="backend/src/database/models/tm1_coding_convention.py",
         permission="tm1.read",
     ),
+    # --- TM1 engineering capabilities (2026-09-24 benchmark work) ---
+    #
+    # Implemented, permission-gated, on specialist agents' allowlists and
+    # tested against a mocked TM1. Status follows the live benchmark
+    # (docs/TM1_LIVE_BENCHMARK_REPORT.md): a capability is AVAILABLE only
+    # when its representative calls passed against a real server.
+    Capability(
+        key="tm1_model_exploration",
+        name="Model exploration",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Find objects by partial name, see what a process reads, writes "
+            "and calls, and what writes to or reads from a cube."
+        ),
+        implementation="backend/src/ai/tools/tm1/explore.py",
+        permission="tm1.read",
+    ),
+    Capability(
+        key="tm1_cell_analysis",
+        name="Cell inspection",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Read and compare cells with TM1's rule-derived and consolidated "
+            "flags, and trace the rule that calculates a cell."
+        ),
+        implementation="backend/src/ai/tools/tm1/cells.py",
+        permission="tm1.read",
+        caveat="Runtime feeder state is not exposed by TM1 REST.",
+    ),
+    Capability(
+        key="tm1_process_diagnostics",
+        name="Process diagnostics",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Read server and process logs, map an error to its code line, "
+            "list recent runs, and diagnose a failure with labelled evidence."
+        ),
+        implementation="backend/src/ai/tools/tm1/diagnostics.py",
+        permission="tm1.read",
+        caveat="Run history is only what the message log retains.",
+    ),
+    Capability(
+        key="tm1_code_validation",
+        name="TI validation and review",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Compile TI on the server without saving, and review it for "
+            "syntax, v12 readiness, risky operations and documentation."
+        ),
+        implementation="backend/src/ai/tools/tm1/development.py",
+        permission="tm1.read",
+    ),
+    Capability(
+        key="tm1_model_health",
+        name="Model health check",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "Rule, feeder and process findings across the model, ranked, "
+            "each with evidence and a recommendation."
+        ),
+        implementation="backend/src/ai/tools/tm1/health.py",
+        permission="tm1.read",
+    ),
+    Capability(
+        key="tm1_process_runs",
+        name="Approved process runs",
+        status=CapabilityStatus.DEVELOPER_PREVIEW,
+        summary=(
+            "The assistant proposes a run with parameters; a person with "
+            "tm1.execute approves it, and TM1's result is recorded."
+        ),
+        implementation="backend/src/tm1/deployment/change_service.py",
+        permission="tm1.execute",
+        caveat="No rollback. The assistant can never run a process itself.",
+    ),
     # --- Developer preview: built, reachable, NOT validated end-to-end ---
     #
     # Every report-automation capability sits here because the PAfE

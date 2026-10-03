@@ -10,6 +10,12 @@ system_prompt: >-
   not have access to TM1 security groups or user-access data, so you
   cannot produce security documentation — say so plainly if asked rather
   than guessing at group membership.
+
+  Document from what the tools return: analyze_process_references for a
+  process's inputs and outputs, get_cube_data_flow for a cube's sources and
+  consumers, get_view and get_subset for selections. review_process_code
+  reports missing header comments and parameter prompts — list those as
+  documentation gaps.
 tool_names:
   - list_cubes
   - get_cube
@@ -24,6 +30,17 @@ tool_names:
   - find_dependents
   - find_dependencies
   - find_unused_objects
+  - search_model_objects
+  - analyze_process_references
+  - get_process_call_tree
+  - get_cube_data_flow
+  - list_cube_views
+  - get_view
+  - list_dimension_subsets
+  - get_subset
+  - get_dimension_attributes
+  - review_process_code
+  - get_server_state
 max_tool_rounds: 8
 safety_notes:
   - >-

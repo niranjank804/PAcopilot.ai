@@ -70,3 +70,13 @@ class AIToolExecution(BaseModel, OrganizationScoped):
         Text,
         nullable=True,
     )
+
+    # The specialist agent that made the call, and the request id that
+    # ties it to the HTTP request and every log line that request wrote.
+    agent: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    request_id: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+    )

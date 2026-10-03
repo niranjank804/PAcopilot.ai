@@ -16,12 +16,16 @@ class CubeInfo:
 async def list_cubes(
     client: TM1Service,
     connection_id: uuid.UUID,
+    include_control: bool = False,
     **resilience_kwargs,
 ) -> list[str]:
+    # Control cubes (}ClientGroups, }ElementAttributes_…, }Stats…) are
+    # hidden unless asked for: they are noise in "what cubes are there" and
+    # the evidence in "why can this user not see that".
     return await call_with_resilience(
         connection_id,
         client.cubes.get_all_names,
-        skip_control_cubes=True,
+        skip_control_cubes=not include_control,
         **resilience_kwargs,
     )
 

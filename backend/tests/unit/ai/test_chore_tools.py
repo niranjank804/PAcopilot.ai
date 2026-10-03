@@ -98,7 +98,11 @@ async def test_get_chore_tool_returns_details(
         chore_name="Load Sales Nightly",
     )
 
-    assert json.loads(result) == {
+    body = json.loads(result)
+    # The schedule fields are asserted in test_tm1_capability_tools.py.
+    for key in ("start_time", "frequency", "execution_mode", "steps"):
+        body.pop(key)
+    assert body == {
         "name": "Load Sales Nightly",
         "active": True,
         "process_names": ["Load Sales"],

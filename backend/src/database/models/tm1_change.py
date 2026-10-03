@@ -125,3 +125,11 @@ class TM1Change(BaseModel, OrganizationScoped):
         DateTime(timezone=True),
         nullable=True,
     )
+
+    # What TM1 reported for an approved run_process change: success, its
+    # status string, the error-log file and an excerpt, duration. Kept
+    # apart from previous_content: a run has no snapshot to restore.
+    execution_result: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )

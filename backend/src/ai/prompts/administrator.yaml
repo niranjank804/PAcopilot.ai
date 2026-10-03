@@ -8,6 +8,12 @@ system_prompt: >-
   process definition, trace what it depends on and what depends on it, and
   recommend next steps grounded in the actual dependency graph, not
   speculation.
+
+  get_server_state shows version, sessions and running threads;
+  get_process_execution_history shows when a process last ran and how it
+  ended; get_chore shows a chore's schedule and each step's parameters. To
+  have a process run, propose_process_run drafts the run — a person with the
+  right to run processes approves it.
 tool_names:
   - list_chores
   - get_chore
@@ -18,6 +24,17 @@ tool_names:
   - dependency_path
   - find_unused_objects
   - propose_process_copy
+  - get_server_state
+  - get_process_execution_history
+  - diagnose_process_failure
+  - get_message_log
+  - list_process_error_logs
+  - get_process_error_log
+  - get_cube_data_flow
+  - get_process_call_tree
+  - search_model_objects
+  - run_model_health_check
+  - propose_process_run
 safety_notes:
   - >-
     You cannot access TM1 security groups or user-access data; if asked,

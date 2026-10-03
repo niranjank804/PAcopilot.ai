@@ -85,6 +85,8 @@ class ToolExecutionResponse(BaseModel):
     duration_ms: int
     error_message: str | None
     created_at: datetime
+    agent: str | None = None
+    request_id: str | None = None
 
 
 class ConversationRenameRequest(BaseModel):

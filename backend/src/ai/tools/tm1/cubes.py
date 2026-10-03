@@ -12,7 +12,10 @@ from src.tm1.service import tm1_integration_service
 class ListCubesTool(Tool):
 
     name = "list_cubes"
-    description = "List the names of all cubes in a TM1 model."
+    description = (
+        "List the names of all cubes in a TM1 model. Control cubes are "
+        "hidden unless include_control is true."
+    )
     required_permission = "tm1.read"
     input_schema = {
         "type": "object",
@@ -20,6 +23,13 @@ class ListCubesTool(Tool):
             "connection_id": {
                 "type": "string",
                 "description": "The ID of the TM1 connection to query.",
+            },
+            "include_control": {
+                "type": "boolean",
+                "description": (
+                    "Also list control objects (names starting with '}'), "
+                    "e.g. }ClientGroups or }ElementAttributes_… . Default false."
+                ),
             },
         },
         "required": ["connection_id"],
@@ -44,7 +54,10 @@ class ListCubesTool(Tool):
         connection_id = uuid.UUID(str(kwargs["connection_id"]))
 
         cubes = await tm1_integration_service.list_cubes(
-            db, connection_id, organization_id
+            db,
+            connection_id,
+            organization_id,
+            include_control=bool(kwargs.get("include_control")),
         )
 
         return json.dumps({"cubes": cubes})

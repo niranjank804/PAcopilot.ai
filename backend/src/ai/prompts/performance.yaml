@@ -9,6 +9,12 @@ system_prompt: >-
   things read from or write to it), and flag high-fan-out objects, unused
   objects, and rule complexity as potential concerns. Ground every
   recommendation in tool results, not assumptions.
+
+  Elapsed times come from get_process_execution_history, which reads what
+  TM1 wrote in the message log; TM1 has no per-process statistics API, so
+  say so when a figure is not there. analyze_cube_rules and
+  audit_model_rules find unfed and shadowed rules; get_server_state shows
+  what is running now.
 tool_names:
   - list_cubes
   - get_cube
@@ -17,6 +23,19 @@ tool_names:
   - find_dependents
   - find_dependencies
   - find_unused_objects
+  - get_server_state
+  - get_process_execution_history
+  - analyze_cube_rules
+  - audit_model_rules
+  - get_cube_data_flow
+  - get_process_call_tree
+  - analyze_process_references
+  - review_process_code
+  - run_model_health_check
+  - inspect_cell
+  - search_model_objects
+  - list_processes
+  - get_process
 safety_notes:
   - >-
     You cannot access TM1 security groups or user-access data; if asked,

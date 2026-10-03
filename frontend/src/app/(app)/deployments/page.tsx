@@ -40,6 +40,7 @@ import Link from "next/link";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { RunPlan } from "@/components/run-plan";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { CHANGE_TYPE_LABEL, PROCESS_FIELD_MAP, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,10 @@ function ChangeDiff({ detail }: { detail: TM1ChangeDetail }) {
         after={String(preview.proposed?.rules ?? "")}
       />
     );
+  }
+
+  if (change.change_type === "run_process") {
+    return <RunPlan change={change} />;
   }
 
   if (change.change_type === "delete_process") {
@@ -439,7 +444,8 @@ export default function DeploymentsPage() {
 
                 <ChangeDiff detail={selectedDetail} />
 
-                <div>
+                {/* A run's impact is its plan, shown above by RunPlan. */}
+                <div hidden={selectedDetail.change.change_type === "run_process"}>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">
                     Impact ({selectedDetail.change.impact?.length ?? 0}{" "}
                     downstream objects)

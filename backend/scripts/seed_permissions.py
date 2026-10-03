@@ -28,6 +28,11 @@ PERMISSIONS = [
     ("tm1.write", "Create and delete TM1 connections."),
     ("tm1.security.read", "View TM1 security groups and their members."),
     ("tm1.deploy", "Execute and roll back TM1 changes (rules, TI processes)."),
+    # Running a process is its own grant, on top of tm1.deploy: a load can
+    # change data across a model, has no rollback, and is the one action
+    # an approver must be separately trusted with. Admin roles only, via
+    # the full list below.
+    ("tm1.execute", "Approve and run TurboIntegrator processes."),
     ("monitoring.view", "View AI usage, tool, and TM1 status dashboards."),
     # Report automation (DEVELOPER PREVIEW). Split so that running a
     # report — which starts Excel on a customer machine and reads live

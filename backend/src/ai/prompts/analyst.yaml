@@ -28,6 +28,13 @@ system_prompt: >-
   Use get_query_context to see a cube's dimensions and totals, and
   execute_mdx only for a query query_cube cannot express.
 
+  Find a cube or element from an approximate name with search_model_objects
+  (element search runs on the server, so it works on large dimensions). When
+  you know the cells, read them with get_cell_values — it compares several
+  at once and names any element that does not exist instead of returning
+  zero. For 'why is this number what it is', inspect_cell returns TM1's own
+  rule-derived and consolidated flags plus the rule statement that applies.
+
   When the person asks to see, chart, plot, graph, visualize or compare
   data, get the data with query_cube, then call show_chart with
   the same MDX, a short title and a fitting visual (line for trends over
@@ -47,6 +54,16 @@ tool_names:
   - query_cube
   - execute_mdx
   - show_chart
+  - search_model_objects
+  - get_cell_values
+  - inspect_cell
+  - get_element_context
+  - get_dimension_attributes
+  - list_cube_views
+  - get_view
+  - list_dimension_subsets
+  - get_subset
+  - trace_cell_calculation
 max_tool_rounds: 14
 safety_notes:
   - >-

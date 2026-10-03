@@ -16,7 +16,7 @@ async def _check_permission(db: AsyncSession, user_id: uuid.UUID) -> None:
 
 _OBJECT_TYPE_SCHEMA = {
     "type": "string",
-    "enum": ["cube", "dimension", "hierarchy", "process", "chore"],
+    "enum": ["cube", "dimension", "hierarchy", "process", "chore", "view", "subset"],
     "description": "The type of the object.",
 }
 
@@ -211,7 +211,7 @@ class FindUnusedObjectsTool(Tool):
             },
             "object_type": {
                 "type": "string",
-                "enum": ["cube", "dimension", "hierarchy", "process", "chore"],
+                "enum": ["cube", "dimension", "hierarchy", "process", "chore", "view", "subset"],
                 "description": "Optional: restrict to one object type.",
             },
         },

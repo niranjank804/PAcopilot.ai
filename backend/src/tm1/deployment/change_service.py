@@ -1,11 +1,13 @@
 import hashlib
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from TM1py import Process
 
+from src.core.config import settings
 from src.core.exceptions import (
     ConflictException,
     NotFoundException,
@@ -15,17 +17,116 @@ from src.database.models.tm1_change import TM1Change
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment import ti_analysis
-from src.tm1.exceptions import TM1NotFoundError
+from src.tm1.exceptions import TM1ConnectionError, TM1NotFoundError
 from src.tm1.metadata import dependency_analyzer
 from src.tm1.service import tm1_integration_service
-from src.tm1.services import cube_service, process_service
+from src.tm1.services import cube_service, log_service, process_service
+from src.tm1.ti.parser import parse_process_code
+
+logger = logging.getLogger(__name__)
 
 VALID_CHANGE_TYPES = (
     "update_rules",
     "create_process",
     "update_process",
     "delete_process",
+    "run_process",
 )
+
+# Characters of a failed run's error log kept on the change. Enough for
+# the lines that matter; the full file stays on the server.
+RUN_LOG_EXCERPT_CHARS = 4000
+
+
+def validate_run_parameters(definitions: list[dict], given: dict) -> list[str]:
+    """Problems with the parameters proposed for a run.
+
+    A name the process does not declare, or a non-number for a numeric
+    parameter, would otherwise reach TM1 and either be ignored silently
+    or fail the run after the approver has already approved it.
+    """
+
+    by_name = {(d.get("name") or "").lower(): d for d in definitions}
+    problems = []
+
+    for name, value in given.items():
+        if str(name).lower() in process_service.RESERVED_RUN_KEYWORDS:
+            # TM1py takes these names as its own arguments, so the value
+            # could never reach the process: refuse it now, not at run time.
+            problems.append(
+                f"A parameter named '{name}' cannot be passed to a run by "
+                "PA-Copilot. Rename it in the process, or run it from TM1."
+            )
+            continue
+
+        definition = by_name.get(str(name).lower())
+
+        if definition is None:
+            declared = ", ".join(d.get("name") for d in definitions) or "none"
+            problems.append(
+                f"The process has no parameter '{name}'. Its parameters are: {declared}."
+            )
+            continue
+
+        if str(definition.get("type") or "").lower() == "numeric":
+            try:
+                float(value)
+            except (TypeError, ValueError):
+                problems.append(f"Parameter '{name}' is numeric; '{value}' is not a number.")
+
+    return problems
+
+
+def run_plan(definitions: list[dict], given: dict, record) -> list[dict]:
+    """What the approver needs to see before approving a run: every
+    parameter with the value it will actually take, and what the process
+    writes and calls according to its source."""
+
+    lowered = {str(k).lower(): v for k, v in given.items()}
+    plan: list[dict] = []
+
+    for definition in definitions:
+        name = definition.get("name") or ""
+        given_value = lowered.get(name.lower())
+        plan.append(
+            {
+                "kind": "parameter",
+                "name": name,
+                "value": given_value if given_value is not None else definition.get("default"),
+                "source": "given" if given_value is not None else "default",
+            }
+        )
+
+    for cube in sorted(record.cubes_written):
+        plan.append({"kind": "writes_cube", "name": cube, "source": "TI parser"})
+
+    for process in sorted(record.processes_called):
+        plan.append({"kind": "calls_process", "name": process, "source": "TI parser"})
+
+    unresolved = [o for o in record.objects if not o.literal and o.access in ("write", "calls")]
+
+    if unresolved:
+        plan.append(
+            {
+                "kind": "note",
+                "note": (
+                    f"{len(unresolved)} write or call target(s) are built from "
+                    "variables; what they touch depends on the parameter values."
+                ),
+            }
+        )
+
+    plan.append(
+        {
+            "kind": "note",
+            "note": (
+                "A process run cannot be rolled back. Anything it writes stays "
+                "written; TM1 does not keep a before-image of a run."
+            ),
+        }
+    )
+
+    return plan
 
 _PROCESS_CODE_FIELDS = {
     "prolog": "prolog_procedure",
@@ -156,6 +257,47 @@ def _build_process(name: str, content: dict, base: dict | None = None) -> Proces
     return process
 
 
+def build_candidate(name: str, content: dict, base: dict | None = None) -> Process:
+    """A process object as a draft would create it, never saved. Used to
+    compile code on the server without persisting it."""
+
+    return _build_process(name, content, base)
+
+
+_CODE_KEYS = ("PrologProcedure", "MetadataProcedure", "DataProcedure", "EpilogProcedure")
+
+
+def _code_of(body: dict) -> dict:
+    """A process's four code sections as TM1 stores them, for comparing what
+    is on the server now with what a change left there."""
+
+    return {key: (body.get(key) or "").replace("\r\n", "\n").strip() for key in _CODE_KEYS}
+
+
+def _rules_text(text: str | None) -> str:
+    return (text or "").replace("\r\n", "\n").strip()
+
+
+def _changed_since(target: str) -> ConflictException:
+    return ConflictException(
+        f"'{target}' has been edited since this change was applied. Rolling "
+        "back would overwrite those later edits, so nothing was changed. "
+        "Review the current version and make a new change instead."
+    )
+
+
+async def _restore_then_raise(restore, original: BaseException):
+    """A check after an apply failed outright (not with findings): put the
+    previous state back before the error reaches the caller, so a failure
+    never leaves an unchecked change on the server."""
+
+    try:
+        await restore()
+    except Exception:  # noqa: BLE001 - the original error is the one to report
+        logger.exception("Restoring the previous state after a failed check also failed")
+    raise original
+
+
 class ChangeService:
 
     async def _client(self, db, connection):
@@ -281,6 +423,31 @@ class ChangeService:
             ) + (errors or [])
             object_type = "process"
 
+        elif change_type == "run_process":
+            # Raises TM1NotFoundError for a process that does not exist.
+            process = await process_service.get_process(
+                client, connection.id, target_name
+            )
+            given = (new_content or {}).get("parameters") or {}
+
+            if not isinstance(given, dict):
+                raise ValidationException("run_process parameters must be an object.")
+
+            validation_errors = validate_run_parameters(process.parameters, given)
+            record = parse_process_code(
+                process.name,
+                prolog=process.prolog,
+                metadata=process.metadata,
+                data=process.data,
+                epilog=process.epilog,
+                datasource_type=process.datasource_type,
+                datasource_name=process.datasource_name,
+                parameters=process.parameters,
+                variables=process.variables,
+            )
+            object_type = None
+            run_impact = run_plan(process.parameters, given, record)
+
         else:  # delete_process
             exists = await process_service.process_exists(
                 client, connection.id, target_name
@@ -289,8 +456,14 @@ class ChangeService:
                 raise TM1NotFoundError(f"Process '{target_name}' not found.")
             object_type = "process"
 
-        impact = await self._impact(
-            db, connection.id, organization_id, object_type, target_name
+        # A run's impact is its plan: parameter values and what it writes.
+        # Everything else uses the dependency graph.
+        impact = (
+            run_impact
+            if change_type == "run_process"
+            else await self._impact(
+                db, connection.id, organization_id, object_type, target_name
+            )
         )
 
         # An agent that calls propose_process_update several times in one
@@ -414,9 +587,17 @@ class ChangeService:
                 change.new_content["rules"],
             )
 
-            errors = await cube_service.check_cube_rules(
-                client, connection.id, change.target_name
-            )
+            async def restore_rules():
+                await cube_service.update_cube_rules(
+                    client, connection.id, change.target_name, previous or ""
+                )
+
+            try:
+                errors = await cube_service.check_cube_rules(
+                    client, connection.id, change.target_name
+                )
+            except Exception as exc:  # noqa: BLE001
+                await _restore_then_raise(restore_rules, exc)
 
             if errors:
                 # No rule dry-run exists: restore the snapshot immediately.
@@ -430,7 +611,30 @@ class ChangeService:
                 )
                 return await tm1_change_repository.update(db, change)
 
+            change.previous_content = {
+                "rules": previous,
+                # What this change left on the server, so a rollback can
+                # tell whether anyone has edited the rules since.
+                "applied": _rules_text(
+                    await cube_service.get_cube_rules(
+                        client, connection.id, change.target_name
+                    )
+                ),
+            }
+
         elif change.change_type == "create_process":
+            # Checked when drafted, and again now: a process of this name
+            # created in between would be overwritten, and its rollback would
+            # then delete it with no snapshot to restore.
+            if await process_service.process_exists(
+                client, connection.id, change.target_name
+            ):
+                raise ConflictException(
+                    f"A process named '{change.target_name}' was created after "
+                    "this draft was made. Nothing was changed; draft an update "
+                    "to it instead."
+                )
+
             change.previous_content = {"existed": False}
 
             candidate = _build_process(change.target_name, change.new_content)
@@ -438,9 +642,17 @@ class ChangeService:
                 client, connection.id, candidate
             )
 
-            errors = await process_service.compile_process_on_server(
-                client, connection.id, change.target_name
-            )
+            async def remove_created():
+                await process_service.delete_process(
+                    client, connection.id, change.target_name
+                )
+
+            try:
+                errors = await process_service.compile_process_on_server(
+                    client, connection.id, change.target_name
+                )
+            except Exception as exc:  # noqa: BLE001
+                await _restore_then_raise(remove_created, exc)
 
             if errors:
                 await process_service.delete_process(
@@ -453,6 +665,15 @@ class ChangeService:
                 )
                 return await tm1_change_repository.update(db, change)
 
+            change.previous_content = {
+                "existed": False,
+                "applied": _code_of(
+                    await process_service.get_process_body(
+                        client, connection.id, change.target_name
+                    )
+                ),
+            }
+
         elif change.change_type == "update_process":
             base = await process_service.get_process_body(
                 client, connection.id, change.target_name
@@ -464,9 +685,17 @@ class ChangeService:
                 client, connection.id, candidate
             )
 
-            errors = await process_service.compile_process_on_server(
-                client, connection.id, change.target_name
-            )
+            async def restore_base():
+                await process_service.update_or_create_process(
+                    client, connection.id, Process.from_dict(base)
+                )
+
+            try:
+                errors = await process_service.compile_process_on_server(
+                    client, connection.id, change.target_name
+                )
+            except Exception as exc:  # noqa: BLE001
+                await _restore_then_raise(restore_base, exc)
 
             if errors:
                 await process_service.update_or_create_process(
@@ -479,6 +708,18 @@ class ChangeService:
                 )
                 return await tm1_change_repository.update(db, change)
 
+            change.previous_content = {
+                "process": base,
+                "applied": _code_of(
+                    await process_service.get_process_body(
+                        client, connection.id, change.target_name
+                    )
+                ),
+            }
+
+        elif change.change_type == "run_process":
+            return await self._run(db, change, client, connection)
+
         else:  # delete_process
             base = await process_service.get_process_body(
                 client, connection.id, change.target_name
@@ -490,6 +731,74 @@ class ChangeService:
             )
 
         change.status = "executed"
+
+        return await tm1_change_repository.update(db, change)
+
+    async def _run(self, db, change: TM1Change, client, connection) -> TM1Change:
+        """Perform an approved run and record exactly what TM1 said.
+
+        Never retried. On a timeout TM1 has been asked to cancel, but the
+        run may have written some data first, so the change is marked
+        failed with that said plainly rather than left as a draft someone
+        might approve again.
+        """
+
+        parameters = (change.new_content or {}).get("parameters") or {}
+
+        try:
+            result = await process_service.execute_process(
+                client,
+                connection.id,
+                change.target_name,
+                parameters,
+                timeout=settings.TM1_PROCESS_RUN_TIMEOUT_SECONDS,
+            )
+        except TM1ConnectionError as exc:
+            change.status = "failed"
+            change.execution_result = {"success": False, "status": "NoResponse"}
+            change.error_message = (
+                f"{exc.message} TM1 was asked to cancel the run. It may have "
+                "written some data before stopping: check the message log "
+                "before running it again."
+            )
+            return await tm1_change_repository.update(db, change)
+        except Exception as exc:  # noqa: BLE001 - recorded on the change, not a 500
+            # The process deleted since approval, a value TM1 refused, an
+            # unexpected TM1py error: the run did not start, and the change
+            # says so rather than staying approved-but-unrun.
+            logger.warning(f"Approved run of {change.target_name} did not start: {exc!r}")
+            change.status = "failed"
+            change.execution_result = {"success": False, "status": "NotStarted"}
+            change.error_message = (
+                "The run could not be started: "
+                f"{getattr(exc, 'message', None) or type(exc).__name__}."
+            )
+            return await tm1_change_repository.update(db, change)
+
+        if not result["success"] and result.get("error_log_file"):
+            try:
+                content = await log_service.get_process_error_log(
+                    client, connection.id, result["error_log_file"]
+                )
+                result["error_log_excerpt"] = content[:RUN_LOG_EXCERPT_CHARS]
+                result["error_locations"] = log_service.parse_error_locations(content)
+            except Exception:  # noqa: BLE001 - the run result matters more
+                result["error_log_excerpt"] = None
+
+        change.execution_result = result
+
+        if result["success"]:
+            change.status = "executed"
+        else:
+            change.status = "failed"
+            change.error_message = (
+                f"TM1 reported {result['status']}."
+                + (
+                    f" Error log: {result['error_log_file']}."
+                    if result.get("error_log_file")
+                    else ""
+                )
+            )
 
         return await tm1_change_repository.update(db, change)
 
@@ -518,6 +827,13 @@ class ChangeService:
 
         change = await self._lock(db, change)
 
+        if change.change_type == "run_process":
+            raise ConflictException(
+                "A process run cannot be rolled back: TM1 keeps no "
+                "before-image of what a run writes. Reverse its effect with "
+                "another process, or restore from a backup."
+            )
+
         if change.status != "executed":
             raise ConflictException(
                 f"Only executed changes can be rolled back (status: {change.status})."
@@ -527,6 +843,38 @@ class ChangeService:
             db, change.connection_id, change.organization_id
         )
         client = await self._client(db, connection)
+        previous = change.previous_content or {}
+
+        # Restore only over what this change left there; never over later
+        # edits. Changes applied before "applied" was recorded restore as
+        # they always did.
+        if change.change_type == "update_rules":
+            if "applied" in previous and _rules_text(
+                await cube_service.get_cube_rules(client, connection.id, change.target_name)
+            ) != previous["applied"]:
+                raise _changed_since(change.target_name)
+
+        elif change.change_type == "delete_process":
+            if await process_service.process_exists(client, connection.id, change.target_name):
+                raise ConflictException(
+                    f"A process named '{change.target_name}' exists again since "
+                    "it was deleted. Restoring the old one would overwrite it, "
+                    "so nothing was changed."
+                )
+
+        elif "applied" in previous:  # create_process / update_process
+            if not await process_service.process_exists(
+                client, connection.id, change.target_name
+            ):
+                if change.change_type == "update_process":
+                    raise ConflictException(
+                        f"'{change.target_name}' has been deleted since this "
+                        "change was applied; nothing was restored."
+                    )
+            elif _code_of(
+                await process_service.get_process_body(client, connection.id, change.target_name)
+            ) != previous["applied"]:
+                raise _changed_since(change.target_name)
 
         if change.change_type == "update_rules":
             await cube_service.update_cube_rules(
@@ -535,9 +883,13 @@ class ChangeService:
             )
 
         elif change.change_type == "create_process":
-            await process_service.delete_process(
+            # Already gone: nothing left to remove.
+            if await process_service.process_exists(
                 client, connection.id, change.target_name
-            )
+            ):
+                await process_service.delete_process(
+                    client, connection.id, change.target_name
+                )
 
         else:  # update_process / delete_process — restore the snapshot
             await process_service.update_or_create_process(

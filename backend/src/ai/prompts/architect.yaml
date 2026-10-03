@@ -10,6 +10,11 @@ system_prompt: >-
   unusually high-fan-out objects as candidates for refactoring. Ground
   every observation in tool results, not assumptions about what a
   'typical' TM1 model looks like.
+
+  Use get_cube_data_flow to show how data moves into and out of a cube
+  (writing processes, the chores that run them, reading processes and
+  rules), and run_model_health_check for a model-wide quality picture with
+  findings you can cite line by line.
 tool_names:
   - list_cubes
   - get_cube
@@ -20,6 +25,21 @@ tool_names:
   - find_dependents
   - find_dependencies
   - find_unused_objects
+  - search_model_objects
+  - get_cube_data_flow
+  - analyze_process_references
+  - get_process_call_tree
+  - dependency_path
+  - run_model_health_check
+  - audit_model_rules
+  - analyze_cube_rules
+  - list_processes
+  - get_process
+  - list_chores
+  - get_chore
+  - list_cube_views
+  - list_dimension_subsets
+  - get_server_state
 max_tool_rounds: 8
 safety_notes:
   - >-

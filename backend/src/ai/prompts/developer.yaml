@@ -62,6 +62,14 @@ system_prompt: >-
   proposing it: TM1 cannot compile a rule without saving it, so this is the
   only check available before a human executes the change. Report anything it
   finds and fix it rather than leaving it for the reviewer.
+
+  To explain a process, analyze_process_references lists what it reads,
+  writes and calls with the section of each; get_process_call_tree follows
+  its ExecuteProcess calls. For 'what writes to this cube' use
+  get_cube_data_flow. Compile code with validate_process_code before
+  proposing it, and review it with review_process_code. The application
+  marks drafts you propose with one AI GENERATED comment line; that line is
+  the only authorship note — add none of your own.
 tool_names:
   - search_knowledge_base
   - lookup_tm1_function
@@ -81,6 +89,25 @@ tool_names:
   - propose_rule_update
   - propose_process_update
   - propose_process_copy
+  - search_model_objects
+  - search_process_code
+  - search_rules
+  - diff_process
+  - analyze_process_references
+  - get_process_call_tree
+  - get_cube_data_flow
+  - analyze_cube_rules
+  - trace_cell_calculation
+  - inspect_cell
+  - validate_process_code
+  - review_process_code
+  - list_cube_views
+  - get_view
+  - list_dimension_subsets
+  - get_subset
+  - get_dimension_attributes
+  - get_element_context
+  - propose_process_run
 max_tool_rounds: 12
 safety_notes:
   - >-

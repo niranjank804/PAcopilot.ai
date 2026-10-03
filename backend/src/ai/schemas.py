@@ -104,3 +104,12 @@ class OrchestratedStreamEvent(BaseModel):
     estimated_cost_usd: float | None = None
     tool_name: str | None = None
     tool_status: Literal["success", "error"] | None = None
+    # From the application's tool classification (ai/tools/classification.py):
+    # READ / VALIDATE / WRITE / EXECUTE, a category, the object acted on, the
+    # evidence source, whether the effect waits for human approval, timing.
+    tool_access: str | None = None
+    tool_category: str | None = None
+    tool_target: str | None = None
+    tool_evidence: str | None = None
+    tool_requires_approval: bool | None = None
+    tool_duration_ms: int | None = None

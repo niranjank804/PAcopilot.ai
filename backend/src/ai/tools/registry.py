@@ -6,13 +6,25 @@ from src.ai.tools.tm1.analysis import (
     FindDependentsTool,
     FindUnusedObjectsTool,
 )
-from src.ai.tools.tm1.cells import ExecuteMDXTool
+from src.ai.tools.tm1.cells import ExecuteMDXTool, GetCellValuesTool, InspectCellTool
 from src.ai.tools.tm1.chart import ShowChartTool
 from src.ai.tools.tm1.query import FindDataTool, GetQueryContextTool, QueryCubeTool
 from src.ai.tools.tm1.changes import (
     ProposeProcessCopyTool,
+    ProposeProcessRunTool,
     ProposeProcessUpdateTool,
     ProposeRuleUpdateTool,
+)
+from src.ai.tools.tm1.development import ReviewProcessCodeTool, ValidateProcessCodeTool
+from src.ai.tools.tm1.diagnostics import (
+    DiagnoseProcessFailureTool,
+    GetProcessExecutionHistoryTool,
+)
+from src.ai.tools.tm1.explore import (
+    AnalyzeProcessReferencesTool,
+    GetCubeDataFlowTool,
+    GetProcessCallTreeTool,
+    SearchModelObjectsTool,
 )
 from src.ai.tools.tm1.chores import GetChoreTool, ListChoresTool
 from src.ai.tools.tm1.cubes import GetCubeRulesTool, GetCubeTool, ListCubesTool
@@ -55,6 +67,8 @@ from src.ai.tools.tm1.structure import (
     GetDimensionAttributesTool,
     GetElementContextTool,
     GetServerStateTool,
+    GetSubsetTool,
+    GetViewTool,
     ListCubeViewsTool,
     ListDimensionSubsetsTool,
 )
@@ -73,12 +87,20 @@ TOOLS: dict[str, Tool] = {
         GetQueryContextTool(),
         FindDataTool(),
         QueryCubeTool(),
+        GetCellValuesTool(),
+        InspectCellTool(),
         ListProcessesTool(),
         GetProcessTool(),
         SearchProcessCodeTool(),
         DiffProcessTool(),
         ListCubeViewsTool(),
+        GetViewTool(),
         ListDimensionSubsetsTool(),
+        GetSubsetTool(),
+        SearchModelObjectsTool(),
+        AnalyzeProcessReferencesTool(),
+        GetProcessCallTreeTool(),
+        GetCubeDataFlowTool(),
         GetDimensionAttributesTool(),
         GetElementContextTool(),
         GetServerStateTool(),
@@ -92,6 +114,10 @@ TOOLS: dict[str, Tool] = {
         ListProcessErrorLogsTool(),
         GetProcessErrorLogTool(),
         MapLogErrorToCodeTool(),
+        GetProcessExecutionHistoryTool(),
+        DiagnoseProcessFailureTool(),
+        ValidateProcessCodeTool(),
+        ReviewProcessCodeTool(),
         ListChoresTool(),
         GetChoreTool(),
         GetCubeDependenciesTool(),
@@ -104,6 +130,7 @@ TOOLS: dict[str, Tool] = {
         ProposeRuleUpdateTool(),
         ProposeProcessUpdateTool(),
         ProposeProcessCopyTool(),
+        ProposeProcessRunTool(),
         SearchKnowledgeBaseTool(),
         LookupTM1FunctionTool(),
         CheckTM1CodeTool(),

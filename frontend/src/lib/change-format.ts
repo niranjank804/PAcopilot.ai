@@ -43,6 +43,7 @@ export const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   create_process: "Create process",
   update_process: "Update process",
   delete_process: "Delete process",
+  run_process: "Run process",
 };
 
 // Maps the short keys used in TM1Change.new_content to the PascalCase field

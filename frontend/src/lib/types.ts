@@ -43,7 +43,8 @@ export type ChangeType =
   | "update_rules"
   | "create_process"
   | "update_process"
-  | "delete_process";
+  | "delete_process"
+  | "run_process";
 
 export type ChangeStatus =
   | "draft"
@@ -255,7 +256,12 @@ export interface ToolExecutionResponse {
   duration_ms: number;
   error_message: string | null;
   created_at: string;
+  agent?: string | null;
+  request_id?: string | null;
 }
+
+/** How the application classifies a tool (backend ai/tools/classification.py). */
+export type ToolAccess = "READ" | "VALIDATE" | "WRITE" | "EXECUTE" | "ADMIN";
 
 export type StreamEvent =
   | {
@@ -283,6 +289,12 @@ export type StreamEvent =
       estimated_cost_usd: null;
       tool_name: string;
       tool_status: "success" | "error";
+      tool_access?: ToolAccess | null;
+      tool_category?: string | null;
+      tool_target?: string | null;
+      tool_evidence?: string | null;
+      tool_requires_approval?: boolean | null;
+      tool_duration_ms?: number | null;
     }
   | {
       type: "done";
@@ -316,6 +328,8 @@ export interface TM1ChangeSummary {
   created_at: string;
   executed_at: string | null;
   rolled_back_at: string | null;
+  // What TM1 reported for an approved process run.
+  execution_result?: Record<string, unknown> | null;
 }
 
 export interface TM1ChangeDetail {

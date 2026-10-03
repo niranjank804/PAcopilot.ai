@@ -379,47 +379,7 @@ class MapLogErrorToCodeTool(_ReadLogTool):
         process = await tm1_integration_service.get_process(
             db, connection_id, organization_id, process_name
         )
-        sections = {
-            "prolog": process.prolog,
-            "metadata": process.metadata,
-            "data": process.data,
-            "epilog": process.epilog,
-        }
-
-        resolved = []
-        for location in locations:
-            code = sections.get(location["section"]) or ""
-            lines = code.splitlines()
-            index = location["line_number"] - 1  # TM1 reports 1-based
-
-            if not 0 <= index < len(lines):
-                resolved.append(
-                    {
-                        **location,
-                        "code_line": None,
-                        "note": "Line number is outside the current code. The "
-                        "process has probably been edited since it failed.",
-                    }
-                )
-                continue
-
-            start = max(0, index - CONTEXT_LINES)
-            end = min(len(lines), index + CONTEXT_LINES + 1)
-
-            resolved.append(
-                {
-                    **location,
-                    "code_line": lines[index].strip(),
-                    "context": [
-                        {
-                            "line_number": n + 1,
-                            "text": lines[n],
-                            "is_error_line": n == index,
-                        }
-                        for n in range(start, end)
-                    ],
-                }
-            )
+        resolved = resolve_locations(locations, process)
 
         return json.dumps(
             {
@@ -430,3 +390,56 @@ class MapLogErrorToCodeTool(_ReadLogTool):
                 "errors": resolved,
             }
         )
+
+
+def resolve_locations(locations: list[dict], process) -> list[dict]:
+    """Each logged error location with the code line it names, plus context.
+
+    TM1 reports 1-based line numbers per section. A line number beyond the
+    current code means the process changed after it failed; that is said,
+    not papered over.
+    """
+
+    sections = {
+        "prolog": process.prolog,
+        "metadata": process.metadata,
+        "data": process.data,
+        "epilog": process.epilog,
+    }
+    resolved = []
+
+    for location in locations:
+        code = sections.get(location["section"]) or ""
+        lines = code.splitlines()
+        index = location["line_number"] - 1
+
+        if not 0 <= index < len(lines):
+            resolved.append(
+                {
+                    **location,
+                    "code_line": None,
+                    "note": "Line number is outside the current code. The "
+                    "process has probably been edited since it failed.",
+                }
+            )
+            continue
+
+        start = max(0, index - CONTEXT_LINES)
+        end = min(len(lines), index + CONTEXT_LINES + 1)
+
+        resolved.append(
+            {
+                **location,
+                "code_line": lines[index].strip(),
+                "context": [
+                    {
+                        "line_number": n + 1,
+                        "text": lines[n],
+                        "is_error_line": n == index,
+                    }
+                    for n in range(start, end)
+                ],
+            }
+        )
+
+    return resolved

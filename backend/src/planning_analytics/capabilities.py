@@ -34,12 +34,18 @@ class ProviderType(str, Enum):
 
 
 class PlanningAnalyticsCapability(str, Enum):
-    """Read-only capabilities. This phase adds no write capability.
+    """Read-only capabilities. This provider layer has no write capability.
 
     There is deliberately no `execute_process`, `create_view`,
     `write_cells` or `publish_report` member. A capability that does not
     exist cannot be routed, requested, or accidentally enabled by
     configuration — the absence is the control.
+
+    Process runs exist in PA-Copilot only on the native TM1 REST path, and
+    only as an approved change (`run_process` in
+    tm1/deployment/change_service.py): the assistant proposes, a person
+    holding tm1.deploy and tm1.execute approves. Nothing routed through
+    this layer — IBM MCP included — can run a process.
     """
 
     GET_CONNECTION_METADATA = "get_connection_metadata"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Rocket, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { Play, Rocket, RotateCcw, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { RunPlan } from "@/components/run-plan";
 import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import type { TM1ChangeDetail, TM1ChangeSummary } from "@/lib/types";
 
@@ -66,7 +67,13 @@ export function ChangeActionCard({
         { method: "POST" },
       ),
     onSuccess: (updated, kind) => {
-      if (updated.status === "failed") {
+      if (updated.change_type === "run_process" && kind === "execute") {
+        if (updated.status === "failed") {
+          toast.error(updated.error_message ?? "The process run failed.");
+        } else {
+          toast.success("Process ran. TM1 reported it completed successfully.");
+        }
+      } else if (updated.status === "failed") {
         toast.error(
           `Change ${kind} finished with verification errors — previous state was restored automatically.`,
         );
@@ -105,6 +112,8 @@ export function ChangeActionCard({
 
   const { change } = detailQuery.data;
   const hasErrors = Boolean(change.validation_errors?.length);
+  const isRun = change.change_type === "run_process";
+  const aiGenerated = Boolean(change.new_content?.ai_generated);
 
   return (
     <div className="max-w-md space-y-2 rounded-md border p-3">
@@ -120,6 +129,13 @@ export function ChangeActionCard({
         </div>
       ) : null}
 
+      {aiGenerated ? (
+        <Badge variant="outline" className="gap-1">
+          <Sparkles className="h-3 w-3" />
+          AI generated
+        </Badge>
+      ) : null}
+
       {/* The one screen where the product's central guarantee is either
           visible or invisible. A reviewer looking at generated TM1 needs to
           know, without asking, that the server has not been touched yet. */}
@@ -132,11 +148,14 @@ export function ChangeActionCard({
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Nothing has been written to your TM1 server. This draft stands
-            until someone with deploy rights executes it.
+            {isRun
+              ? "The process has not run. It runs only when someone with permission to run processes approves it."
+              : "Nothing has been written to your TM1 server. This draft stands until someone with deploy rights executes it."}
           </p>
         </div>
       ) : null}
+
+      {isRun ? <RunPlan change={change} /> : null}
 
       {hasErrors ? (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
@@ -147,8 +166,12 @@ export function ChangeActionCard({
       <div className="flex items-center gap-2">
         {change.status === "draft" && !hasErrors ? (
           <Button size="sm" onClick={() => setConfirmKind("execute")}>
-            <Rocket className="mr-2 h-3.5 w-3.5" />
-            Execute on server
+            {isRun ? (
+              <Play className="mr-2 h-3.5 w-3.5" />
+            ) : (
+              <Rocket className="mr-2 h-3.5 w-3.5" />
+            )}
+            {isRun ? "Review & run" : "Execute on server"}
           </Button>
         ) : null}
         {change.status === "draft" ? (
@@ -161,7 +184,7 @@ export function ChangeActionCard({
             Discard
           </Button>
         ) : null}
-        {change.status === "executed" ? (
+        {change.status === "executed" && !isRun ? (
           <Button
             size="sm"
             variant="outline"
@@ -182,20 +205,29 @@ export function ChangeActionCard({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmKind === "execute"
+              {confirmKind === "execute" && isRun
+                ? `You're about to run process "${change.target_name}"`
+                : confirmKind === "execute"
                 ? `Execute "${change.target_name}" on the live TM1 server?`
                 : confirmKind === "reject"
                   ? `Discard draft "${change.target_name}"?`
                   : `Roll back "${change.target_name}"?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmKind === "execute"
+              {confirmKind === "execute" && isRun
+                ? "This operation will modify TM1 data. It runs once, on the live server, with the values below, and cannot be rolled back. Your approval is audited."
+                : confirmKind === "execute"
                 ? "The change is applied to the live server, verified, and automatically restored if verification fails. This action is audited."
                 : confirmKind === "reject"
                   ? "The draft is discarded and marked rejected. It was never applied to the live TM1 server, and this cannot be undone."
                   : "The snapshot taken at execution time will be restored on the live server. This action is audited."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirmKind === "execute" && isRun ? (
+            <div className="max-h-72 overflow-y-auto rounded-md border p-3">
+              <RunPlan change={change} />
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
@@ -204,8 +236,12 @@ export function ChangeActionCard({
               variant={confirmKind === "reject" ? "destructive" : "default"}
             >
               {actionMutation.isPending
-                ? "Working..."
-                : confirmKind === "execute"
+                ? isRun && confirmKind === "execute"
+                  ? "Running…"
+                  : "Working..."
+                : confirmKind === "execute" && isRun
+                  ? "Approve & run"
+                  : confirmKind === "execute"
                   ? "Execute"
                   : confirmKind === "reject"
                     ? "Discard"

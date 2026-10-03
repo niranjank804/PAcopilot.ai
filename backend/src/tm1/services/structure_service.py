@@ -191,3 +191,98 @@ async def get_server_state(
         ],
         "unavailable": state.get("unavailable") or {},
     }
+
+
+async def get_view(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    cube_name: str,
+    view_name: str,
+    private: bool = False,
+    **resilience_kwargs,
+) -> dict:
+    """A view's definition as MDX: its own for an MDX view, TM1py's
+    rendering of the axes for a native one."""
+
+    def fetch() -> dict:
+        view = client.views.get(cube_name=cube_name, view_name=view_name, private=private)
+        kind = "mdx" if type(view).__name__ == "MDXView" else "native"
+
+        try:
+            mdx = view.mdx
+            note = None
+        except Exception as exc:  # noqa: BLE001 - TM1py raises bare errors here
+            mdx = None
+            note = f"TM1py could not render this native view as MDX ({type(exc).__name__})."
+
+        return {
+            "cube": cube_name,
+            "view": view_name,
+            "private": private,
+            "type": kind,
+            "mdx": mdx if isinstance(mdx, str) else None,
+            "note": note,
+        }
+
+    return await call_with_resilience(connection_id, fetch, **resilience_kwargs)
+
+
+async def get_subset(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    dimension_name: str,
+    hierarchy_name: str,
+    subset_name: str,
+    private: bool = False,
+    **resilience_kwargs,
+) -> dict:
+    def fetch() -> dict:
+        subset = client.subsets.get(
+            subset_name=subset_name,
+            dimension_name=dimension_name,
+            hierarchy_name=hierarchy_name,
+            private=private,
+        )
+        elements = list(subset.elements or [])
+        shown, truncated = cap(elements)
+
+        return {
+            "dimension": dimension_name,
+            "hierarchy": hierarchy_name,
+            "subset": subset_name,
+            "private": private,
+            "dynamic": bool(subset.is_dynamic),
+            "expression": subset.expression if isinstance(subset.expression, str) else None,
+            "element_count": len(elements),
+            "elements": shown,
+            "truncated": truncated,
+        }
+
+    return await call_with_resilience(connection_id, fetch, **resilience_kwargs)
+
+
+async def search_elements(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    dimension_name: str,
+    hierarchy_name: str,
+    pattern: str,
+    **resilience_kwargs,
+) -> list[str]:
+    """Element names containing `pattern`, case- and space-insensitively.
+
+    Filtered on the server (OData `contains`), so a dimension with a
+    million elements answers with the matches, not the million.
+    """
+
+    return list(
+        await call_with_resilience(
+            connection_id,
+            client.elements.get_elements_filtered_by_wildcard,
+            dimension_name,
+            hierarchy_name,
+            pattern,
+            **resilience_kwargs,
+        )
+        or []
+    )

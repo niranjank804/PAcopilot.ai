@@ -106,6 +106,11 @@ class GetProcessTool(Tool):
                 "datasource_view": process.datasource_view,
                 "has_security_access": process.has_security_access,
                 "parameter_names": process.parameter_names,
+                # Name, type, default and prompt of each parameter; the
+                # datasource's variables and ASCII settings.
+                "parameters": process.parameters,
+                "variables": process.variables,
+                "datasource": process.datasource,
                 "prolog": truncate_code(process.prolog),
                 "metadata": truncate_code(process.metadata),
                 "data": truncate_code(process.data),

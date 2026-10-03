@@ -54,8 +54,9 @@ class GetChoreTool(Tool):
 
     name = "get_chore"
     description = (
-        "Get details about a TM1 chore, including whether it's active and "
-        "which TurboIntegrator processes it runs."
+        "Get details about a TM1 chore: whether it is active, its schedule "
+        "(start time, frequency as DD:HH:MM:SS, commit mode) and each step "
+        "with the process it runs and the parameter values it passes."
     )
     required_permission = "tm1.read"
     input_schema = {
@@ -101,5 +102,9 @@ class GetChoreTool(Tool):
                 "name": chore.name,
                 "active": chore.active,
                 "process_names": chore.process_names,
+                "start_time": chore.start_time,
+                "frequency": chore.frequency,
+                "execution_mode": chore.execution_mode,
+                "steps": chore.tasks,
             }
         )

@@ -401,17 +401,43 @@ class TM1IntegrationService:
             message=_explain(problem, connection, detail),
         )
 
+    async def run(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        operation,
+        *args,
+        **kwargs,
+    ):
+        """Resolve the connection *within the caller's organization*, then
+        call `operation(client, connection.id, *args, **kwargs)`.
+
+        The one place a service function meets a live client. Every
+        operation reached through here inherits the same organization
+        check, the connection's circuit breaker and TM1py's timeout,
+        which is why new capabilities use this rather than adding one
+        more near-identical wrapper method to this class.
+        """
+
+        connection, client = await self._client_for(db, connection_id, organization_id)
+
+        return await operation(client, connection.id, *args, **kwargs)
+
     async def list_cubes(
         self,
         db: AsyncSession,
         connection_id: uuid.UUID,
         organization_id: uuid.UUID,
+        include_control: bool = False,
     ) -> list[str]:
 
         connection = await self.get_connection(db, connection_id, organization_id)
         client = await tm1_connection_manager.get_client(connection)
 
-        return await cube_service.list_cubes(client, connection.id)
+        return await cube_service.list_cubes(
+            client, connection.id, include_control=include_control
+        )
 
     async def get_cube(
         self,
@@ -431,12 +457,15 @@ class TM1IntegrationService:
         db: AsyncSession,
         connection_id: uuid.UUID,
         organization_id: uuid.UUID,
+        include_control: bool = False,
     ) -> list[str]:
 
         connection = await self.get_connection(db, connection_id, organization_id)
         client = await tm1_connection_manager.get_client(connection)
 
-        return await dimension_service.list_dimensions(client, connection.id)
+        return await dimension_service.list_dimensions(
+            client, connection.id, include_control=include_control
+        )
 
     async def get_dimension(
         self,
@@ -595,6 +624,23 @@ class TM1IntegrationService:
     ):
         connection = await self.get_connection(db, connection_id, organization_id)
         return connection, await tm1_connection_manager.get_client(connection)
+
+    async def connect(
+        self,
+        db: AsyncSession,
+        connection_id: uuid.UUID,
+        organization_id: uuid.UUID,
+    ):
+        """(connection, client) for a caller about to make several TM1
+        calls concurrently.
+
+        Resolve once, then fan out on the client. Fanning out through the
+        methods above instead runs several queries on one AsyncSession at
+        the same time, which SQLAlchemy does not permit — it works in a
+        fast test and fails under a real driver.
+        """
+
+        return await self._client_for(db, connection_id, organization_id)
 
     async def list_views(
         self,

@@ -23,6 +23,7 @@ import {
   Search,
   Send,
   ShieldAlert,
+  ShieldCheck,
   Square,
   Trash2,
   User,
@@ -82,6 +83,7 @@ import type {
   ConversationSummary,
   MessageResponse,
   StreamEvent,
+  ToolAccess,
   ToolExecutionResponse,
 } from "@/lib/types";
 
@@ -180,7 +182,18 @@ function readStoredModel(): string {
   }
 }
 
-const ACCEPTED_ATTACHMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".docx"];
+// .pro / .txt / .ti: a local TI process, compared with or validated
+// against the server by the agent (diff_process, validate_process_code).
+const ACCEPTED_ATTACHMENT_EXTENSIONS = [
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".docx",
+  ".pro",
+  ".txt",
+  ".ti",
+];
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 // Above this the file goes to storage first and the message carries its
 // key: the API cannot accept a body over 4.5 MB, and base64 adds a third.
@@ -190,6 +203,107 @@ const MAX_ATTACHMENTS = 5;
 interface ToolCallEvent {
   name: string;
   status: "success" | "error";
+  // From the backend's tool classification — never from the model.
+  access?: ToolAccess | null;
+  category?: string | null;
+  target?: string | null;
+  evidence?: string | null;
+  requiresApproval?: boolean | null;
+  durationMs?: number | null;
+}
+
+const ACCESS_LABEL: Record<ToolAccess, string> = {
+  READ: "Read only",
+  VALIDATE: "Validate — nothing saved",
+  WRITE: "Draft change — waits for approval",
+  EXECUTE: "Draft run — waits for approval",
+  ADMIN: "Administration",
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  discovery: "Model discovery",
+  exploration: "Model exploration",
+  dependencies: "Dependency graph",
+  cells: "Cell analysis",
+  diagnostics: "Diagnostics",
+  development: "TI development",
+  change_management: "Change management",
+  execution: "Process execution",
+  governance: "Model quality",
+  knowledge: "Knowledge base",
+};
+
+/** One tool call in the timeline. Hover or focus shows what it did, on
+ * what, with which access, where its answer came from and how long it
+ * took — so a reader can tell a live TM1 read from a draft proposal
+ * without opening the audit log. */
+function ToolChip({ call }: { call: ToolCallEvent }) {
+  const drafted = call.requiresApproval && call.status === "success";
+  const detail = (
+    <div className="space-y-0.5 text-left">
+      <p className="font-medium">{call.name}</p>
+      {call.category ? <p>Purpose: {CATEGORY_LABEL[call.category] ?? call.category}</p> : null}
+      {call.target ? <p>Target: {call.target}</p> : null}
+      {call.access ? <p>Access: {ACCESS_LABEL[call.access] ?? call.access}</p> : null}
+      {call.evidence ? <p>Evidence: {call.evidence}</p> : null}
+      <p>
+        Status: {call.status === "error" ? "could not run" : "succeeded"}
+        {typeof call.durationMs === "number" ? ` · ${call.durationMs} ms` : ""}
+      </p>
+    </div>
+  );
+
+  return (
+    <Tip content={detail} side="bottom">
+      <button
+        type="button"
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs",
+          call.status === "error"
+            ? "border-destructive/40 bg-destructive/10 text-destructive"
+            : drafted
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              : "border-transparent bg-secondary text-secondary-foreground",
+        )}
+      >
+        <Wrench className="h-3 w-3" />
+        {call.name}
+        {call.target ? (
+          <span className="max-w-[10rem] truncate text-muted-foreground">
+            · {call.target}
+          </span>
+        ) : null}
+        {drafted ? <span className="font-medium">· awaiting approval</span> : null}
+      </button>
+    </Tip>
+  );
+}
+
+/** The verified sources an answer drew on: distinct evidence labels of the
+ * calls that succeeded. What the model concluded from them is labelled in
+ * the answer itself ("Inferred:"), per the backend's evidence rules. */
+function EvidenceStrip({ calls }: { calls: ToolCallEvent[] }) {
+  const sources = Array.from(
+    new Set(
+      calls
+        .filter((c) => c.status === "success" && c.evidence && c.access !== "WRITE" && c.access !== "EXECUTE")
+        .map((c) => c.evidence as string),
+    ),
+  );
+
+  if (!sources.length) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <span className="font-medium">Evidence</span>
+      {sources.map((source) => (
+        <span key={source} className="inline-flex items-center gap-1">
+          <ShieldCheck className="h-3 w-3 text-primary" />
+          {source}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 interface ThreadMessage {
@@ -302,6 +416,7 @@ const DRAFT_TOOL_NAMES = new Set([
   "propose_rule_update",
   "propose_process_update",
   "propose_process_copy",
+  "propose_process_run",
 ]);
 
 function draftChangeId(execution: ToolExecutionResponse): string | null {
@@ -899,7 +1014,16 @@ export default function ChatPage() {
               ...last,
               toolCalls: [
                 ...(last.toolCalls ?? []),
-                { name: event.tool_name, status: event.tool_status },
+                {
+                  name: event.tool_name,
+                  status: event.tool_status,
+                  access: event.tool_access,
+                  category: event.tool_category,
+                  target: event.tool_target,
+                  evidence: event.tool_evidence,
+                  requiresApproval: event.tool_requires_approval,
+                  durationMs: event.tool_duration_ms,
+                },
               ],
             };
             return next;
@@ -1390,14 +1514,7 @@ export default function ChatPage() {
                     {message.toolCalls?.length ? (
                       <div className="flex flex-wrap gap-1">
                         {message.toolCalls.map((call, callIndex) => (
-                          <Badge
-                            key={callIndex}
-                            variant={call.status === "error" ? "destructive" : "secondary"}
-                            className="gap-1"
-                          >
-                            <Wrench className="h-3 w-3" />
-                            {call.name}
-                          </Badge>
+                          <ToolChip key={callIndex} call={call} />
                         ))}
                       </div>
                     ) : null}
@@ -1446,6 +1563,11 @@ export default function ChatPage() {
                               Reload conversation
                             </Button>
                           ) : null}
+                        </div>
+                      ) : null}
+                      {message.role === "assistant" && message.toolCalls?.length ? (
+                        <div className="mt-2 border-t border-border/60 pt-2">
+                          <EvidenceStrip calls={message.toolCalls} />
                         </div>
                       ) : null}
                       {message.totalTokens ? (
@@ -1563,7 +1685,7 @@ export default function ChatPage() {
                 event.target.value = "";
               }}
             />
-            <Tip content="Attach up to 5 files (PDF, JPG, PNG or DOCX, 15 MB each). The model reads them directly — a screenshot of an error or a page of a spec works.">
+            <Tip content="Attach up to 5 files (PDF, JPG, PNG, DOCX, or a TI process as .pro / .txt; 15 MB each). The model reads them directly — a screenshot of an error, a page of a spec, or a local copy of a process to compare with the server.">
               <Button
                 type="button"
                 variant="outline"
