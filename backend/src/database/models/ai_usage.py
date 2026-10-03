@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -100,3 +100,11 @@ class AIUsage(BaseModel, OrganizationScoped):
         Integer,
         nullable=False,
     )
+
+    # Which specialist agent ran the turn (None for plain chat), the routing
+    # tier it ran on and why (src/ai/routing.py), and whether it fell back to
+    # the neighbouring tier — for cost per agent and the fallback rate.
+    agent: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    route_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    fell_back: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)

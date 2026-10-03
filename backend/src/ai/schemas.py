@@ -96,7 +96,8 @@ class StreamEvent(BaseModel):
 class OrchestratedStreamEvent(BaseModel):
     # "start" carries the conversation id before any text, so a client
     # whose connection drops mid-answer can still find the saved reply.
-    type: Literal["start", "text_delta", "tool_call", "done"]
+    # "route" says which model answers and why, before the first word.
+    type: Literal["start", "route", "text_delta", "tool_call", "done"]
     text: str | None = None
     conversation_id: uuid.UUID | None = None
     message_id: uuid.UUID | None = None
@@ -113,3 +114,6 @@ class OrchestratedStreamEvent(BaseModel):
     tool_evidence: str | None = None
     tool_requires_approval: bool | None = None
     tool_duration_ms: int | None = None
+    # {model, tier, requested, reason} — on "route", and on "done" with
+    # fell_back and the model that actually answered.
+    route: dict | None = None

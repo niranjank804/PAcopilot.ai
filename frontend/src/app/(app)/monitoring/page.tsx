@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { AICostPanel } from "@/components/ai-cost-panel";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -59,6 +60,8 @@ export default function MonitoringPage() {
           the last 30 days.
         </p>
       </div>
+
+      <AICostPanel />
 
       <Card>
         <CardHeader>

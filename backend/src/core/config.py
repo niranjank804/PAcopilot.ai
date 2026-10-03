@@ -271,7 +271,8 @@ class Settings(BaseSettings):
     # must be priced in src/ai/pricing.py (a unit test enforces it) and
     # AI_DEFAULT_MODEL must be one of them. JSON list in the environment,
     # like CORS_ALLOWED_ORIGINS.
-    AI_ALLOWED_MODELS: list[str] = ["claude-opus-5", "claude-sonnet-5"]
+    # One per routing tier (src/ai/routing.py): best, balanced, fast.
+    AI_ALLOWED_MODELS: list[str] = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"]
 
     # Adaptive thinking lets the model decide how much to reason per turn.
     # It is NOT the default on the wire: a request that omits `thinking`

@@ -80,6 +80,7 @@ import { newCharts, placeCharts, type ChatChart } from "@/lib/chat-charts";
 import { useVoice } from "@/lib/voice";
 import type {
   AgentInfo,
+  ModelRoute,
   TM1Connection,
   ChatAttachmentInput,
   ConversationSummary,
@@ -151,24 +152,46 @@ const TASKS: { label: string; agent: string; prompt: string; help: string }[] = 
 ];
 
 /**
- * Which model answers. The backend accepts any model it has a price for;
- * this offers the two that matter and remembers the choice.
- *
- * Fast is the default because latency was the complaint. Best is one
- * click away for the work that needs it.
+ * Which model answers (backend src/ai/routing.py): AUTO, or a tier chosen
+ * outright. AUTO is the default — it picks per message by fixed rules and
+ * every answer says which model it used and why. The choice is remembered.
  */
 const MODELS = [
   {
-    id: "claude-sonnet-5",
-    label: "Fast",
-    help: "Claude Sonnet 5. Noticeably quicker to first word and about 40% cheaper per token. The right choice for questions, explanations and most drafting.",
+    id: "auto",
+    label: "Auto",
+    help: "Picks the model for each message by fixed rules: plain questions and documentation → Fast; TI work and troubleshooting → Balanced; architecture, review, or a PROD server → Best. Each answer says which model it used and why.",
   },
   {
-    id: "claude-opus-5",
+    id: "fast",
+    label: "Fast",
+    help: "Claude Haiku 4.5. Quickest and cheapest — for plain questions and explanations.",
+  },
+  {
+    id: "balanced",
+    label: "Balanced",
+    help: "Claude Sonnet 5. Quick, about 40% cheaper than Best per token — the right choice for most TI development and troubleshooting.",
+  },
+  {
+    id: "best",
     label: "Best",
-    help: "Claude Opus 5. Slower and about 1.7× the cost per token, with the most careful reasoning — for tangled rule and feeder logic or a large TI refactor.",
+    help: "Claude Opus 5. Slower and dearer, with the most careful reasoning — for tangled rule and feeder logic or a large TI refactor.",
   },
 ] as const;
+
+// Choices saved before routing existed, by model name.
+const LEGACY_MODEL_CHOICES: Record<string, string> = {
+  "claude-sonnet-5": "balanced",
+  "claude-opus-5": "best",
+};
+
+const TIER_LABEL: Record<string, string> = { fast: "Fast", balanced: "Balanced", best: "Best" };
+
+function routeLine(route: ModelRoute): string {
+  const model = route.model.replace("claude-", "").replace(/-/g, " ");
+  const tier = route.tier ? `${TIER_LABEL[route.tier]} · ` : "";
+  return `${tier}${model} — ${route.reason}${route.fell_back ? " (the first model was busy; answered by the fallback)" : ""}`;
+}
 
 const MODEL_STORAGE_KEY = "pa-copilot-model";
 
@@ -176,7 +199,8 @@ function readStoredModel(): string {
   if (typeof window === "undefined") return MODELS[0].id;
 
   try {
-    const stored = window.localStorage.getItem(MODEL_STORAGE_KEY);
+    const raw = window.localStorage.getItem(MODEL_STORAGE_KEY);
+    const stored = raw && LEGACY_MODEL_CHOICES[raw] ? LEGACY_MODEL_CHOICES[raw] : raw;
 
     return MODELS.some((model) => model.id === stored) ? stored! : MODELS[0].id;
   } catch {
@@ -315,6 +339,8 @@ interface ThreadMessage {
   model?: string;
   totalTokens?: number;
   estimatedCostUsd?: number;
+  // Which model answered and why (AUTO / a chosen tier; fell back?).
+  route?: ModelRoute;
   toolCalls?: ToolCallEvent[];
   isError?: boolean;
   // The stream ended without "done" or "error": the connection dropped.
@@ -1030,6 +1056,13 @@ export default function ChatPage() {
             };
             return next;
           });
+        } else if (event.type === "route") {
+          setMessages((previous) => {
+            const next = [...previous];
+            const last = next[next.length - 1];
+            if (last?.role === "assistant") next[next.length - 1] = { ...last, route: event.route };
+            return next;
+          });
         } else if (event.type === "done") {
           finished = true;
           const isNewConversation = conversationId === null;
@@ -1043,6 +1076,7 @@ export default function ChatPage() {
               id: event.message_id,
               totalTokens: event.usage.input_tokens + event.usage.output_tokens,
               estimatedCostUsd: event.estimated_cost_usd,
+              route: event.route ?? last.route,
             };
             return next;
           });
@@ -1579,9 +1613,10 @@ export default function ChatPage() {
                           <EvidenceStrip calls={message.toolCalls} />
                         </div>
                       ) : null}
-                      {message.totalTokens ? (
+                      {message.totalTokens || message.route ? (
                         <div className="mt-2 text-xs text-muted-foreground">
-                          {number(message.totalTokens)} tokens
+                          {message.route ? <span className="block">{routeLine(message.route)}</span> : null}
+                          {message.totalTokens ? `${number(message.totalTokens)} tokens` : null}
                         </div>
                       ) : null}
                       {message.role === "assistant" &&

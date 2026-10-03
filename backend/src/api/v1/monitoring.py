@@ -10,7 +10,7 @@ from src.schemas.monitoring import (
     UsageSummaryResponse,
 )
 from src.schemas.response import ApiResponse
-from src.services.monitoring_service import monitoring_service
+from src.services.monitoring_service import ai_cost_report, monitoring_service
 
 router = APIRouter(
     prefix="/monitoring",
@@ -74,3 +74,22 @@ async def get_tm1_status(
         success=True,
         data=[TM1ConnectionStatusResponse(**entry) for entry in statuses],
     )
+
+
+@router.get(
+    "/ai-costs",
+    response_model=ApiResponse[dict],
+)
+async def get_ai_costs(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("monitoring.view")),
+    days: int = Query(default=30, ge=1, le=365),
+):
+    """AI spend by agent, tier, model and user; latency; fallback rate;
+    and what caching and AUTO routing saved (estimates, labelled)."""
+
+    return ApiResponse(
+        success=True,
+        data=await ai_cost_report(db, current_user.organization_id, days),
+    )
+

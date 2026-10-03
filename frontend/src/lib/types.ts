@@ -276,6 +276,15 @@ export interface ToolExecutionResponse {
 /** How the application classifies a tool (backend ai/tools/classification.py). */
 export type ToolAccess = "READ" | "VALIDATE" | "WRITE" | "EXECUTE" | "ADMIN";
 
+/** Backend src/ai/routing.py: the model a turn ran on, and why. */
+export interface ModelRoute {
+  model: string;
+  tier: "fast" | "balanced" | "best" | null;
+  requested: string;
+  reason: string;
+  fell_back?: boolean;
+}
+
 export type StreamEvent =
   | {
       // Sent before any text: the conversation the answer is being saved
@@ -310,6 +319,11 @@ export type StreamEvent =
       tool_duration_ms?: number | null;
     }
   | {
+      // Which model answers and why, before the first word.
+      type: "route";
+      route: ModelRoute;
+    }
+  | {
       type: "done";
       text: null;
       conversation_id: string;
@@ -318,6 +332,7 @@ export type StreamEvent =
       estimated_cost_usd: number;
       tool_name: null;
       tool_status: null;
+      route?: ModelRoute | null;
     }
   | {
       type: "error";

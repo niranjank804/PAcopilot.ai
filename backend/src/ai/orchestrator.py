@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.agents.base import AgentPersona
 from src.ai.agents.registry import get_agent
 from src.ai.attachment_processing import process_attachments
+from src.ai.routing import FallbackProvider, RouteDecision
+from src.ai.routing import decide as decide_route
 from src.ai.pricing import estimate_cost
 from src.ai.product_knowledge import PRODUCT_OVERVIEW
 from src.ai.providers.base import AIProvider
@@ -111,28 +113,6 @@ def _outcome_status(exc: AppException) -> str:
         return "not_found"
 
     return "error"
-
-
-def _resolve_model(requested: str | None) -> str:
-    """The model this turn runs on: the deployment default, or one of the
-    names it lets a caller choose.
-
-    Checked before anything is persisted, so a rejected request leaves no
-    conversation behind. The list exists because the quota is counted in
-    tokens: a model priced above the default would be a way to spend more
-    per token without ever reaching the limit.
-    """
-
-    if requested is None:
-        return settings.AI_DEFAULT_MODEL
-
-    if requested not in settings.AI_ALLOWED_MODELS:
-        raise ValidationException(
-            f"Model not available: {requested}. Choose one of "
-            f"{', '.join(settings.AI_ALLOWED_MODELS)}."
-        )
-
-    return requested
 
 
 # Chat turns in flight, per organization, for the quota check. The usage
@@ -1036,6 +1016,35 @@ class AIOrchestrator:
                 "Monthly AI usage quota exceeded for this organization."
             )
 
+    async def _route(
+        self,
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        model: str | None,
+        agent: str | None,
+        connection_id: uuid.UUID | None,
+        attachments: list[AttachmentInput] | None,
+    ) -> RouteDecision:
+        """The model for this turn (src/ai/routing.py), from what the
+        person chose, the agent, and the environment of the TM1 server."""
+
+        environment = None
+        if connection_id is not None:
+            try:
+                connection = await tm1_integration_service.get_connection(
+                    db, connection_id, organization_id
+                )
+                environment = getattr(connection, "environment", None)
+            except NotFoundException:
+                environment = None
+
+        # Inline attachments only: an uploaded file's size is not known here.
+        attachment_chars = sum(len(a.data or "") for a in attachments or [])
+
+        return decide_route(
+            model, agent=agent, environment=environment, attachment_chars=attachment_chars
+        )
+
     async def chat(
         self,
         db: AsyncSession,
@@ -1054,7 +1063,8 @@ class AIOrchestrator:
         user_agent: str | None = None,
     ) -> ChatResult:
 
-        resolved_model = _resolve_model(model)
+        route = await self._route(db, organization_id, model, agent, connection_id, attachments)
+        resolved_model = route.model
 
         await self._check_usage_quota(db, organization_id)
 
@@ -1068,6 +1078,7 @@ class AIOrchestrator:
                 message=message,
                 conversation_id=conversation_id,
                 resolved_model=resolved_model,
+                route=route,
                 system=system,
                 enable_tools=enable_tools,
                 agent=agent,
@@ -1088,6 +1099,7 @@ class AIOrchestrator:
         message: str,
         conversation_id: uuid.UUID | None,
         resolved_model: str,
+        route: RouteDecision | None = None,
         system: str | None,
         enable_tools: bool,
         agent: str | None,
@@ -1141,7 +1153,13 @@ class AIOrchestrator:
             ),
         )
 
-        provider = get_provider("anthropic")
+        # Retries once on the neighbouring tier if the model is overloaded
+        # before it says anything (src/ai/routing.py).
+        provider = FallbackProvider(
+            get_provider("anthropic"),
+            resolved_model,
+            route.fallback_model if route else None,
+        )
 
         start = time.monotonic()
 
@@ -1182,7 +1200,7 @@ class AIOrchestrator:
             ),
         )
 
-        cost = estimate_cost(resolved_model, usage)
+        cost = estimate_cost(provider.model_used, usage)
 
         await ai_usage_repository.create(
             db,
@@ -1192,7 +1210,7 @@ class AIOrchestrator:
                 organization_id=organization_id,
                 user_id=user_id,
                 provider="anthropic",
-                model=resolved_model,
+                model=provider.model_used,
                 prompt_tokens=usage.input_tokens,
                 completion_tokens=usage.output_tokens,
                 # Cached prompt tokens are billed but are not part of
@@ -1208,6 +1226,10 @@ class AIOrchestrator:
                 cache_read_tokens=usage.cache_read_input_tokens,
                 estimated_cost_usd=cost,
                 latency_ms=latency_ms,
+                agent=persona.name if persona is not None else None,
+                tier=route.tier if route else None,
+                route_reason=(route.reason[:200] if route else None),
+                fell_back=provider.fell_back,
             ),
         )
 
@@ -1230,7 +1252,7 @@ class AIOrchestrator:
             conversation_id=conversation.id,
             message_id=assistant_message.id,
             content=response.content,
-            model=resolved_model,
+            model=provider.model_used,
             usage=usage,
             estimated_cost_usd=cost,
         )
@@ -1253,7 +1275,8 @@ class AIOrchestrator:
         user_agent: str | None = None,
     ) -> AsyncIterator[OrchestratedStreamEvent]:
 
-        resolved_model = _resolve_model(model)
+        route = await self._route(db, organization_id, model, agent, connection_id, attachments)
+        resolved_model = route.model
 
         await self._check_usage_quota(db, organization_id)
 
@@ -1267,6 +1290,7 @@ class AIOrchestrator:
                 message=message,
                 conversation_id=conversation_id,
                 resolved_model=resolved_model,
+                route=route,
                 system=system,
                 enable_tools=enable_tools,
                 agent=agent,
@@ -1288,6 +1312,7 @@ class AIOrchestrator:
         message: str,
         conversation_id: uuid.UUID | None,
         resolved_model: str,
+        route: RouteDecision | None = None,
         system: str | None,
         enable_tools: bool,
         agent: str | None,
@@ -1343,7 +1368,17 @@ class AIOrchestrator:
 
         yield OrchestratedStreamEvent(type="start", conversation_id=conversation.id)
 
-        provider = get_provider("anthropic")
+        # Which model answers and why, before the first word.
+        if route is not None:
+            yield OrchestratedStreamEvent(type="route", route=route.as_dict())
+
+        # Retries once on the neighbouring tier if the model is overloaded
+        # before it says anything (src/ai/routing.py).
+        provider = FallbackProvider(
+            get_provider("anthropic"),
+            resolved_model,
+            route.fallback_model if route else None,
+        )
 
         tools: list[ToolDefinition] | None = None
         resolved_system = (
@@ -1567,7 +1602,7 @@ class AIOrchestrator:
                         organization_id=organization_id,
                         user_id=user_id,
                         conversation_id=conversation.id,
-                        model=resolved_model,
+                        model=provider.model_used,
                         content="".join(streamed_text),
                         usage=Usage(
                             input_tokens=total_input_tokens,
@@ -1598,7 +1633,7 @@ class AIOrchestrator:
             cache_creation_input_tokens=total_cache_creation,
             cache_read_input_tokens=total_cache_read,
         )
-        cost = estimate_cost(resolved_model, usage)
+        cost = estimate_cost(provider.model_used, usage)
 
         await ai_usage_repository.create(
             db,
@@ -1608,7 +1643,7 @@ class AIOrchestrator:
                 organization_id=organization_id,
                 user_id=user_id,
                 provider="anthropic",
-                model=resolved_model,
+                model=provider.model_used,
                 prompt_tokens=usage.input_tokens,
                 completion_tokens=usage.output_tokens,
                 total_tokens=(
@@ -1621,6 +1656,10 @@ class AIOrchestrator:
                 cache_read_tokens=usage.cache_read_input_tokens,
                 estimated_cost_usd=cost,
                 latency_ms=latency_ms,
+                agent=persona.name if persona is not None else None,
+                tier=route.tier if route else None,
+                route_reason=(route.reason[:200] if route else None),
+                fell_back=provider.fell_back,
             ),
         )
 
@@ -1645,6 +1684,11 @@ class AIOrchestrator:
             message_id=assistant_message.id,
             usage=usage,
             estimated_cost_usd=float(cost),
+            route=(
+                {**route.as_dict(), "model": provider.model_used, "fell_back": provider.fell_back}
+                if route
+                else None
+            ),
         )
 
 

@@ -157,13 +157,21 @@ async def test_chat_stream_endpoint_streams_and_persists(client, db_session, fak
         for line in resp.text.splitlines()
         if line.startswith("data: ")
     ]
-    assert len(events) == 3
+    assert len(events) == 4
 
     import json
 
     start = json.loads(events[0])
-    first = json.loads(events[1])
-    last = json.loads(events[2])
+    route = json.loads(events[1])
+    first = json.loads(events[2])
+    last = json.loads(events[3])
+
+    # Which model answers, and why, before the first word (AUTO by default:
+    # plain chat with no agent goes to the FAST tier).
+    assert route["type"] == "route"
+    assert route["route"]["requested"] == "auto"
+    assert route["route"]["tier"] == "fast"
+    assert last["route"]["fell_back"] is False
 
     # The conversation id arrives before any text, so a client whose
     # connection drops mid-answer can still find the saved reply.

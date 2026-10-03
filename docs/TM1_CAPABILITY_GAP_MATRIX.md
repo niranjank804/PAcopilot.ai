@@ -221,6 +221,30 @@ rollback plan.
 Not covered: memory and CPU per process (TM1 REST does not report them per
 run); naming conventions are still not checked against learned standards.
 
+### Phase 9 — AI model routing and cost (2026-10-03)
+
+Owner's decisions: Anthropic models only (TM1 data goes to one AI company;
+every tool is tested on these), AUTO by default, one-step fallback.
+
+- **Tiers** (`src/ai/routing.py`): FAST = claude-haiku-4-5, BALANCED =
+  claude-sonnet-5, BEST = claude-opus-5. The chat offers Auto / Fast /
+  Balanced / Best; each answer shows the model and the reason.
+- **AUTO's rules, in order**: a PROD connection → BEST; architect or
+  reviewer → BEST; a large attachment → BALANCED; a tool-using specialist
+  (developer, ti, troubleshooter, administrator, analyst, performance) →
+  BALANCED; documentation or plain chat → FAST. AUTO never puts a
+  tool-using agent below BALANCED. A tier the deployment does not allow
+  (AI_ALLOWED_MODELS) moves up, and the reason says so.
+- **Fallback**: an overloaded, failing or rate-limited model, before it has
+  said anything, is retried once on the neighbouring tier (never down to
+  FAST); the rest of the turn stays on it; the answer and the ledger record
+  it. A stream that fails mid-answer is not finished by another model.
+- **Cost** (`GET /monitoring/ai-costs`, Monitoring → AI Cost): spend, cost
+  per request, by agent / tier / model / person, response time (avg, p95),
+  fallback rate, tool calls, savings from caching, and the AUTO saving —
+  an estimate (the same tokens priced at BEST), labelled as one. Migration
+  `e6a1c8d3f5b7` adds agent, tier, route_reason and fell_back to `ai_usage`.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

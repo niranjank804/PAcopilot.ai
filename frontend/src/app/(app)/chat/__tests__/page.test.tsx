@@ -159,6 +159,40 @@ describe("sending a message", () => {
   });
 });
 
+describe("model routing", () => {
+  it("asks for AUTO by default and says which model answered and why", async () => {
+    const user = userEvent.setup();
+    streamRequest.mockReturnValue(
+      streamOf([
+        { type: "start", conversation_id: "c1" },
+        { type: "route", route: { model: "claude-sonnet-5", tier: "balanced", requested: "auto",
+                                  reason: "AUTO: the developer agent works through TM1 tools" } },
+        { type: "text_delta", text: "Here is the fix." },
+        { ...DONE, route: { model: "claude-sonnet-5", tier: "balanced", requested: "auto",
+                            reason: "AUTO: the developer agent works through TM1 tools", fell_back: false } },
+      ]),
+    );
+
+    renderChat();
+    await sendMessage(user, "fix my load");
+
+    expect(await screen.findByText(/Balanced · sonnet 5 — AUTO: the developer agent works through TM1 tools/)).toBeInTheDocument();
+    expect(streamRequest.mock.calls[0][1]).toMatchObject({ model: "auto" });
+  });
+
+  it("keeps a choice saved before routing existed", async () => {
+    window.localStorage.setItem("pa-copilot-model", "claude-opus-5");
+    const user = userEvent.setup();
+    streamRequest.mockReturnValue(streamOf([{ type: "text_delta", text: "ok" }, DONE]));
+
+    renderChat();
+    await sendMessage(user, "hello");
+
+    expect(streamRequest.mock.calls[0][1]).toMatchObject({ model: "best" });
+    window.localStorage.removeItem("pa-copilot-model");
+  });
+});
+
 describe("while streaming", () => {
   it("locks the composer so a second message cannot be started", async () => {
     const user = userEvent.setup();
