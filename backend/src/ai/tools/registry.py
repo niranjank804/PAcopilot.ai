@@ -17,6 +17,7 @@ from src.ai.tools.tm1.changes import (
     ProposeProcessUpdateTool,
     ProposeRuleUpdateTool,
 )
+from src.ai.tools.tm1.intelligence import GetModelHealthTool, GetPerformanceReportTool
 from src.ai.tools.tm1.development import ReviewProcessCodeTool, ValidateProcessCodeTool
 from src.ai.tools.tm1.diagnostics import (
     DiagnoseProcessFailureTool,
@@ -119,6 +120,8 @@ TOOLS: dict[str, Tool] = {
         MapLogErrorToCodeTool(),
         GetProcessExecutionHistoryTool(),
         GetChangeStatusTool(),
+        GetModelHealthTool(),
+        GetPerformanceReportTool(),
         DiagnoseProcessFailureTool(),
         ValidateProcessCodeTool(),
         ReviewProcessCodeTool(),

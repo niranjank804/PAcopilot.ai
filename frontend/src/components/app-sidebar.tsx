@@ -6,6 +6,7 @@ import {
   BookOpen,
   Database,
   FileSpreadsheet,
+  HeartPulse,
   History,
   LayoutDashboard,
   MessageSquare,
@@ -128,6 +129,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Rocket,
         tour: "nav-deployments",
         help: "Every rule or process change the assistant drafts lands here with impact analysis. Nothing reaches TM1 until someone with deploy rights executes it; the previous version is kept for rollback.",
+      },
+      {
+        label: "Model Health",
+        href: "/health",
+        icon: HeartPulse,
+        help: "A health score for the model with the evidence behind every point, and how long processes take: regressions, the slowest loads, and recent failures.",
       },
       {
         label: "Reports",

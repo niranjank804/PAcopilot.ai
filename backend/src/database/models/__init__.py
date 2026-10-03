@@ -26,6 +26,7 @@ from .tm1_process import TM1Process, TM1ProcessPattern
 from .revoked_token import RevokedToken
 from .tm1_connection import TM1Connection
 from .tm1_extraction import TM1Extraction
+from .tm1_health import TM1HealthScan, TM1ProcessRun
 from .tm1_gateway import TM1Gateway
 from .tm1_object import TM1Object
 from .tm1_relationship import TM1Relationship
@@ -55,6 +56,8 @@ __all__ = [
     "RevokedToken",
     "TM1Connection",
     "TM1Extraction",
+    "TM1HealthScan",
+    "TM1ProcessRun",
     "TM1Gateway",
     "TM1Object",
     "TM1Relationship",

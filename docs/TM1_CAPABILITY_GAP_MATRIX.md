@@ -199,6 +199,28 @@ evidence (where it was verified; whether the content stayed identical), the
 checks on this server, diff, impact, the approval rule that applies, and the
 rollback plan.
 
+### Phase 8 — model health and performance (2026-10-03)
+
+- **Health score** (`src/tm1/health/score.py`): 100 minus fixed points per
+  finding, capped per category — critical rule findings 10 (cap 40), process
+  errors 5 (25), rule warnings 2 (15), performance regressions 3 (15),
+  processes failed in 7 days 2 (10), other process findings 0.5 (10), unused
+  objects 0.5 (5); graded A–F. Every deduction lists the objects that cost
+  it. Scans are kept (`tm1_health_scans`, migration `d2f7b4e9a0c6`) for a
+  trend, and re-run daily (`/internal/cron/model-health`, 03:30 UTC) for
+  connections someone has scanned.
+- **Performance history** (`src/tm1/health/performance.py`,
+  `tm1_process_runs`): run times collected from TM1's message log and from
+  runs PA-Copilot made. A regression is a latest run over 2x the median of
+  at least 3 earlier runs in 30 days and at least 30 s longer — e.g.
+  "normally 42 s (median of 12 runs), latest 7 min 18 s, +938%". Also the
+  slowest processes and failures in the last 7 days.
+- **Where**: a Model Health page (TM1 menu), and agent tools
+  `get_model_health` and `get_performance_report`.
+
+Not covered: memory and CPU per process (TM1 REST does not report them per
+run); naming conventions are still not checked against learned standards.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

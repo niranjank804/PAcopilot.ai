@@ -52,6 +52,8 @@ from src.services.audit_service import audit_service
 from src.tm1.deployment import promotion
 from src.tm1.deployment.change_service import change_service
 from src.tm1.metadata import dependency_analyzer
+from src.tm1.health import performance as health_performance
+from src.tm1.health import score as health_score
 from src.tm1.impact.analyzer import analyze_impact
 from src.tm1.metadata import history as extraction_history
 from src.tm1 import governance
@@ -1727,4 +1729,65 @@ async def change_package(
         db, connection_id, change_id, current_user.organization_id
     )
     return ApiResponse(success=True, data=await promotion.package(db, change))
+
+
+def _scan_view(scan) -> dict:
+    return {
+        "id": str(scan.id),
+        "trigger": scan.trigger,
+        "scanned_at": scan.scanned_at,
+        "score": scan.score,
+        "grade": scan.grade,
+        "deductions": scan.deductions,
+        "totals": scan.totals,
+        "findings": scan.findings,
+    }
+
+
+@router.post(
+    "/connections/{connection_id}/health/scan",
+    response_model=ApiResponse[dict],
+)
+async def scan_model_health(
+    connection_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+    _: UserResponse = Depends(heavy_rate_limited),
+):
+    """Score the model's health now (rules, processes, unused objects,
+    failed and slower runs) and keep the scan. Read-only on TM1."""
+
+    scan, perf = await health_score.run_health_scan(
+        db, connection_id, current_user.organization_id, trigger="manual"
+    )
+    return ApiResponse(success=True, data={"scan": _scan_view(scan), "performance": perf})
+
+
+@router.get(
+    "/connections/{connection_id}/health",
+    response_model=ApiResponse[dict],
+)
+async def model_health(
+    connection_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+):
+    """The latest health scan, the trend of recent scores, and the
+    performance report from the collected run history."""
+
+    await tm1_integration_service.get_connection(db, connection_id, current_user.organization_id)
+    scans = await health_score.recent_scans(db, connection_id, current_user.organization_id)
+    return ApiResponse(
+        success=True,
+        data={
+            "latest": _scan_view(scans[0]) if scans else None,
+            "trend": [
+                {"scanned_at": s.scanned_at, "score": s.score, "grade": s.grade, "trigger": s.trigger}
+                for s in scans
+            ],
+            "performance": await health_performance.report(
+                db, connection_id, current_user.organization_id
+            ),
+        },
+    )
 

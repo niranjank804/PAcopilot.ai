@@ -16,6 +16,10 @@
     {
       "path": "/internal/cron/refresh-metadata",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/internal/cron/model-health",
+      "schedule": "30 3 * * *"
     }
   ]
 }

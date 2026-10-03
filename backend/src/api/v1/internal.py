@@ -14,6 +14,7 @@ from src.core.config import settings
 from src.core.exceptions import AuthenticationException
 from src.reports.tasks import reap_stale_executions
 from src.schemas.response import ApiResponse
+from src.tm1.health.score import scan_due_connections
 from src.tm1.metadata.history import refresh_due_connections
 
 router = APIRouter(
@@ -47,3 +48,13 @@ async def refresh_metadata(request: Request):
     _require_cron_secret(request)
 
     return ApiResponse(success=True, data=await refresh_due_connections())
+
+
+@router.get("/model-health", response_model=ApiResponse[dict])
+async def model_health(request: Request):
+    """Re-scan the health of connections not scanned in a day."""
+
+    _require_cron_secret(request)
+
+    return ApiResponse(success=True, data=await scan_due_connections())
+
