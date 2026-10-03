@@ -466,7 +466,11 @@ class AIOrchestrator:
         if reachable:
             connection_lines = "\n".join(
                 f"- id={connection.id}, name={connection.name}, "
-                f"address={connection.address}"
+                f"address={connection.address}, "
+                f"environment={(connection.environment or 'dev').upper()}"
+                # Said here so the model never drafts there in the first
+                # place; propose_* tools refuse it regardless.
+                + (" (read-only: do not draft changes or runs)" if connection.environment == "prod" else "")
                 for connection in reachable
             )
             connection_context = (

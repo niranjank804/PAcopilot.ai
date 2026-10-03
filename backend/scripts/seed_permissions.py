@@ -27,7 +27,11 @@ PERMISSIONS = [
     ("tm1.read", "View TM1 connections and query cube/dimension metadata."),
     ("tm1.write", "Create and delete TM1 connections."),
     ("tm1.security.read", "View TM1 security groups and their members."),
-    ("tm1.deploy", "Execute and roll back TM1 changes (rules, TI processes)."),
+    ("tm1.deploy", "Execute and roll back TM1 changes (rules, TI processes) on DEV connections."),
+    # Higher environments are separate grants (src/tm1/governance.py);
+    # admin roles hold them through the full list below.
+    ("tm1.deploy.qa", "Execute and roll back TM1 changes on QA connections."),
+    ("tm1.deploy.prod", "Execute and roll back TM1 changes on PROD connections."),
     # Running a process is its own grant, on top of tm1.deploy: a load can
     # change data across a model, has no rollback, and is the one action
     # an approver must be separately trusted with. Admin roles only, via

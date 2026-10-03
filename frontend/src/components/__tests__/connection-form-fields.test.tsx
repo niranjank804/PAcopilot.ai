@@ -165,3 +165,11 @@ describe("reached through a gateway", () => {
     expect(screen.queryByLabelText("Reached through")).not.toBeInTheDocument();
   });
 });
+
+describe("environment", () => {
+  it("every connection form asks which environment it is, DEV by default", () => {
+    render(<Harness authType="native" />);
+
+    expect(screen.getByLabelText("Environment")).toHaveTextContent("DEV");
+  });
+});

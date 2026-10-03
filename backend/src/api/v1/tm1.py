@@ -52,6 +52,7 @@ from src.tm1.deployment.change_service import change_service
 from src.tm1.metadata import dependency_analyzer
 from src.tm1.impact.analyzer import analyze_impact
 from src.tm1.metadata import history as extraction_history
+from src.tm1 import governance
 from src.tm1.service import tm1_integration_service
 
 router = APIRouter(
@@ -128,6 +129,7 @@ async def create_connection(
         tenant=request.tenant,
         database=request.database,
         gateway_id=request.gateway_id,
+        environment=request.environment,
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -228,6 +230,14 @@ async def update_connection(
     current_user: UserResponse = Depends(require_permission("tm1.write")),
 ):
     start = time.monotonic()
+
+    if request.environment is not None:
+        existing = await tm1_integration_service.get_connection(
+            db, connection_id, current_user.organization_id
+        )
+        await governance.check_environment_change(
+            db, current_user.id, governance.environment_of(existing), request.environment
+        )
 
     connection = await tm1_integration_service.update_connection(
         db,
@@ -1525,6 +1535,7 @@ async def execute_change(
     connection = await tm1_integration_service.get_connection(
         db, connection_id, current_user.organization_id
     )
+    await governance.check_can_apply(db, current_user.id, change, connection, action="execute")
 
     change = await change_service.execute_change(
         db,
@@ -1623,6 +1634,7 @@ async def rollback_change(
     connection = await tm1_integration_service.get_connection(
         db, connection_id, current_user.organization_id
     )
+    await governance.check_can_apply(db, current_user.id, change, connection, action="rollback")
 
     change = await change_service.rollback_change(db, change)
 

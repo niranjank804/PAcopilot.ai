@@ -3,6 +3,8 @@
 // generate from the OpenAPI schema once there are enough consumers to
 // justify the tooling.
 
+export type Environment = "dev" | "qa" | "prod";
+
 export interface TM1Connection {
   id: string;
   name: string;
@@ -14,6 +16,8 @@ export interface TM1Connection {
   authentication_type: "native" | "v12_saas" | "pa_cloud";
   tenant: string | null;
   database: string | null;
+  // Who may apply changes here (backend src/tm1/governance.py).
+  environment?: Environment;
 }
 
 export type RegistrationStatus = "pending" | "approved" | "rejected";

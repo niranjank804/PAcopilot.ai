@@ -87,6 +87,15 @@ class TM1Connection(BaseModel, OrganizationScoped):
         nullable=True,
     )
 
+    # dev | qa | prod — decides who may apply changes here
+    # (src/tm1/governance.py).
+    environment: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default="dev",
+        server_default="dev",
+    )
+
     # Set when the TM1 server is inside a company network and is reached
     # through a PA-Copilot gateway there, instead of directly.
     gateway_id: Mapped[uuid.UUID | None] = mapped_column(

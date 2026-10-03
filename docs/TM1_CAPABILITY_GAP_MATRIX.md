@@ -164,6 +164,24 @@ rolled back. Phase 5 closes what was left between those steps:
 way to run a TurboIntegrator process without writing data (sandboxes do not
 apply to processes), and the UI says so.
 
+### Phase 6 — DEV / QA / PROD governance (2026-10-03)
+
+Each connection is DEV, QA or PROD (`tm1_connections.environment`,
+migration `b7d1f0c3e9a5`; existing connections are DEV). The rules live in
+`src/tm1/governance.py`, decided by the owner on 2026-10-03:
+
+| Environment | Apply / roll back needs | Also |
+|---|---|---|
+| DEV | `tm1.deploy` | the assistant may draft |
+| QA | `tm1.deploy.qa` | the assistant may draft |
+| PROD | `tm1.deploy.prod` | **two people**: the requester (or the user whose AI conversation drafted it) cannot apply it; the assistant is **read-only** (no drafts or runs) |
+
+A run still needs `tm1.execute` as well. A rollback is exempt from the
+two-person rule so undoing a bad production change never waits. Taking a
+connection out of PROD needs `tm1.deploy.prod`, so relabelling cannot get
+round the rules. Organization Admins hold all three deploy rights; other
+roles get them through custom roles.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

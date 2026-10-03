@@ -19,7 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ENVIRONMENT_HELP } from "@/components/environment-badge";
 import { DIRECT, type TM1Gateway } from "@/lib/gateways";
+import type { Environment } from "@/lib/types";
 
 // Every PA as a Service region is a subdomain of this. Mirrors
 // backend/src/tm1/addressing.py, which refuses the same mistake on save.
@@ -58,6 +60,7 @@ export interface ConnectionFormValues {
   tenant?: string;
   database?: string;
   gateway_id?: string;
+  environment?: Environment;
 }
 
 interface ConnectionFormFieldsProps<T extends FieldValues> {
@@ -175,6 +178,31 @@ export function ConnectionFormFields<T extends FieldValues>({
             connect.
           </p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="environment">Environment</Label>
+        <Controller
+          control={control}
+          name={"environment" as Path<T>}
+          render={({ field }) => (
+            <Select value={field.value ?? "dev"} onValueChange={field.onChange}>
+              <SelectTrigger id="environment" className="w-full min-w-0">
+                <SelectValue>{(value: Environment) => (value ?? "dev").toUpperCase()}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {(["dev", "qa", "prod"] as const).map((env) => (
+                  <SelectItem key={env} value={env}>
+                    <span className="block whitespace-normal">
+                      <span className="block">{env.toUpperCase()}</span>
+                      <span className="block text-xs text-muted-foreground">{ENVIRONMENT_HELP[env]}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
 
       {authType === "native" ? (

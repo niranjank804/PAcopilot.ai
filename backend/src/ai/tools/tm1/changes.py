@@ -7,6 +7,7 @@ from src.ai.tools.base import Tool
 from src.core.exceptions import PermissionDeniedException, ValidationException
 from src.repositories.auth_repository import auth_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
+from src.tm1 import governance
 from src.tm1.deployment.change_service import change_service
 from src.tm1.service import tm1_integration_service
 from src.tm1.services import process_service
@@ -44,6 +45,13 @@ async def _create_draft(
     target_name: str,
     new_content: dict,
 ) -> str:
+    # The assistant is read-only on PROD (src/tm1/governance.py).
+    governance.check_ai_may_draft(
+        await tm1_integration_service.get_connection(
+            db, uuid.UUID(str(connection_id)), organization_id
+        )
+    )
+
     change = await change_service.create_change(
         db,
         connection_id=uuid.UUID(str(connection_id)),

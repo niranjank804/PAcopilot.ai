@@ -22,6 +22,8 @@ class ConnectionCreate(BaseModel):
     # A TM1 server inside a company network: reached through the
     # PA-Copilot gateway installed there (native connections only).
     gateway_id: uuid.UUID | None = None
+    # Who may apply changes here: see src/tm1/governance.py.
+    environment: Literal["dev", "qa", "prod"] = "dev"
 
 
 class ConnectionUpdate(BaseModel):
@@ -39,6 +41,7 @@ class ConnectionUpdate(BaseModel):
     database: str | None = None
     # Explicit null moves the connection off its gateway.
     gateway_id: uuid.UUID | None = None
+    environment: Literal["dev", "qa", "prod"] | None = None
 
 
 class ConnectionResponse(BaseModel):
@@ -55,6 +58,7 @@ class ConnectionResponse(BaseModel):
     tenant: str | None
     database: str | None
     gateway_id: uuid.UUID | None = None
+    environment: str = "dev"
 
 
 class TestConnectionResponse(BaseModel):

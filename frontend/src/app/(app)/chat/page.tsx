@@ -38,6 +38,7 @@ import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
 import { ChangeActionCard } from "@/components/change-action-card";
+import { EnvironmentBadge } from "@/components/environment-badge";
 import { ChatChartCard } from "@/components/chat-chart";
 import {
   AlertDialog,
@@ -1335,7 +1336,12 @@ export default function ChatPage() {
                 <SelectTrigger className="w-44" aria-label="TM1 server">
                   <SelectValue>
                     {(value: string) =>
-                      servers.find((c) => c.id === value)?.name ?? "TM1 server"
+                      (() => {
+                        const chosen = servers.find((c) => c.id === value);
+                        return chosen
+                          ? `${chosen.name} · ${(chosen.environment ?? "dev").toUpperCase()}`
+                          : "TM1 server";
+                      })()
                     }
                   </SelectValue>
                 </SelectTrigger>
@@ -1344,7 +1350,9 @@ export default function ChatPage() {
                 {servers.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     <span className="block whitespace-normal">
-                      <span className="block">{c.name}</span>
+                      <span className="flex items-center gap-1.5">
+                        {c.name} <EnvironmentBadge environment={c.environment} />
+                      </span>
                       <span className="block text-xs text-muted-foreground">
                         {c.address}
                       </span>

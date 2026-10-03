@@ -41,6 +41,7 @@ import {
   ConnectionFormFields,
   databaseFromBaseUrl,
 } from "@/components/connection-form-fields";
+import { EnvironmentBadge } from "@/components/environment-badge";
 import { GatewaysPanel } from "@/components/gateways-panel";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { DIRECT, type ConnectionWithGateway, type TM1Gateway } from "@/lib/gateways";
@@ -58,6 +59,7 @@ const connectionSchema = z
     tenant: z.string().optional(),
     database: z.string().optional(),
     gateway_id: z.string().optional(),
+    environment: z.enum(["dev", "qa", "prod"]),
   })
   .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
@@ -95,6 +97,7 @@ const editSchema = z
     tenant: z.string().optional(),
     database: z.string().optional(),
     gateway_id: z.string().optional(),
+    environment: z.enum(["dev", "qa", "prod"]),
   })
   .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
@@ -152,7 +155,7 @@ export default function ConnectionsPage() {
     formState: { errors },
   } = useForm<ConnectionValues>({
     resolver: zodResolver(connectionSchema),
-    defaultValues: { authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT },
+    defaultValues: { authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev" },
   });
 
   const authType = watch("authentication_type");
@@ -190,7 +193,7 @@ export default function ConnectionsPage() {
     onSuccess: (created) => {
       toast.success(`Connection "${created.name}" created.`);
       setCreateOpen(false);
-      reset({ authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT });
+      reset({ authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev" });
       queryClient.invalidateQueries({ queryKey: ["tm1-connections"] });
       queryClient.invalidateQueries({ queryKey: ["monitoring-tm1-status"] });
     },
@@ -241,6 +244,7 @@ export default function ConnectionsPage() {
       tenant: connection.tenant ?? "",
       database: connection.database ?? "",
       gateway_id: connection.gateway_id ?? DIRECT,
+      environment: connection.environment ?? "dev",
     });
   };
 
@@ -329,9 +333,12 @@ export default function ConnectionsPage() {
                   >
                     <CardTitle className="text-lg">{connection.name}</CardTitle>
                   </Link>
-                  <Badge variant={connection.is_active ? "success" : "secondary"}>
-                    {connection.is_active ? "active" : "inactive"}
-                  </Badge>
+                  <span className="flex items-center gap-1.5">
+                    <EnvironmentBadge environment={connection.environment} />
+                    <Badge variant={connection.is_active ? "success" : "secondary"}>
+                      {connection.is_active ? "active" : "inactive"}
+                    </Badge>
+                  </span>
                 </div>
                 <CardDescription>
                   {connection.authentication_type === "v12_saas" ? (

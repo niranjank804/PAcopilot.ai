@@ -180,6 +180,7 @@ class TM1IntegrationService:
         tenant: str | None = None,
         database: str | None = None,
         gateway_id: uuid.UUID | None = None,
+        environment: str = "dev",
     ) -> TM1Connection:
 
         parsed = parse_address(address)
@@ -221,6 +222,7 @@ class TM1IntegrationService:
             tenant=tenant,
             database=database,
             gateway_id=gateway_id,
+            environment=environment,
         )
 
         return await tm1_connection_repository.create(db, connection)
@@ -279,6 +281,7 @@ class TM1IntegrationService:
         tenant: str | None = None,
         database: str | None = None,
         gateway_id: object = _UNSET,
+        environment: str | None = None,
     ) -> TM1Connection:
 
         connection = await self.get_connection(db, connection_id, organization_id)
@@ -333,6 +336,8 @@ class TM1IntegrationService:
             connection.tenant = tenant
         if database is not None:
             connection.database = database
+        if environment is not None:
+            connection.environment = environment
         if gateway_id is not _UNSET:
             if gateway_id is None:
                 # Off the gateway: the address must now be reachable directly.
