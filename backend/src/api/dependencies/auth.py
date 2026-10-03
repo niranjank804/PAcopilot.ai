@@ -61,6 +61,11 @@ async def get_current_user(
     # test suite overrides get_db wholesale (see tests/conftest.py), so
     # anything in its real body would silently never run under test.
     db.info["organization_id"] = current_user.organization_id
+    # And the user: TM1 connections are private to their creator unless
+    # shared (tm1_integration_service.get_connection reads this). A
+    # session with no user stamped — a scheduled job — is the system.
+    db.info["user_id"] = current_user.id
+    db.info.pop("manages_all_connections", None)
 
     # No path issues a token to a pending or rejected account (see
     # auth_service._check_can_authenticate), so this only ever fires for

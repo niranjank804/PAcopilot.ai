@@ -173,3 +173,11 @@ describe("environment", () => {
     expect(screen.getByLabelText("Environment")).toHaveTextContent("DEV");
   });
 });
+
+describe("visibility", () => {
+  it("a new connection is private to its creator unless shared", () => {
+    render(<Harness authType="native" />);
+
+    expect(screen.getByLabelText("Who can use it")).toHaveTextContent("Only me");
+  });
+});

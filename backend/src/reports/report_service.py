@@ -13,9 +13,6 @@ from src.repositories.report_definition_repository import (
     report_definition_repository,
 )
 from src.repositories.report_worker_repository import report_worker_repository
-from src.repositories.tm1_connection_repository import (
-    tm1_connection_repository,
-)
 from src.reports.enums import (
     ApprovalStatus,
     ReportStatus,
@@ -238,12 +235,14 @@ class ReportService:
         organization_id: uuid.UUID,
     ) -> None:
 
-        connection = await tm1_connection_repository.get_by_id(
-            db, connection_id
-        )
+        # A report runs with this connection's credentials: it must be one
+        # the requesting user may use (their own, or shared), not merely one
+        # in their organization.
+        from src.tm1.service import tm1_integration_service
 
-        if connection is None or connection.organization_id != organization_id:
-            raise NotFoundException("TM1 connection not found.")
+        connection = await tm1_integration_service.get_connection(
+            db, connection_id, organization_id
+        )
 
         if not connection.is_active:
             raise ConflictException(

@@ -659,6 +659,22 @@ class AIOrchestrator:
             )
 
         try:
+            # The model chooses connection_id, so it is never trusted: the
+            # connection must be one this user may use before the tool runs,
+            # loads credentials or touches TM1. Several tools read the
+            # dependency map by id without loading the connection, so this
+            # is the check that covers all of them.
+            requested_connection = (tool_call.input or {}).get("connection_id")
+            if requested_connection:
+                try:
+                    requested_uuid = uuid.UUID(str(requested_connection))
+                except ValueError:
+                    requested_uuid = None
+                if requested_uuid is not None:
+                    await tm1_integration_service.get_connection(
+                        db, requested_uuid, organization_id, user_id=user_id
+                    )
+
             result = await tool.execute(
                 db,
                 organization_id=organization_id,

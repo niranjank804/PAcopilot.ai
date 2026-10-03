@@ -25,6 +25,7 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/api-client";
+import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import { useAuth } from "@/lib/auth-context";
 import type {
   ConversationSummary,
@@ -94,8 +95,8 @@ export default function DashboardPage() {
   const { user } = useAuth();
 
   const connectionsQuery = useQuery({
-    queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryKey: USABLE_CONNECTIONS_KEY,
+    queryFn: fetchUsableConnections,
   });
 
   const usageQuery = useQuery({

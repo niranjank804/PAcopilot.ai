@@ -134,6 +134,7 @@ async def create_connection(
         database=request.database,
         gateway_id=request.gateway_id,
         environment=request.environment,
+        visibility=request.visibility,
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -164,9 +165,13 @@ async def list_connections(
 ):
     start = time.monotonic()
 
+    # Every connection the caller may see: their own, shared ones, and —
+    # for an organization admin — members' private ones, marked can_use
+    # false because an admin manages them but does not use them.
     connections = await tm1_integration_service.list_connections(
         db,
         current_user.organization_id,
+        purpose="manage",
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -183,7 +188,12 @@ async def list_connections(
 
     return ApiResponse(
         success=True,
-        data=[ConnectionResponse.model_validate(c) for c in connections],
+        data=[
+            ConnectionResponse.model_validate(c).model_copy(
+                update={"can_use": await tm1_integration_service.may_access(db, c)}
+            )
+            for c in connections
+        ],
     )
 
 
@@ -203,6 +213,7 @@ async def get_connection(
         db,
         connection_id,
         current_user.organization_id,
+        purpose="manage",
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -218,7 +229,9 @@ async def get_connection(
 
     return ApiResponse(
         success=True,
-        data=ConnectionResponse.model_validate(connection),
+        data=ConnectionResponse.model_validate(connection).model_copy(
+            update={"can_use": await tm1_integration_service.may_access(db, connection)}
+        ),
     )
 
 
@@ -235,10 +248,26 @@ async def update_connection(
 ):
     start = time.monotonic()
 
-    if request.environment is not None:
-        existing = await tm1_integration_service.get_connection(
-            db, connection_id, current_user.organization_id
+    existing = await tm1_integration_service.get_connection(
+        db, connection_id, current_user.organization_id, purpose="manage"
+    )
+
+    # Who can see a connection is its owner's decision (or an admin's): a
+    # member using a shared connection must not be able to make it private
+    # to themselves, or share someone's private one.
+    if (
+        request.visibility is not None
+        and request.visibility != existing.visibility
+        and existing.created_by != current_user.id
+        and not await auth_repository.user_has_permission(
+            db, current_user.id, "tm1.connections.manage_all"
         )
+    ):
+        raise PermissionDeniedException(
+            "Only the connection's owner or an organization admin can change who sees it."
+        )
+
+    if request.environment is not None:
         await governance.check_environment_change(
             db, current_user.id, governance.environment_of(existing), request.environment
         )
@@ -263,7 +292,9 @@ async def update_connection(
 
     return ApiResponse(
         success=True,
-        data=ConnectionResponse.model_validate(connection),
+        data=ConnectionResponse.model_validate(connection).model_copy(
+            update={"can_use": await tm1_integration_service.may_access(db, connection)}
+        ),
     )
 
 
@@ -283,6 +314,7 @@ async def delete_connection(
         db,
         connection_id,
         current_user.organization_id,
+        purpose="manage",
     )
 
     await tm1_integration_service.delete_connection(

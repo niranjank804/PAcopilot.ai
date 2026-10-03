@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.ai_tool_execution_repository import ai_tool_execution_repository
 from src.repositories.ai_usage_repository import ai_usage_repository
-from src.repositories.tm1_connection_repository import tm1_connection_repository
 from src.tm1.resilience import CircuitState, peek_circuit_breaker
 
 
@@ -46,8 +45,12 @@ class MonitoringService:
         organization_id: uuid.UUID,
     ) -> list[dict]:
 
-        connections = await tm1_connection_repository.list_by_organization(
-            db, organization_id
+        # Only connections the caller may see: a member's private
+        # connection is not listed to the rest of the organization.
+        from src.tm1.service import tm1_integration_service
+
+        connections = await tm1_integration_service.list_connections(
+            db, organization_id, purpose="manage"
         )
 
         statuses = []

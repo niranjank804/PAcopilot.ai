@@ -61,6 +61,7 @@ export interface ConnectionFormValues {
   database?: string;
   gateway_id?: string;
   environment?: Environment;
+  visibility?: "private" | "organization";
 }
 
 interface ConnectionFormFieldsProps<T extends FieldValues> {
@@ -178,6 +179,43 @@ export function ConnectionFormFields<T extends FieldValues>({
             connect.
           </p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="visibility">Who can use it</Label>
+        <Controller
+          control={control}
+          name={"visibility" as Path<T>}
+          render={({ field }) => (
+            <Select value={field.value ?? "private"} onValueChange={field.onChange}>
+              <SelectTrigger id="visibility" className="w-full min-w-0">
+                <SelectValue>
+                  {(value: string) =>
+                    value === "organization" ? "Everyone in my organization" : "Only me"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">
+                  <span className="block whitespace-normal">
+                    <span className="block">Only me</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Nobody else sees or uses it. Admins can see it exists and manage it, never use it.
+                    </span>
+                  </span>
+                </SelectItem>
+                <SelectItem value="organization">
+                  <span className="block whitespace-normal">
+                    <span className="block">Everyone in my organization</span>
+                    <span className="block text-xs text-muted-foreground">
+                      A team server: every member with TM1 access can see and use it.
+                    </span>
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
 
       <div className="space-y-2">

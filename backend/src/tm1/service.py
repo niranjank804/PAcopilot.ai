@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.exceptions import NotFoundException, ValidationException
 from src.database.models.tm1_connection import TM1Connection
+from src.repositories.auth_repository import auth_repository
 from src.repositories.tm1_connection_repository import tm1_connection_repository
 from src.tm1.addressing import (
     PRIVATE_ADDRESS_REFUSED,
@@ -181,6 +182,7 @@ class TM1IntegrationService:
         database: str | None = None,
         gateway_id: uuid.UUID | None = None,
         environment: str = "dev",
+        visibility: str = "private",
     ) -> TM1Connection:
 
         parsed = parse_address(address)
@@ -223,20 +225,66 @@ class TM1IntegrationService:
             database=database,
             gateway_id=gateway_id,
             environment=environment,
+            # Owner: created_by, set from the session above, never from
+            # the request body.
+            visibility=visibility,
         )
 
         return await tm1_connection_repository.create(db, connection)
+
+    async def _manages_all_connections(self, db: AsyncSession, user_id: uuid.UUID) -> bool:
+        cached = db.info.get("manages_all_connections")
+        if cached is not None and cached[0] == user_id:
+            return cached[1]
+        allowed = await auth_repository.user_has_permission(db, user_id, "tm1.connections.manage_all")
+        db.info["manages_all_connections"] = (user_id, allowed)
+        return allowed
+
+    async def may_access(
+        self,
+        db: AsyncSession,
+        connection: TM1Connection,
+        *,
+        purpose: str = "use",
+        user_id: uuid.UUID | None = None,
+    ) -> bool:
+        """Whether the user may `use` this connection (anything that reads
+        or changes TM1 through it, with its credentials) or `manage` it
+        (see it in the list, edit, share or delete it).
+
+        A shared connection: any member. A private one: its creator. An
+        organization admin (tm1.connections.manage_all) may manage a
+        private connection but not use it — seeing that a member has a
+        server is administration; running queries with their credentials
+        is not. No user (a scheduled job, a script) is the system.
+        """
+
+        user = user_id or db.info.get("user_id")
+        if user is None:
+            return True
+        if connection.visibility == "organization" or connection.created_by == user:
+            return True
+        return purpose == "manage" and await self._manages_all_connections(db, user)
 
     async def get_connection(
         self,
         db: AsyncSession,
         connection_id: uuid.UUID,
         organization_id: uuid.UUID,
+        *,
+        purpose: str = "use",
+        user_id: uuid.UUID | None = None,
     ) -> TM1Connection:
 
         connection = await tm1_connection_repository.get_by_id(db, connection_id)
 
-        if connection is None or connection.organization_id != organization_id:
+        # Not found, another organization's, or another member's private
+        # connection: the same answer, so its existence is not disclosed.
+        if (
+            connection is None
+            or connection.organization_id != organization_id
+            or not await self.may_access(db, connection, purpose=purpose, user_id=user_id)
+        ):
             raise NotFoundException("TM1 connection not found.")
 
         return connection
@@ -245,12 +293,18 @@ class TM1IntegrationService:
         self,
         db: AsyncSession,
         organization_id: uuid.UUID,
+        *,
+        purpose: str = "use",
     ) -> list[TM1Connection]:
 
-        return await tm1_connection_repository.list_by_organization(
+        connections = await tm1_connection_repository.list_by_organization(
             db,
             organization_id,
         )
+        return [
+            c for c in connections
+            if await self.may_access(db, c, purpose=purpose)
+        ]
 
     async def delete_connection(
         self,
@@ -259,7 +313,9 @@ class TM1IntegrationService:
         organization_id: uuid.UUID,
     ) -> None:
 
-        connection = await self.get_connection(db, connection_id, organization_id)
+        connection = await self.get_connection(
+            db, connection_id, organization_id, purpose="manage"
+        )
 
         tm1_connection_manager.invalidate(connection.id)
 
@@ -282,9 +338,12 @@ class TM1IntegrationService:
         database: str | None = None,
         gateway_id: object = _UNSET,
         environment: str | None = None,
+        visibility: str | None = None,
     ) -> TM1Connection:
 
-        connection = await self.get_connection(db, connection_id, organization_id)
+        connection = await self.get_connection(
+            db, connection_id, organization_id, purpose="manage"
+        )
         next_gateway = connection.gateway_id if gateway_id is _UNSET else gateway_id
 
         if address is not None:
@@ -338,6 +397,8 @@ class TM1IntegrationService:
             connection.database = database
         if environment is not None:
             connection.environment = environment
+        if visibility is not None:
+            connection.visibility = visibility
         if gateway_id is not _UNSET:
             if gateway_id is None:
                 # Off the gateway: the address must now be reachable directly.

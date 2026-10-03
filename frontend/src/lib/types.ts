@@ -18,6 +18,11 @@ export interface TM1Connection {
   database: string | null;
   // Who may apply changes here (backend src/tm1/governance.py).
   environment?: Environment;
+  // private: only its creator; organization: every member with TM1 access.
+  visibility?: "private" | "organization";
+  created_by?: string;
+  // False for a member's private connection an admin can manage, not use.
+  can_use?: boolean;
 }
 
 export type RegistrationStatus = "pending" | "approved" | "rejected";

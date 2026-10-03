@@ -87,6 +87,17 @@ class TM1Connection(BaseModel, OrganizationScoped):
         nullable=True,
     )
 
+    # private: only its creator (created_by) sees and uses it — organization
+    # admins can see and manage it, never use it. organization: every
+    # member with the right permission, as before. src/tm1/service.py
+    # enforces this in get_connection / list_connections.
+    visibility: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="private",
+        server_default="private",
+    )
+
     # dev | qa | prod — decides who may apply changes here
     # (src/tm1/governance.py).
     environment: Mapped[str] = mapped_column(

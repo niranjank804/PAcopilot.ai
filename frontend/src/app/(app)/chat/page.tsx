@@ -72,6 +72,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { ApiError, apiRequest, streamRequest } from "@/lib/api-client";
+import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import { useRememberedChoice, useRememberedFlag } from "@/lib/use-remembered-flag";
 import { cn } from "@/lib/utils";
 import { directUpload } from "@/lib/uploads";
@@ -767,8 +768,8 @@ export default function ChatPage() {
   // were the other. The last choice is remembered; until one is made,
   // the first active connection.
   const connectionsQuery = useQuery({
-    queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryKey: USABLE_CONNECTIONS_KEY,
+    queryFn: fetchUsableConnections,
   });
   const servers = (connectionsQuery.data ?? []).filter((c) => c.is_active);
   const [rememberedServer, setServer] = useRememberedChoice("pa-copilot-chat-connection");

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import type { TM1Connection } from "@/lib/types";
 import { tableFrom, type VisualizeResult, type VisualizeTable } from "@/lib/visualize";
 
@@ -55,8 +56,8 @@ export default function VisualizePage() {
   const [editing, setEditing] = useState(false);
 
   const connectionsQuery = useQuery({
-    queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryKey: USABLE_CONNECTIONS_KEY,
+    queryFn: fetchUsableConnections,
   });
 
   const show = (result: VisualizeResult, summary: string) => {

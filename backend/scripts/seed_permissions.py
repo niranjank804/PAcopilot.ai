@@ -32,6 +32,10 @@ PERMISSIONS = [
     # admin roles hold them through the full list below.
     ("tm1.deploy.qa", "Execute and roll back TM1 changes on QA connections."),
     ("tm1.deploy.prod", "Execute and roll back TM1 changes on PROD connections."),
+    # A private connection is its creator's. Admins may see and manage
+    # (rename, share, delete) every connection in the organization — not
+    # use another member's private one. src/tm1/service.py:may_access.
+    ("tm1.connections.manage_all", "See and manage every TM1 connection in the organization (not use other members' private ones)."),
     # Running a process is its own grant, on top of tm1.deploy: a load can
     # change data across a model, has no rollback, and is the one action
     # an approver must be separately trusted with. Admin roles only, via

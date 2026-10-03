@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import type { TM1Connection } from "@/lib/types";
 
 interface Deduction {
@@ -72,8 +73,8 @@ export default function HealthPage() {
   const [chosen, setChosen] = useState<string | null>(null);
 
   const connections = useQuery({
-    queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryKey: USABLE_CONNECTIONS_KEY,
+    queryFn: fetchUsableConnections,
   });
   const connectionId = chosen ?? connections.data?.[0]?.id ?? null;
 

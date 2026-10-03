@@ -45,6 +45,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { RunPlan } from "@/components/run-plan";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import { CHANGE_TYPE_LABEL, PROCESS_FIELD_MAP, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
 import type {
@@ -164,8 +165,8 @@ export default function DeploymentsPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   const connectionsQuery = useQuery({
-    queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryKey: USABLE_CONNECTIONS_KEY,
+    queryFn: fetchUsableConnections,
   });
 
   const activeConnectionId =

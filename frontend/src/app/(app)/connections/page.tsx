@@ -60,6 +60,7 @@ const connectionSchema = z
     database: z.string().optional(),
     gateway_id: z.string().optional(),
     environment: z.enum(["dev", "qa", "prod"]),
+    visibility: z.enum(["private", "organization"]),
   })
   .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
@@ -98,6 +99,7 @@ const editSchema = z
     database: z.string().optional(),
     gateway_id: z.string().optional(),
     environment: z.enum(["dev", "qa", "prod"]),
+    visibility: z.enum(["private", "organization"]),
   })
   .refine((v) => v.authentication_type === "v12_saas" || !!v.username?.trim(), {
     message: "Username is required",
@@ -155,7 +157,7 @@ export default function ConnectionsPage() {
     formState: { errors },
   } = useForm<ConnectionValues>({
     resolver: zodResolver(connectionSchema),
-    defaultValues: { authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev" },
+    defaultValues: { authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev", visibility: "private" },
   });
 
   const authType = watch("authentication_type");
@@ -193,7 +195,7 @@ export default function ConnectionsPage() {
     onSuccess: (created) => {
       toast.success(`Connection "${created.name}" created.`);
       setCreateOpen(false);
-      reset({ authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev" });
+      reset({ authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev", visibility: "private" });
       queryClient.invalidateQueries({ queryKey: ["tm1-connections"] });
       queryClient.invalidateQueries({ queryKey: ["monitoring-tm1-status"] });
     },
@@ -245,6 +247,7 @@ export default function ConnectionsPage() {
       database: connection.database ?? "",
       gateway_id: connection.gateway_id ?? DIRECT,
       environment: connection.environment ?? "dev",
+      visibility: connection.visibility ?? "private",
     });
   };
 
@@ -301,7 +304,7 @@ export default function ConnectionsPage() {
             TM1 Connections
           </h1>
           <p className="text-sm text-muted-foreground">
-            Planning Analytics servers this organization can reach.
+            Your TM1 servers, and the ones shared with your organization.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
@@ -334,6 +337,22 @@ export default function ConnectionsPage() {
                     <CardTitle className="text-lg">{connection.name}</CardTitle>
                   </Link>
                   <span className="flex items-center gap-1.5">
+                    <Badge
+                      variant="outline"
+                      title={
+                        connection.visibility === "organization"
+                          ? "Shared: everyone in your organization with TM1 access can use it."
+                          : connection.can_use === false
+                            ? "A member's private connection. As an admin you can rename, share or delete it, but not use it."
+                            : "Private: only you can see and use it."
+                      }
+                    >
+                      {connection.visibility === "organization"
+                        ? "Shared"
+                        : connection.can_use === false
+                          ? "Member's private"
+                          : "Private"}
+                    </Badge>
                     <EnvironmentBadge environment={connection.environment} />
                     <Badge variant={connection.is_active ? "success" : "secondary"}>
                       {connection.is_active ? "active" : "inactive"}
@@ -356,25 +375,31 @@ export default function ConnectionsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex gap-2">
-                <Link
-                  href={`/connections/${connection.id}`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  View details
-                </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={testingId === connection.id}
-                  onClick={() => testMutation.mutate(connection)}
-                >
-                  {testingId === connection.id ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plug className="mr-2 h-4 w-4" />
-                  )}
-                  Test
-                </Button>
+                {/* A member's private connection: an admin manages it (edit,
+                    share, delete) but never uses it, so no Test or details. */}
+                {connection.can_use !== false ? (
+                  <>
+                    <Link
+                      href={`/connections/${connection.id}`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      View details
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={testingId === connection.id}
+                      onClick={() => testMutation.mutate(connection)}
+                    >
+                      {testingId === connection.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plug className="mr-2 h-4 w-4" />
+                      )}
+                      Test
+                    </Button>
+                  </>
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"

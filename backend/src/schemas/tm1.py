@@ -24,6 +24,8 @@ class ConnectionCreate(BaseModel):
     gateway_id: uuid.UUID | None = None
     # Who may apply changes here: see src/tm1/governance.py.
     environment: Literal["dev", "qa", "prod"] = "dev"
+    # private: only you. organization: every member with TM1 access.
+    visibility: Literal["private", "organization"] = "private"
 
 
 class ConnectionUpdate(BaseModel):
@@ -42,6 +44,7 @@ class ConnectionUpdate(BaseModel):
     # Explicit null moves the connection off its gateway.
     gateway_id: uuid.UUID | None = None
     environment: Literal["dev", "qa", "prod"] | None = None
+    visibility: Literal["private", "organization"] | None = None
 
 
 class ConnectionResponse(BaseModel):
@@ -59,6 +62,11 @@ class ConnectionResponse(BaseModel):
     database: str | None
     gateway_id: uuid.UUID | None = None
     environment: str = "dev"
+    visibility: str = "private"
+    created_by: uuid.UUID | None = None
+    # False when the caller may manage this connection (an admin seeing a
+    # member's private one) but not use it: pickers leave it out.
+    can_use: bool = True
 
 
 class TestConnectionResponse(BaseModel):

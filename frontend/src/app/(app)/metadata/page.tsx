@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/tabs";
 import { ObjectGraph } from "@/components/object-graph";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
 import type {
@@ -199,8 +200,8 @@ function MetadataExplorer() {
   const [, setRecentVersion] = useState(0);
 
   const connectionsQuery = useQuery({
-    queryKey: ["tm1-connections"],
-    queryFn: () => apiRequest<TM1Connection[]>("/tm1/connections"),
+    queryKey: USABLE_CONNECTIONS_KEY,
+    queryFn: fetchUsableConnections,
   });
 
   const activeConnectionId = connectionId ?? connectionsQuery.data?.[0]?.id ?? null;

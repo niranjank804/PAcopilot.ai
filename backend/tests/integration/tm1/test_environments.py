@@ -35,6 +35,8 @@ async def _connection(client, headers, environment="dev"):
             "username": "admin",
             "password": "secret",
             "environment": environment,
+            # Team servers: approvers other than the creator must use them.
+            "visibility": "organization",
         },
         headers=headers,
     )
