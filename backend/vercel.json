@@ -12,6 +12,10 @@
     {
       "path": "/internal/cron/reap-executions",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/internal/cron/refresh-metadata",
+      "schedule": "30 2 * * *"
     }
   ]
 }

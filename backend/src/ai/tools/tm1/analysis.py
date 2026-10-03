@@ -7,6 +7,7 @@ from src.ai.tools.base import Tool
 from src.core.exceptions import PermissionDeniedException
 from src.repositories.auth_repository import auth_repository
 from src.tm1.metadata import dependency_analyzer
+from src.tm1.metadata.history import graph_freshness, list_extractions
 
 
 async def _check_permission(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -74,7 +75,14 @@ class FindDependentsTool(Tool):
             db, connection_id, organization_id, object_type, name, max_depth=max_depth
         )
 
-        return json.dumps({"object_type": object_type, "name": name, "dependents": dependents})
+        return json.dumps(
+            {
+                "object_type": object_type,
+                "name": name,
+                "dependents": dependents,
+                "graph": await graph_freshness(db, connection_id),
+            }
+        )
 
 
 class FindDependenciesTool(Tool):
@@ -131,7 +139,12 @@ class FindDependenciesTool(Tool):
         )
 
         return json.dumps(
-            {"object_type": object_type, "name": name, "dependencies": dependencies}
+            {
+                "object_type": object_type,
+                "name": name,
+                "dependencies": dependencies,
+                "graph": await graph_freshness(db, connection_id),
+            }
         )
 
 
@@ -189,7 +202,13 @@ class DependencyPathTool(Tool):
             max_depth=max_depth,
         )
 
-        return json.dumps({"found": path is not None, "path": path or []})
+        return json.dumps(
+            {
+                "found": path is not None,
+                "path": path or [],
+                "graph": await graph_freshness(db, connection_id),
+            }
+        )
 
 
 class FindUnusedObjectsTool(Tool):
@@ -238,3 +257,75 @@ class FindUnusedObjectsTool(Tool):
         )
 
         return json.dumps({"unused": unused})
+
+
+class GetModelChangesTool(Tool):
+
+    name = "get_model_changes"
+    description = (
+        "What changed in the TM1 model between metadata extractions: cubes, "
+        "dimensions, processes, chores, views and subsets that appeared or "
+        "disappeared, and dependencies that were added or removed (a process "
+        "that now writes a cube, a chore that no longer runs a process). Each "
+        "extraction is listed with when it ran. Use for 'what changed since "
+        "last week', or to explain why something that worked before no "
+        "longer does. Only as current as the newest extraction."
+    )
+    required_permission = "tm1.read"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": {
+                "type": "string",
+                "description": "The ID of the TM1 connection to query.",
+            },
+            "extractions": {
+                "type": "integer",
+                "description": "How many recent extractions to include (default 3, at most 10).",
+            },
+        },
+        "required": ["connection_id"],
+    }
+
+    async def execute(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        **kwargs,
+    ) -> str:
+
+        await _check_permission(db, user_id)
+
+        connection_id = uuid.UUID(str(kwargs["connection_id"]))
+        try:
+            count = int(kwargs.get("extractions") or 3)
+        except (TypeError, ValueError):
+            count = 3
+        count = max(1, min(count, 10))
+
+        records = await list_extractions(db, connection_id, organization_id, count)
+
+        return json.dumps(
+            {
+                "extractions": [
+                    {
+                        "started_at": r.started_at.isoformat(),
+                        "trigger": r.trigger,
+                        "status": r.status,
+                        "objects": r.object_count,
+                        "relationships": r.relationship_count,
+                        "changes": r.changes,
+                        "error": r.error_message,
+                    }
+                    for r in records
+                ],
+                "note": (
+                    None
+                    if records
+                    else "No extraction has been recorded for this connection yet."
+                ),
+                "graph": await graph_freshness(db, connection_id),
+            }
+        )

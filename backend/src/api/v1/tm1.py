@@ -30,6 +30,7 @@ from src.schemas.tm1 import (
     DependencyNode,
     DependencyPathResponse,
     DimensionResponse,
+    ExtractionRecordResponse,
     ExtractionSummaryResponse,
     ObjectRelationshipsResponse,
     PathNode,
@@ -48,7 +49,7 @@ from src.ai.visualization import _cube_from_mdx, generate_visualization, run_mdx
 from src.services.audit_service import audit_service
 from src.tm1.deployment.change_service import change_service
 from src.tm1.metadata import dependency_analyzer
-from src.tm1.metadata.extractor import extract_metadata
+from src.tm1.metadata import history as extraction_history
 from src.tm1.service import tm1_integration_service
 
 router = APIRouter(
@@ -635,10 +636,12 @@ async def extract_connection_metadata(
         current_user.organization_id,
     )
 
-    summary = await extract_metadata(
+    summary, record = await extraction_history.run_extraction(
         db,
         connection_id,
         current_user.organization_id,
+        trigger="manual",
+        triggered_by=current_user.id,
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -662,7 +665,33 @@ async def extract_connection_metadata(
             objects_created=summary.objects_created,
             relationships_created=summary.relationships_created,
             unresolved_references=summary.unresolved_references,
+            changes=record.changes,
         ),
+    )
+
+
+@router.get(
+    "/connections/{connection_id}/metadata/history",
+    response_model=ApiResponse[list[ExtractionRecordResponse]],
+)
+async def metadata_history(
+    connection_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """Each extraction of this connection, newest first, with what it found
+    changed in the model since the one before."""
+
+    await tm1_integration_service.get_connection(
+        db, connection_id, current_user.organization_id
+    )
+    records = await extraction_history.list_extractions(
+        db, connection_id, current_user.organization_id, limit
+    )
+    return ApiResponse(
+        success=True,
+        data=[ExtractionRecordResponse.model_validate(r) for r in records],
     )
 
 

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.tm1_object import TM1Object
@@ -248,14 +249,8 @@ async def extract_metadata(
             )
 
     # Processes. Two passes: every process node first, so an ExecuteProcess
-    # call to a process later in the list still finds its target.
-    #
-    # Edges come from the TI parser (src/tm1/ti/parser.py), the same one
-    # standards learning uses: reads_cube (CellGet*, or a TM1CubeView
-    # datasource), updates_cube (CellPut*/CellIncrement*), calls_process
-    # (ExecuteProcess/RunProcess), updates_dimension (element and attribute
-    # writes) and references_dimension (lookups). Only literal names make
-    # edges; a name built from a variable is counted, not guessed.
+    # call to a process later in the list still finds its target. Which
+    # edges a process makes: see process_edges below.
     process_names = await tm1_integration_service.list_processes(
         db, connection_id, organization_id
     )
@@ -268,62 +263,16 @@ async def extract_metadata(
         await writer.add_object("process", process_info.name)
         processes.append(process_info)
 
+    index = _GraphIndex(writer._objects)
     unresolved = 0
-    by_lower = {
-        name.lower(): name for kind in ("cube", "dimension", "process")
-        for name in writer.list_names(kind)
-    }
-
-    def lookup(kind: str, name: str):
-        exact = writer.get_object(kind, name)
-        if exact is not None:
-            return exact
-        # TM1 names are case-insensitive; the code may not match the
-        # server's casing.
-        canonical = by_lower.get(name.lower())
-        return writer.get_object(kind, canonical) if canonical else None
 
     for process_info in processes:
         process_object = writer.get_object("process", process_info.name)
-        record = parse_process_code(
-            process_info.name,
-            prolog=process_info.prolog,
-            metadata=process_info.metadata,
-            data=process_info.data,
-            epilog=process_info.epilog,
-            datasource_type=process_info.datasource_type,
-            datasource_name=process_info.datasource_name,
-        )
+        edges, missed = process_edges(process_info, index)
+        unresolved += missed
 
-        if process_info.datasource_type == "TM1CubeView":
-            source_cube = lookup("cube", process_info.datasource_name)
-
-            if source_cube is not None:
-                await writer.add_relationship(process_object, source_cube, "reads_cube")
-
-        for ref in record.objects:
-            if not ref.literal:
-                if ref.kind in ("cube", "dimension", "process"):
-                    unresolved += 1
-                continue
-
-            if ref.kind == "cube" and ref.access in ("write", "read"):
-                target = lookup("cube", ref.name)
-                relationship = "updates_cube" if ref.access == "write" else "reads_cube"
-            elif ref.kind == "process" and ref.access == "calls":
-                target = lookup("process", ref.name)
-                relationship = "calls_process"
-            elif ref.kind == "dimension":
-                target = lookup("dimension", ref.name)
-                relationship = (
-                    "updates_dimension"
-                    if ref.function in DIMENSION_WRITE_FUNCTIONS
-                    else "references_dimension"
-                )
-            else:
-                continue
-
-            if target is not None and target is not process_object:
+        for target, relationship in edges:
+            if target is not process_object:
                 await writer.add_relationship(process_object, target, relationship)
 
     # Chores: chore -> runs_process -> process (skips process names not
@@ -353,3 +302,189 @@ async def extract_metadata(
         relationships_created=writer.relationships_created,
         unresolved_references=unresolved,
     )
+
+
+class _GraphIndex:
+    """Find graph objects the way TI names them.
+
+    TM1 names are case-insensitive, so code may not match the server's
+    casing. Views and subsets are stored qualified ("Sales:Default") because
+    a name is unique only within its cube or dimension, but TI names them by
+    the short name with the container in another argument: a short name
+    that matches exactly one public view or subset resolves; one that
+    matches several, or none (a temporary view the process creates and
+    destroys), does not.
+    """
+
+    def __init__(self, objects: dict[tuple[str, str], TM1Object]):
+        self._objects = objects
+        self._by_lower = {(t, n.lower()): (t, n) for (t, n) in objects}
+        self._qualified: dict[str, dict[str, list[str]]] = {"view": {}, "subset": {}}
+        for (kind, name) in objects:
+            if kind in self._qualified:
+                short = name.partition(":")[2].lower()
+                self._qualified[kind].setdefault(short, []).append(name)
+
+    def get(self, kind: str, name: str) -> TM1Object | None:
+        return self._objects.get((kind, name))
+
+    def lookup(self, kind: str, name: str) -> TM1Object | None:
+        exact = self._objects.get((kind, name))
+        if exact is not None:
+            return exact
+        key = self._by_lower.get((kind, name.lower()))
+        return self._objects.get(key) if key else None
+
+    def by_short_name(self, kind: str, short: str) -> TM1Object | None:
+        matches = self._qualified[kind].get(short.lower(), [])
+        return self._objects.get((kind, matches[0])) if len(matches) == 1 else None
+
+
+def process_edges(process_info, index: _GraphIndex) -> tuple[list[tuple[TM1Object, str]], int]:
+    """The edges one process makes, from its code, and how many references
+    it makes through a variable (real dependencies the graph cannot draw).
+
+    Edges come from the TI parser (src/tm1/ti/parser.py), the same one
+    standards learning uses: reads_cube (CellGet*, or a TM1CubeView
+    datasource), reads_view (that datasource's view), updates_cube
+    (CellPut*/CellIncrement*), calls_process (ExecuteProcess/RunProcess),
+    updates_dimension (element and attribute writes), references_dimension
+    (lookups), and uses_view / uses_subset. Only literal names make edges.
+    """
+
+    record = parse_process_code(
+        process_info.name,
+        prolog=process_info.prolog,
+        metadata=process_info.metadata,
+        data=process_info.data,
+        epilog=process_info.epilog,
+        datasource_type=process_info.datasource_type,
+        datasource_name=process_info.datasource_name,
+    )
+    edges: list[tuple[TM1Object, str]] = []
+    unresolved = 0
+
+    if process_info.datasource_type == "TM1CubeView":
+        source_cube = index.lookup("cube", process_info.datasource_name)
+
+        if source_cube is not None:
+            edges.append((source_cube, "reads_cube"))
+
+            if process_info.datasource_view:
+                source_view = index.get(
+                    "view", f"{source_cube.name}:{process_info.datasource_view}"
+                )
+                if source_view is not None:
+                    edges.append((source_view, "reads_view"))
+
+    for ref in record.objects:
+        if not ref.literal:
+            if ref.kind in ("cube", "dimension", "process"):
+                unresolved += 1
+            continue
+
+        if ref.kind == "cube" and ref.access in ("write", "read"):
+            target = index.lookup("cube", ref.name)
+            relationship = "updates_cube" if ref.access == "write" else "reads_cube"
+        elif ref.kind == "process" and ref.access == "calls":
+            target = index.lookup("process", ref.name)
+            relationship = "calls_process"
+        elif ref.kind == "dimension":
+            target = index.lookup("dimension", ref.name)
+            relationship = (
+                "updates_dimension"
+                if ref.function in DIMENSION_WRITE_FUNCTIONS
+                else "references_dimension"
+            )
+        elif ref.kind in ("view", "subset"):
+            target = index.by_short_name(ref.kind, ref.name)
+            relationship = f"uses_{ref.kind}"
+        else:
+            continue
+
+        if target is not None:
+            edges.append((target, relationship))
+
+    return edges, unresolved
+
+
+async def refresh_process(
+    db: AsyncSession,
+    connection_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    process_name: str,
+    *,
+    deleted: bool = False,
+) -> bool:
+    """Bring one process's place in the graph up to date after a change
+    PA-Copilot applied to it, without re-reading the whole model.
+
+    A no-op for a connection that has never been extracted. The process
+    keeps the graph's extraction time, so the graph never claims to be
+    fresher than its last full read. Returns whether the graph was touched.
+    """
+
+    objects = {
+        (obj.object_type, obj.name): obj
+        for obj in (
+            await db.execute(
+                select(TM1Object).where(TM1Object.connection_id == connection_id)
+            )
+        ).scalars()
+    }
+    if not objects:
+        return False
+
+    index = _GraphIndex(objects)
+    existing = index.lookup("process", process_name)
+
+    if existing is not None:
+        await db.execute(
+            delete(TM1Relationship).where(TM1Relationship.from_object_id == existing.id)
+        )
+
+    if deleted:
+        if existing is not None:
+            # Edges into it (chores, callers) go with it.
+            await db.execute(
+                delete(TM1Relationship).where(TM1Relationship.to_object_id == existing.id)
+            )
+            await db.delete(existing)
+        return True
+
+    process_info = await tm1_integration_service.get_process(
+        db, connection_id, organization_id, process_name
+    )
+    extracted_at = max(obj.extracted_at for obj in objects.values())
+
+    if existing is None:
+        existing = await tm1_object_repository.create(
+            db,
+            TM1Object(
+                connection_id=connection_id,
+                organization_id=organization_id,
+                object_type="process",
+                name=process_info.name,
+                extracted_at=extracted_at,
+            ),
+        )
+
+    edges, _ = process_edges(process_info, index)
+    seen = set()
+    for target, relationship in edges:
+        if target is existing or (target.id, relationship) in seen:
+            continue
+        seen.add((target.id, relationship))
+        await tm1_relationship_repository.create(
+            db,
+            TM1Relationship(
+                connection_id=connection_id,
+                organization_id=organization_id,
+                from_object_id=existing.id,
+                to_object_id=target.id,
+                relationship_type=relationship,
+                extracted_at=extracted_at,
+            ),
+        )
+
+    return True

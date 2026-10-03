@@ -109,6 +109,7 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     # --- Dependencies: the extracted graph ---
     "get_cube_dependencies": _c("dependencies", R, "Metadata graph", SNAPSHOT, "cube_name"),
     "get_dimension_dependents": _c("dependencies", R, "Metadata graph", SNAPSHOT, "dimension_name"),
+    "get_model_changes": _c("governance", R, "Metadata extraction history", SNAPSHOT),
     "get_object_relationships": _c("dependencies", R, "Metadata graph", SNAPSHOT, "object_type", "name"),
     "find_dependents": _c("dependencies", R, "Metadata graph", SNAPSHOT, "object_type", "name"),
     "find_dependencies": _c("dependencies", R, "Metadata graph", SNAPSHOT, "object_type", "name"),

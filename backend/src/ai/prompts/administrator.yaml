@@ -20,6 +20,7 @@ tool_names:
   - list_processes
   - get_process
   - find_dependents
+  - get_model_changes
   - find_dependencies
   - dependency_path
   - find_unused_objects

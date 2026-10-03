@@ -62,6 +62,31 @@ APIs), `tests/unit/tm1/test_ti_review.py`, `tests/unit/ai/test_engineering_tools
 (diagnose, call tree, search, validate-without-saving), and
 `frontend/src/components/__tests__/run-plan.test.tsx`.
 
+### Phase 2 — metadata intelligence (2026-10-03)
+
+The dependency map (tm1_objects / tm1_relationships) is rebuilt on every
+extraction. Phase 2 adds what it lacked:
+
+- **History.** Every extraction is recorded in `tm1_extractions` (migration
+  `f1b6d3a8c0e2`) with the objects and dependencies that appeared or
+  disappeared since the one before. Agents read it with `get_model_changes`;
+  the Metadata Explorer shows it as "Model map".
+- **Freshness.** `find_dependents`, `find_dependencies`, `dependency_path` and
+  `get_model_changes` return when the map was read, and say so when it is
+  more than 7 days old.
+- **Kept current.** A daily job (`/internal/cron/refresh-metadata`, 02:30 UTC)
+  re-extracts every connection someone has extracted before, stalest first,
+  within the request time limit. A process saved, deleted or rolled back
+  through an approved change updates that process's links at once.
+- **More links.** process → view (`reads_view` for a cube-view data source,
+  `uses_view`) and process → subset (`uses_subset`), when the name resolves
+  to exactly one public view or subset.
+
+Limits: one extraction must finish within 300 seconds (the platform's
+request limit), so a very large model may need extracting from the local
+copy; temporary views and subsets a process creates and destroys are not in
+the map; rule → dimension links are not drawn.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

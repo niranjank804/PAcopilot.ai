@@ -35,6 +35,7 @@ tool_names:
   - list_chores
   - get_chore
   - get_object_relationships
+  - get_model_changes
   - search_model_objects
   - diagnose_process_failure
   - get_process_execution_history

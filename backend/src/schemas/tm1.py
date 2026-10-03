@@ -81,6 +81,23 @@ class ExtractionSummaryResponse(BaseModel):
     # References in process code whose object name is a variable: real
     # dependencies the graph cannot draw.
     unresolved_references: int = 0
+    # What changed in the model since the previous extraction.
+    changes: dict | None = None
+
+
+class ExtractionRecordResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    trigger: str
+    status: str
+    started_at: datetime
+    finished_at: datetime
+    object_count: int
+    relationship_count: int
+    unresolved_references: int
+    changes: dict | None = None
+    error_message: str | None = None
 
 
 class ProcessResponse(BaseModel):

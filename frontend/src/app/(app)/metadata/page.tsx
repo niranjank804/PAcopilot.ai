@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
+import { ModelHistory } from "@/components/model-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -320,6 +321,7 @@ function MetadataExplorer() {
           `${summary.relationships_created} relationships.`,
       );
       queryClient.invalidateQueries({ queryKey: ["tm1-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["tm1-extractions"] });
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -473,8 +475,15 @@ function MetadataExplorer() {
 
       <div className="flex-1 overflow-y-auto">
         {!selected ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-4">
+            {activeConnectionId ? (
+              <ModelHistory
+                connectionId={activeConnectionId}
+                onExtract={() => extractMutation.mutate()}
+                extracting={extractMutation.isPending}
+              />
+            ) : null}
+            <p className="text-center text-sm text-muted-foreground">
               Select an object on the left to explore it.
             </p>
           </div>

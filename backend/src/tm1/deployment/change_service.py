@@ -18,7 +18,7 @@ from src.repositories.tm1_change_repository import tm1_change_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment import ti_analysis
 from src.tm1.exceptions import TM1ConnectionError, TM1NotFoundError
-from src.tm1.metadata import dependency_analyzer
+from src.tm1.metadata import dependency_analyzer, extractor
 from src.tm1.service import tm1_integration_service
 from src.tm1.services import cube_service, log_service, process_service
 from src.tm1.ti.parser import parse_process_code
@@ -296,6 +296,28 @@ async def _restore_then_raise(restore, original: BaseException):
     except Exception:  # noqa: BLE001 - the original error is the one to report
         logger.exception("Restoring the previous state after a failed check also failed")
     raise original
+
+
+async def _refresh_graph(db: AsyncSession, change: TM1Change, *, deleted: bool) -> None:
+    """Keep the dependency map in step with a process change PA-Copilot
+    just made, so the next impact question sees it. In a savepoint and
+    best-effort: the change on the server has happened either way, and a
+    stale map entry is corrected by the next extraction."""
+
+    if not change.change_type.endswith("_process") or change.change_type == "run_process":
+        return
+
+    try:
+        async with db.begin_nested():
+            await extractor.refresh_process(
+                db,
+                change.connection_id,
+                change.organization_id,
+                change.target_name,
+                deleted=deleted,
+            )
+    except Exception:  # noqa: BLE001
+        logger.warning(f"Dependency map not refreshed for {change.target_name}", exc_info=True)
 
 
 class ChangeService:
@@ -731,6 +753,7 @@ class ChangeService:
             )
 
         change.status = "executed"
+        await _refresh_graph(db, change, deleted=change.change_type == "delete_process")
 
         return await tm1_change_repository.update(db, change)
 
@@ -899,6 +922,7 @@ class ChangeService:
 
         change.status = "rolled_back"
         change.rolled_back_at = datetime.now(timezone.utc)
+        await _refresh_graph(db, change, deleted=change.change_type == "create_process")
 
         return await tm1_change_repository.update(db, change)
 

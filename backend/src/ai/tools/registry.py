@@ -5,6 +5,7 @@ from src.ai.tools.tm1.analysis import (
     FindDependenciesTool,
     FindDependentsTool,
     FindUnusedObjectsTool,
+    GetModelChangesTool,
 )
 from src.ai.tools.tm1.cells import ExecuteMDXTool, GetCellValuesTool, InspectCellTool
 from src.ai.tools.tm1.chart import ShowChartTool
@@ -127,6 +128,7 @@ TOOLS: dict[str, Tool] = {
         FindDependenciesTool(),
         DependencyPathTool(),
         FindUnusedObjectsTool(),
+        GetModelChangesTool(),
         ProposeRuleUpdateTool(),
         ProposeProcessUpdateTool(),
         ProposeProcessCopyTool(),

@@ -28,6 +28,7 @@ tool_names:
   - get_chore
   - get_object_relationships
   - find_dependents
+  - get_model_changes
   - find_dependencies
   - find_unused_objects
   - search_model_objects

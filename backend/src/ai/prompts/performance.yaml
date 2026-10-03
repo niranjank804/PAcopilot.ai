@@ -21,6 +21,7 @@ tool_names:
   - get_cube_rules
   - get_object_relationships
   - find_dependents
+  - get_model_changes
   - find_dependencies
   - find_unused_objects
   - get_server_state

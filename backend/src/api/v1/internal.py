@@ -14,6 +14,7 @@ from src.core.config import settings
 from src.core.exceptions import AuthenticationException
 from src.reports.tasks import reap_stale_executions
 from src.schemas.response import ApiResponse
+from src.tm1.metadata.history import refresh_due_connections
 
 router = APIRouter(
     prefix="/internal/cron", tags=["Internal"], include_in_schema=False
@@ -37,3 +38,12 @@ async def reap_executions(request: Request):
     reaped = await reap_stale_executions()
 
     return ApiResponse(success=True, data={"reaped": reaped})
+
+
+@router.get("/refresh-metadata", response_model=ApiResponse[dict])
+async def refresh_metadata(request: Request):
+    """Re-extract the dependency map of connections not refreshed in a day."""
+
+    _require_cron_secret(request)
+
+    return ApiResponse(success=True, data=await refresh_due_connections())
