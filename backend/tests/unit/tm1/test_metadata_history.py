@@ -227,10 +227,13 @@ async def test_an_approved_process_change_keeps_the_map_in_step(
         target_name="Load Sales",
         new_content={"data": "CellPutN(1, 'Expense', 'NA');"},
     )
-    # What TM1 returns once the change is saved.
-    fake_tm1_client.processes.get.return_value = Process(
-        name="Load Sales", data_procedure="CellPutN(1, 'Expense', 'NA');"
-    )
+    # The server returns the saved version once the change is applied.
+    def saved(process, *args, **kwargs):
+        fake_tm1_client.processes.get.return_value = Process(
+            name="Load Sales", data_procedure="CellPutN(1, 'Expense', 'NA');"
+        )
+
+    fake_tm1_client.processes.update_or_create.side_effect = saved
 
     done = await change_service.execute_change(db_session, change, user.id)
 

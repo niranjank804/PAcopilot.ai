@@ -334,6 +334,23 @@ export interface TM1ChangeSummary {
   rolled_back_at: string | null;
   // What TM1 reported for an approved process run.
   execution_result?: Record<string, unknown> | null;
+  // Pre-deployment checklist (backend change_service._check).
+  checks?: ChangeCheck[] | null;
+}
+
+export interface LifecycleStep {
+  key: string;
+  label: string;
+  state: "done" | "current" | "failed" | "skipped" | "pending";
+  at: string | null;
+  detail: string | null;
+}
+
+export interface ChangeCheck {
+  name: string;
+  status: "pass" | "warn" | "fail" | "info";
+  detail: string;
+  items?: string[];
 }
 
 export interface TM1ChangeDetail {
@@ -344,6 +361,7 @@ export interface TM1ChangeDetail {
     impact: (RelatedObject | { note: string })[] | null;
     validation_errors: ProcessSyntaxError[] | null;
   };
+  lifecycle?: LifecycleStep[];
 }
 
 export interface CodingConvention {

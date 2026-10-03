@@ -23,6 +23,7 @@ from src.tm1.metadata import dependency_analyzer, extractor
 from src.tm1.service import tm1_integration_service
 from src.tm1.services import cube_service, log_service, process_service
 from src.tm1.ti.parser import parse_process_code
+from src.tm1.ti.review import review
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +322,46 @@ async def _refresh_graph(db: AsyncSession, change: TM1Change, *, deleted: bool) 
         logger.warning(f"Dependency map not refreshed for {change.target_name}", exc_info=True)
 
 
+def _hash(value) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+
+
+async def _server_fingerprint(client, connection_id, change_type: str, target: str) -> str | None:
+    """The target as the server holds it now, hashed: the rules text, or a
+    process's four code sections. None where no later edit could be lost
+    (a new process is re-checked for existence instead; a run has no
+    content)."""
+
+    if change_type == "update_rules":
+        return _hash(_rules_text(await cube_service.get_cube_rules(client, connection_id, target)))
+    if change_type in ("update_process", "delete_process"):
+        return _hash(_code_of(await process_service.get_process_body(client, connection_id, target)))
+    return None
+
+
+def _check(name: str, status: str, detail: str, items: list | None = None) -> dict:
+    entry = {"name": name, "status": status, "detail": detail}
+    if items:
+        entry["items"] = items[:10]
+    return entry
+
+
+def _impact_check(impact: list) -> dict:
+    counts = {s: 0 for s in ("critical", "high", "medium", "low")}
+    for entry in impact or []:
+        if isinstance(entry, dict) and entry.get("severity") in counts:
+            counts[entry["severity"]] += 1
+    serious = counts["critical"] + counts["high"]
+    detail = ", ".join(f"{n} {s}" for s, n in counts.items() if n) or "nothing in the dependency map depends on it"
+    return _check(
+        "Impact",
+        "warn" if serious else "pass",
+        detail + (" — the approver must confirm reading it" if serious else ""),
+    )
+
+
 class ChangeService:
 
     async def _client(self, db, connection):
@@ -369,6 +410,8 @@ class ChangeService:
         new_content: dict | None,
     ) -> TM1Change:
 
+        checks: list[dict] = []
+
         if change_type not in VALID_CHANGE_TYPES:
             raise ValidationException(f"Unknown change_type '{change_type}'.")
 
@@ -412,6 +455,15 @@ class ChangeService:
             # dry-run exists in TM1 — real validation happens at execute.
             await cube_service.get_cube(client, connection.id, target_name)
             object_type = "cube"
+            checks = [
+                _check(
+                    "Rule syntax",
+                    "info",
+                    "TM1 has no dry run for rules: they are checked right after "
+                    "they are applied, and the previous rules are restored "
+                    "automatically if the check fails",
+                ),
+            ]
 
         elif change_type in ("create_process", "update_process"):
             if new_content is None:
@@ -449,11 +501,47 @@ class ChangeService:
             errors = await process_service.compile_process_dryrun(
                 client, connection.id, candidate
             )
-            validation_errors = ti_analysis.analyze(
+            static_errors = ti_analysis.analyze(
                 new_content,
                 datasource_type=(base or {}).get("DataSourceType"),
-            ) + (errors or [])
+            )
+            validation_errors = static_errors + (errors or [])
             object_type = "process"
+
+            findings, _ = review(parse_process_code(
+                target_name,
+                prolog=candidate.prolog_procedure or "",
+                metadata=candidate.metadata_procedure or "",
+                data=candidate.data_procedure or "",
+                epilog=candidate.epilog_procedure or "",
+                datasource_type=(base or {}).get("DataSourceType") or "None",
+                datasource_name="",
+            ))
+            concerns = [f for f in findings if f.severity in ("error", "warning")]
+            checks = [
+                _check(
+                    "Static analysis",
+                    "fail" if static_errors else "pass",
+                    f"{len(static_errors)} problem(s) found" if static_errors else "no undeclared or misspelled names",
+                    [e.get("Message", str(e)) if isinstance(e, dict) else str(e) for e in static_errors],
+                ),
+                _check(
+                    "Compiled on the server (not saved)",
+                    "fail" if errors else "pass",
+                    f"{len(errors)} compile error(s)" if errors else "TM1 compiled it without errors",
+                    [f"{e.get('Procedure', '')} line {e.get('LineNumber', '?')}: {e.get('Message', '')}" for e in errors or []],
+                ),
+                _check(
+                    "Code review",
+                    "warn" if concerns else "pass",
+                    (
+                        f"{len(concerns)} finding(s) to look at before approving"
+                        if concerns
+                        else "no dangerous operations or errors found"
+                    ),
+                    [f"{f.category}: {f.evidence}" for f in concerns],
+                ),
+            ]
 
         elif change_type == "run_process":
             # Raises TM1NotFoundError for a process that does not exist.
@@ -466,6 +554,21 @@ class ChangeService:
                 raise ValidationException("run_process parameters must be an object.")
 
             validation_errors = validate_run_parameters(process.parameters, given)
+            checks = [
+                _check(
+                    "Parameters",
+                    "fail" if validation_errors else "pass",
+                    f"{len(validation_errors)} problem(s)" if validation_errors
+                    else "every value matches a parameter the process declares",
+                    validation_errors,
+                ),
+                _check(
+                    "No rollback",
+                    "warn",
+                    "A run writes data directly; it cannot be rolled back. Check "
+                    "the values and the cubes it writes before approving",
+                ),
+            ]
             record = parse_process_code(
                 process.name,
                 prolog=process.prolog,
@@ -498,6 +601,16 @@ class ChangeService:
             )
         )
 
+        if change_type != "run_process":
+            checks.append(_impact_check(impact))
+            checks.append(_check(
+                "Snapshot and rollback",
+                "info",
+                "The current version is saved when the change is applied, and "
+                "can be restored with Roll back",
+            ))
+        base_fingerprint = await _server_fingerprint(client, connection.id, change_type, target_name)
+
         # An agent that calls propose_process_update several times in one
         # turn produces several proposals against the same target. Each one
         # replaces the last, so the turn ends with exactly one executable
@@ -521,6 +634,8 @@ class ChangeService:
             validation_errors=validation_errors or None,
             impact=impact,
             status="draft",
+            base_fingerprint=base_fingerprint,
+            checks=checks or None,
         )
 
         created = await tm1_change_repository.create(db, change)
@@ -565,6 +680,64 @@ class ChangeService:
             "impact": change.impact,
             "validation_errors": change.validation_errors,
         }
+
+    @staticmethod
+    def lifecycle(change: TM1Change) -> list[dict]:
+        """Where the change is in its life, step by step, from the record.
+
+        Each step is done, current, failed, skipped or pending. Nothing is
+        inferred: a step is done only when the record shows it happened.
+        """
+
+        is_run = change.change_type == "run_process"
+        status = change.status
+        drafted = {"at": change.created_at}
+        valid = not change.validation_errors
+        decided = change.executed_at is not None
+        outcome_failed = status == "failed"
+
+        def step(key, label, state, at=None, detail=None):
+            return {"key": key, "label": label, "state": state, "at": at, "detail": detail}
+
+        steps = [
+            step("requested", "Requested", "done", **drafted,
+                 detail="drafted by the AI assistant" if (change.new_content or {}).get("ai_generated") else None),
+            step("analyzed", "Impact analysed" if not is_run else "Run plan prepared", "done", **drafted),
+            step("validated", "Validated", "done" if valid else "failed", **drafted,
+                 detail=None if valid else f"{len(change.validation_errors)} problem(s): cannot be approved"),
+            step("diff", "Diff ready" if not is_run else "Values shown", "done", **drafted),
+        ]
+
+        if status in ("rejected", "superseded"):
+            steps.append(step("approval", "Approval", "skipped",
+                              detail="rejected" if status == "rejected" else "replaced by a newer draft"))
+            return steps
+
+        if not decided:
+            steps.append(step("approval", "Approval", "current" if valid else "pending",
+                              detail="waiting for someone with deploy rights" if valid else None))
+            for key, label in (("snapshot", "Snapshot"), ("deployed", "Applied" if not is_run else "Run"),
+                               ("verified", "Verified")):
+                steps.append(step(key, label, "pending"))
+            return steps
+
+        steps.append(step("approval", "Approved", "done", at=change.executed_at))
+        if not is_run:
+            steps.append(step("snapshot", "Snapshot", "done" if change.previous_content else "skipped",
+                              at=change.executed_at))
+        steps.append(step("deployed", "Applied" if not is_run else "Run",
+                          "failed" if outcome_failed else "done", at=change.executed_at,
+                          detail=change.error_message if outcome_failed else None))
+        steps.append(step("verified", "Verified",
+                          "failed" if outcome_failed else "done", at=change.executed_at,
+                          detail=(
+                              "TM1 reported the outcome" if is_run
+                              else "checked by TM1 after applying; restored automatically on failure"
+                          )))
+        if change.rolled_back_at:
+            steps.append(step("rolled_back", "Rolled back", "done", at=change.rolled_back_at))
+
+        return steps
 
     @staticmethod
     async def _lock(db: AsyncSession, change: TM1Change) -> TM1Change:
@@ -617,6 +790,21 @@ class ChangeService:
             db, change.connection_id, change.organization_id
         )
         client = await self._client(db, connection)
+
+        # Drift: the draft was made against the server as it was then. If the
+        # target was edited in TM1 since, applying would overwrite that
+        # edit — refuse, and say so, rather than lose someone's work.
+        if change.base_fingerprint:
+            current = await _server_fingerprint(
+                client, connection.id, change.change_type, change.target_name
+            )
+            if current != change.base_fingerprint:
+                raise ConflictException(
+                    f"'{change.target_name}' was changed on the TM1 server after "
+                    "this draft was made. Applying it would overwrite that "
+                    "change, so nothing was applied. Make a new draft from the "
+                    "current version."
+                )
 
         change.executed_by = executed_by
         change.executed_at = datetime.now(timezone.utc)

@@ -133,3 +133,18 @@ class TM1Change(BaseModel, OrganizationScoped):
         JSONB,
         nullable=True,
     )
+
+    # Hash of the target as it was on the server when the draft was made
+    # (rules text, or process code). Compared again at approval: a change
+    # made in TM1 in between would otherwise be silently overwritten.
+    base_fingerprint: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    # The pre-deployment checklist shown to the approver:
+    # [{"name", "status": pass|warn|fail|info, "detail", "items"?}].
+    checks: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )

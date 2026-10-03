@@ -140,6 +140,30 @@ to "what does changing (or deleting) this affect?":
   Deployments page, in the approval dialog, and in a new Impact tab on
   Metadata Explorer (`GET …/metadata/impact`).
 
+### Phase 5 — safe change engine (2026-10-03)
+
+The STET flow already drafted, validated, compiled, diffed, snapshot,
+required approval, applied, verified with automatic restore, audited and
+rolled back. Phase 5 closes what was left between those steps:
+
+- **Drift.** A draft records a fingerprint of its target as the server held
+  it (rules text, or the process's code; migration `a3c9e5f71b24` adds
+  `tm1_changes.base_fingerprint`). Approval compares it again, and refuses if
+  someone edited the object in TM1 in between — the draft would otherwise
+  overwrite their work.
+- **One checklist before approval** (`tm1_changes.checks`): static
+  analysis, compile on the server without saving, code review (dangerous
+  operations, errors), impact, snapshot/rollback; for a run, parameters and
+  "cannot be rolled back". Shown on Deployments and, for anything to look
+  at, in the approval dialog.
+- **The lifecycle on screen**: requested, impact analysed, validated, diff,
+  approval, snapshot, applied, verified, rolled back — each done, current,
+  failed, skipped or to do, read from the record, never assumed.
+
+"Test" in this lifecycle is the checklist, not a trial run: TM1 has no safe
+way to run a TurboIntegrator process without writing data (sandboxes do not
+apply to processes), and the UI says so.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

@@ -1489,6 +1489,7 @@ async def get_change(
         data=ChangeDetailResponse(
             change=ChangeResponse.model_validate(change),
             preview=preview,
+            lifecycle=change_service.lifecycle(change),
         ),
     )
 

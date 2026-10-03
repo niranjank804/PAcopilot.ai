@@ -247,8 +247,12 @@ class ChangeResponse(BaseModel):
     executed_at: datetime | None
     rolled_back_at: datetime | None
     execution_result: dict | None = None
+    # Pre-deployment checklist: [{name, status, detail, items?}].
+    checks: list | None = None
 
 
 class ChangeDetailResponse(BaseModel):
     change: ChangeResponse
     preview: dict
+    # Where the change is in its life: [{key, label, state, at, detail}].
+    lifecycle: list[dict] = []

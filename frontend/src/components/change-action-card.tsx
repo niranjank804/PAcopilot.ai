@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { ChangeChecks } from "@/components/change-lifecycle";
 import { ImpactSummary, needsAcknowledgement } from "@/components/impact-summary";
 import { RunPlan } from "@/components/run-plan";
 import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
@@ -238,6 +239,9 @@ export function ChangeActionCard({
             <div className="max-h-72 overflow-y-auto rounded-md border p-3">
               <RunPlan change={change} />
             </div>
+          ) : null}
+          {confirmKind === "execute" ? (
+            <ChangeChecks checks={change.checks} onlyConcerns />
           ) : null}
           {confirmKind === "execute" && !isRun && change.impact?.length ? (
             <div className="space-y-3">

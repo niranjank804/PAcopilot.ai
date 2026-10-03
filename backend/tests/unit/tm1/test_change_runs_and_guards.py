@@ -279,3 +279,98 @@ async def test_restoring_a_deleted_process_refuses_if_the_name_exists_again(
     # exists() is still True: a process of that name is there again.
     with pytest.raises(ConflictException, match="exists again"):
         await change_service.rollback_change(db_session, done)
+
+
+# ------------------------------------------------- phase 5: the change engine
+
+
+@pytest.mark.asyncio
+async def test_a_process_edited_in_tm1_after_the_draft_is_not_overwritten(
+    db_session, tm1_credentials_key, client
+):
+    org, user, connection = await _setup(db_session)
+    client.processes.exists.return_value = True
+    draft = await _draft(db_session, org, user, connection, "update_process", "Load", {"prolog": "# mine"})
+    assert draft.base_fingerprint
+
+    # A colleague edits the process directly in TM1 before approval.
+    client.processes.get.return_value = _process(prolog="# their hotfix")
+
+    with pytest.raises(ConflictException, match="changed on the TM1 server after this draft"):
+        await change_service.execute_change(db_session, draft, user.id)
+    client.processes.update_or_create.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_rules_edited_in_tm1_after_the_draft_are_not_overwritten(
+    db_session, tm1_credentials_key, client
+):
+    org, user, connection = await _setup(db_session)
+    draft = await _draft(db_session, org, user, connection, "update_rules", "Sales", {"rules": "['A'] = N: 2;"})
+
+    client.rules_state["text"] = "['A'] = N: 99;  # edited in Architect"
+
+    with pytest.raises(ConflictException, match="changed on the TM1 server"):
+        await change_service.execute_change(db_session, draft, user.id)
+
+
+@pytest.mark.asyncio
+async def test_a_process_draft_carries_its_checklist(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    client.processes.exists.return_value = True
+    client.processes.compile_process.return_value = [
+        {"Procedure": "Prolog", "LineNumber": 2, "Message": "Syntax error"}
+    ]
+
+    draft = await _draft(db_session, org, user, connection, "update_process", "Load",
+                         {"prolog": "CubeClearData('Sales');\nnX = ;"})
+    checks = {c["name"]: c for c in draft.checks}
+
+    assert checks["Compiled on the server (not saved)"]["status"] == "fail"
+    assert "Syntax error" in checks["Compiled on the server (not saved)"]["items"][0]
+    assert checks["Code review"]["status"] == "warn"  # CubeClearData
+    assert checks["Impact"]["status"] in ("pass", "warn")
+    assert checks["Snapshot and rollback"]["status"] == "info"
+
+
+@pytest.mark.asyncio
+async def test_a_run_draft_says_it_cannot_be_rolled_back(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    draft = await _draft(db_session, org, user, connection, "run_process", "Load", {"parameters": {"pYear": "2026"}})
+    checks = {c["name"]: c for c in draft.checks}
+
+    assert checks["Parameters"]["status"] == "pass"
+    assert checks["No rollback"]["status"] == "warn"
+    assert "Impact" not in checks
+
+
+@pytest.mark.asyncio
+async def test_the_lifecycle_shows_only_what_the_record_proves(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    client.processes.exists.return_value = True
+    draft = await _draft(db_session, org, user, connection, "update_process", "Load", {"prolog": "# new"})
+
+    states = {s["key"]: s["state"] for s in change_service.lifecycle(draft)}
+    assert states["validated"] == "done"
+    assert states["approval"] == "current"
+    assert states["deployed"] == "pending" and states["verified"] == "pending"
+
+    done = await change_service.execute_change(db_session, draft, user.id)
+    states = {s["key"]: s["state"] for s in change_service.lifecycle(done)}
+    assert states["approval"] == "done" and states["snapshot"] == "done"
+    assert states["deployed"] == "done" and states["verified"] == "done"
+
+    rolled_back = await change_service.rollback_change(db_session, done)
+    assert change_service.lifecycle(rolled_back)[-1]["key"] == "rolled_back"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_run_shows_where_it_failed(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    client.processes.execute_with_return.return_value = (False, "Aborted", None)
+    draft = await _draft(db_session, org, user, connection, "run_process", "Load", {"parameters": {}})
+    done = await change_service.execute_change(db_session, draft, user.id)
+
+    states = {s["key"]: s["state"] for s in change_service.lifecycle(done)}
+    assert states["deployed"] == "failed" and states["verified"] == "failed"
+    assert "snapshot" not in states

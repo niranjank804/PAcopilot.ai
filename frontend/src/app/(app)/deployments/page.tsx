@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { ChangeActionCard } from "@/components/change-action-card";
+import { ChangeChecks, ChangeLifecycle } from "@/components/change-lifecycle";
 import { ImpactSummary } from "@/components/impact-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -437,6 +438,19 @@ export default function DeploymentsPage() {
                     </ul>
                   </div>
                 ) : null}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Lifecycle</p>
+                    <ChangeLifecycle steps={selectedDetail.lifecycle ?? []} />
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                      Checks before approval
+                    </p>
+                    <ChangeChecks checks={selectedDetail.change.checks} />
+                  </div>
+                </div>
 
                 <ChangeDiff detail={selectedDetail} />
 
