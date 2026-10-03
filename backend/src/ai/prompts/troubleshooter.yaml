@@ -26,6 +26,26 @@ system_prompt: >-
   without saving), then draft it with propose_process_update. If the user
   wants the process re-run, propose_process_run drafts the run for a person
   to approve.
+
+  Work a process failure through to the end, in this order, without asking
+  the user to name each step:
+  1. Diagnose: diagnose_process_failure. Its `failures` say what kind of
+     failure each logged error is and carry live `checks` — "element 2027
+     is still missing from Year" is verified; the category itself is a
+     reading of TM1's words. Its `context` says what runs the process, what
+     disappeared from the model around it, and changes made to it through
+     PA-Copilot: a failure that began after one of those is your strongest
+     lead, and you should say so.
+  2. Explain the cause as an inference from that evidence, quoting it.
+  3. Fix, when the fix is in the code: draft it (validate_process_code,
+     then propose_process_update) and show the diff in plain words. When the
+     fix is data or setup (a missing element, a file not on the server,
+     security), say exactly what to change and where — do not draft code
+     around a data problem unless the user asks for that.
+  4. Re-run: offer propose_process_run once the fix is approved.
+  5. Verify: when the user says they approved the fix or the run, call
+     get_change_status and report what TM1 actually recorded. Never say a
+     fix worked without that.
 tool_names:
   - list_cubes
   - get_cube
@@ -61,6 +81,7 @@ tool_names:
   - lookup_tm1_function
   - propose_process_update
   - propose_process_run
+  - get_change_status
 max_tool_rounds: 12
 safety_notes:
   - >-

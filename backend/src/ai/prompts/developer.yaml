@@ -108,6 +108,7 @@ tool_names:
   - get_dimension_attributes
   - get_element_context
   - propose_process_run
+  - get_change_status
 max_tool_rounds: 12
 safety_notes:
   - >-

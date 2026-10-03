@@ -87,6 +87,36 @@ request limit), so a very large model may need extracting from the local
 copy; temporary views and subsets a process creates and destroys are not in
 the map; rule → dimension links are not drawn.
 
+### Phase 3 — diagnostics (2026-10-03)
+
+"Why did process X fail?" now runs from evidence to a verified outcome:
+
+- **What kind of failure.** `diagnose_process_failure` classifies each
+  logged error (`src/tm1/diagnostics/failure.py`): element not found /
+  invalid key, missing cube, dimension or process, value conversion, data
+  source or file, write to a consolidation or a rule-derived cell, security
+  or lock, MDX, ProcessQuit. The category is a reading of TM1's words
+  (inferred); messages no pattern knows are returned unclassified, never
+  forced into one.
+- **Is it still true.** Each claim that one lookup can settle is checked
+  against the model now (verified): "2027 is still missing from Year" vs
+  "it exists now, so the run used another value". A check that cannot be
+  made says so.
+- **What changed around it.** What runs the process (dependency map),
+  objects and dependencies it uses that disappeared in recent extractions
+  (phase 2 history), and changes made to it through PA-Copilot in the last
+  30 days.
+- **Did the fix work.** `get_change_status` reads what happened to a
+  proposed fix or run after approval — applied, failed, rolled back, and
+  TM1's run result — so an agent verifies instead of assuming.
+- **The Troubleshooter works it through**: diagnose, explain from the
+  evidence, fix (code by draft; data or setup by instruction), re-run on
+  approval, verify.
+
+Limits: error-text patterns are English (TM1's server language); the source
+data a run read (file rows, view values) is not read; checks are existence
+checks only.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

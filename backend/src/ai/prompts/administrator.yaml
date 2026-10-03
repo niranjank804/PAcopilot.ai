@@ -36,6 +36,7 @@ tool_names:
   - search_model_objects
   - run_model_health_check
   - propose_process_run
+  - get_change_status
 safety_notes:
   - >-
     You cannot access TM1 security groups or user-access data; if asked,

@@ -9,6 +9,10 @@ look in four places:
    exact code line
 3. the message-log lines TM1 wrote about its runs
 4. static review errors in the current code
+5. each logged error classified, and its claim checked against the model
+   now (src/tm1/diagnostics/failure.py)
+6. what runs the process, and what changed around it lately
+   (src/tm1/diagnostics/context.py)
 
 Each part is labelled by what it is. What TM1 said is VERIFIED. The cause
 is not decided here — that is the model's INFERENCE, and the instructions
@@ -21,8 +25,10 @@ run (`propose_process_run`) and a person approves it.
 
 import json
 import re
+import uuid
 from datetime import datetime
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.tools.tm1._common import (
@@ -34,6 +40,9 @@ from src.ai.tools.tm1._common import (
 )
 from src.ai.tools.tm1.explore import record_from, references_of
 from src.ai.tools.tm1.logs import resolve_locations
+from src.database.models.tm1_change import TM1Change
+from src.tm1.diagnostics import context as failure_context
+from src.tm1.diagnostics.failure import findings_from_log, verify
 from src.tm1.service import tm1_integration_service
 from src.tm1.services import log_service, process_service
 from src.tm1.ti.review import review
@@ -132,8 +141,14 @@ class DiagnoseProcessFailureTool(TM1Tool):
         "source and what it writes and calls, its newest error log with "
         "each error resolved to the exact code line, the message-log lines "
         "TM1 wrote about its runs, and errors a static review finds in the "
-        "current code. Every item is marked verified (read from TM1) or "
-        "unknown (not available, with why). Use this first for any 'why did "
+        "current code. Each logged error is classified (element not found, "
+        "missing object, conversion, data source, consolidated or rule cell, "
+        "security or lock, MDX, ProcessQuit) and its claim checked against "
+        "the model now (is the element there yet?). Also returns what runs "
+        "the process, objects it uses that disappeared in recent extractions, "
+        "and changes made to it through PA-Copilot. Every item is marked "
+        "verified (read from TM1) or unknown (not available, with why). Use "
+        "this first for any 'why did "
         "X fail / abort / not load' question, then explain the cause as an "
         "inference from this evidence and, if a fix is needed, draft it with "
         "propose_process_update."
@@ -168,8 +183,10 @@ class DiagnoseProcessFailureTool(TM1Tool):
         record = record_from(process)
         refs = references_of(record)
 
-        # 2. The error log, mapped to code.
+        # 2. The error log, mapped to code, and what kind of failure it is.
         error_log: dict | None = None
+        failures = []
+        unclassified: list[str] = []
         file_name = kwargs.get("error_log_file")
 
         try:
@@ -189,6 +206,7 @@ class DiagnoseProcessFailureTool(TM1Tool):
                     "excerpt": log_service.truncate_log(content, 4000),
                 }
                 verified.append(f"Error log {file_name} read from TM1")
+                failures, unclassified = findings_from_log(locations, content)
 
                 if not locations:
                     unknown.append(
@@ -226,6 +244,34 @@ class DiagnoseProcessFailureTool(TM1Tool):
         if code_errors:
             verified.append("Static review of the current source (deterministic)")
 
+        # 5. Each failure's claim checked against the model as it is now.
+        if failures:
+            await verify(client, cid, failures)
+            if any(f.checks for f in failures):
+                verified.append("Objects named in the error log checked against TM1 now")
+
+        # 6. What runs it, and what changed around it lately.
+        touched = {process.name} | {
+            entry["name"]
+            for kind in ("cube", "dimension", "process", "view", "subset")
+            for entry in refs["objects"].get(kind, [])
+        }
+        run_by = await failure_context.runners(db, connection.id, organization_id, process.name)
+        model_changes = await failure_context.model_changes_touching(
+            db, connection.id, organization_id, touched
+        )
+        own_changes = await failure_context.recent_changes(
+            db, connection.id, organization_id, process.name
+        )
+
+        if run_by is None:
+            unknown.append(
+                "What runs this process: it is not in the dependency map (run "
+                "metadata extraction)"
+            )
+        if own_changes:
+            verified.append("PA-Copilot change records for this process")
+
         unresolved = refs["unresolved"]
 
         if unresolved:
@@ -248,15 +294,113 @@ class DiagnoseProcessFailureTool(TM1Tool):
                 "reads_cubes": sorted(record.cubes_read),
                 "calls_processes": sorted(record.processes_called),
                 "error_log": error_log,
+                # What kind of failure each error is (a reading of TM1's
+                # words: inferred), with live checks of its claim (verified).
+                "failures": [f.to_dict() for f in failures],
+                "unclassified_errors": unclassified,
+                "context": {
+                    "run_by": run_by,
+                    "model_changes_affecting_it": model_changes,
+                    "recent_changes_through_pa_copilot": own_changes,
+                },
                 "recent_runs": runs[:10],
                 "code_errors": code_errors,
                 "evidence": evidence(
                     verified=verified,
                     inferred=[
                         "The cause of the failure is not stated by TM1. Explain "
-                        "it as an inference from the error log and code above"
+                        "it as an inference from the error log and code above",
+                        *(
+                            ["Each failure's category is a reading of TM1's error "
+                             "text; its checks are verified"]
+                            if failures
+                            else []
+                        ),
                     ],
                     unknown=unknown,
+                ),
+            },
+            default=str,
+        )
+
+
+class GetChangeStatusTool(TM1Tool):
+
+    name = "get_change_status"
+    description = (
+        "What happened to changes proposed through PA-Copilot: whether a "
+        "draft is still waiting for approval, was applied, failed, was "
+        "rejected or rolled back, and for a process run what TM1 reported "
+        "(success, status, error log). Use it after proposing a fix or a "
+        "run, when the user says they approved it, to verify the outcome "
+        "instead of assuming it. Give change_id, or target_name for the "
+        "newest changes to that object."
+    )
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": CONNECTION_ID_SCHEMA,
+            "change_id": {"type": "string", "description": "A change's id, from the proposal."},
+            "target_name": {
+                "type": "string",
+                "description": "A process or cube name: its newest changes (up to 5).",
+            },
+        },
+        "required": ["connection_id"],
+    }
+
+    async def execute(self, db: AsyncSession, *, organization_id, user_id, **kwargs) -> str:
+        await self._authorize(db, user_id)
+
+        connection = await tm1_integration_service.get_connection(
+            db, connection_id_of(kwargs), organization_id
+        )
+        query = select(TM1Change).where(
+            TM1Change.connection_id == connection.id,
+            TM1Change.organization_id == organization_id,
+        )
+
+        change_id = kwargs.get("change_id")
+        target = (kwargs.get("target_name") or "").strip()
+
+        if change_id:
+            try:
+                query = query.where(TM1Change.id == uuid.UUID(str(change_id)))
+            except ValueError:
+                return json.dumps({"error": f"'{change_id}' is not a change id."})
+        elif target:
+            query = query.where(func.lower(TM1Change.target_name) == target.lower())
+        else:
+            return json.dumps({"error": "Give change_id or target_name."})
+
+        changes = (
+            await db.execute(query.order_by(TM1Change.created_at.desc()).limit(5))
+        ).scalars().all()
+
+        return json.dumps(
+            {
+                "changes": [
+                    {
+                        "change_id": str(c.id),
+                        "type": c.change_type,
+                        "target": c.target_name,
+                        "status": c.status,
+                        "created_at": c.created_at,
+                        "executed_at": c.executed_at,
+                        "rolled_back_at": c.rolled_back_at,
+                        "error_message": c.error_message,
+                        "validation_errors": c.validation_errors,
+                        "execution_result": c.execution_result,
+                    }
+                    for c in changes
+                ],
+                "evidence": evidence(
+                    verified=["PA-Copilot's change records (status as recorded at approval)"],
+                    unknown=(
+                        ["No change matches; it may not have been proposed through PA-Copilot"]
+                        if not changes
+                        else []
+                    ),
                 ),
             },
             default=str,

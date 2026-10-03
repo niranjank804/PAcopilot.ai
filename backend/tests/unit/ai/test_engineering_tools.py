@@ -183,3 +183,106 @@ async def test_validating_code_compiles_it_without_saving_anything(
     dryrun.assert_awaited_once()
     save.assert_not_awaited()
     assert "Syntax error" in json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_diagnosis_classifies_checks_and_adds_what_changed_around_it(
+    db_session, tm1_credentials_key, client, monkeypatch
+):
+    from datetime import datetime, timezone
+
+    from src.database.models.tm1_change import TM1Change
+    from src.tm1.services import structure_service
+
+    org, admin, connection = await _setup(db_session)
+    load = _process("Load Sales", data="CellPutN(vValue, 'Sales', vYear, vMonth);\n")
+    monkeypatch.setattr(process_service, "get_process", AsyncMock(return_value=load))
+    monkeypatch.setattr(log_service, "list_process_error_logs", AsyncMock(return_value=["TM1ProcessError_x.log"]))
+    monkeypatch.setattr(
+        log_service,
+        "get_process_error_log",
+        AsyncMock(return_value='Error: Data procedure line (1): Invalid key: Dimension Name: "Year", Element Name (Key): "2027"'),
+    )
+    monkeypatch.setattr(log_service, "get_message_log", AsyncMock(return_value=[]))
+
+    async def object_exists(_client, _cid, kind, name, dimension_name=None, **_):
+        return kind == "dimension"  # Year exists; 2027 does not
+
+    monkeypatch.setattr(structure_service, "object_exists", object_exists)
+
+    # Someone changed the process through PA-Copilot yesterday.
+    db_session.add(TM1Change(
+        connection_id=connection.id, organization_id=org.id, created_by=admin.id,
+        change_type="update_process", target_name="Load Sales", status="executed",
+        new_content={"data": "x"},
+        executed_by=admin.id, executed_at=datetime.now(timezone.utc),
+    ))
+    await db_session.flush()
+
+    result = await _run(DiagnoseProcessFailureTool(), db_session, org, admin, connection,
+                        process_name="Load Sales")
+
+    failure = result["failures"][0]
+    assert failure["category"] == "element_not_found"
+    assert failure["entities"] == {"dimension": "Year", "element": "2027"}
+    assert failure["checks"][0]["result"].startswith("no — it is still missing")
+    assert result["context"]["recent_changes_through_pa_copilot"][0]["type"] == "update_process"
+    # Never mapped: says so instead of claiming nothing runs it.
+    assert result["context"]["run_by"] is None
+    assert any("dependency map" in u for u in result["evidence"]["unknown"])
+
+
+@pytest.mark.asyncio
+async def test_after_approval_the_agent_reads_what_actually_happened(
+    db_session, tm1_credentials_key, client
+):
+    from datetime import datetime, timezone
+
+    from src.ai.tools.tm1.diagnostics import GetChangeStatusTool
+    from src.database.models.tm1_change import TM1Change
+
+    org, admin, connection = await _setup(db_session)
+    run = TM1Change(
+        connection_id=connection.id, organization_id=org.id, created_by=admin.id,
+        change_type="run_process", target_name="Load Sales", status="failed",
+        new_content={"parameters": {}},
+        executed_by=admin.id, executed_at=datetime.now(timezone.utc),
+        execution_result={"success": False, "status": "Aborted", "error_log_file": "x.log"},
+        error_message="TM1 reported Aborted.",
+    )
+    db_session.add(run)
+    await db_session.flush()
+
+    by_id = await _run(GetChangeStatusTool(), db_session, org, admin, connection, change_id=str(run.id))
+    by_name = await _run(GetChangeStatusTool(), db_session, org, admin, connection, target_name="load sales")
+
+    assert by_id["changes"][0]["status"] == "failed"
+    assert by_id["changes"][0]["execution_result"]["status"] == "Aborted"
+    assert by_name["changes"][0]["change_id"] == str(run.id)
+
+
+@pytest.mark.asyncio
+async def test_change_status_never_shows_another_organizations_changes(
+    db_session, tm1_credentials_key, client
+):
+    from src.ai.tools.tm1.diagnostics import GetChangeStatusTool
+    from src.database.models.tm1_change import TM1Change
+
+    org, admin, connection = await _setup(db_session)
+    other_org, other_admin, other_connection = await _setup(db_session)
+    theirs = TM1Change(
+        connection_id=other_connection.id, organization_id=other_org.id, created_by=other_admin.id,
+        change_type="run_process", target_name="Load Sales", status="draft",
+        new_content={},
+    )
+    db_session.add(theirs)
+    await db_session.flush()
+
+    from src.core.exceptions import NotFoundException
+
+    with pytest.raises(NotFoundException):
+        # Their connection is not ours: refused before any change is read.
+        await GetChangeStatusTool().execute(
+            db_session, organization_id=org.id, user_id=admin.id,
+            connection_id=str(other_connection.id), change_id=str(theirs.id),
+        )

@@ -168,6 +168,7 @@ tool_names:
   - validate_process_code
   - review_process_code
   - propose_process_run
+  - get_change_status
 max_tool_rounds: 12
 safety_notes:
   - >-

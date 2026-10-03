@@ -286,3 +286,34 @@ async def search_elements(
         )
         or []
     )
+
+
+async def object_exists(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    kind: str,
+    name: str,
+    dimension_name: str | None = None,
+    **resilience_kwargs,
+) -> bool:
+    """Whether a cube, dimension, process or element exists now.
+
+    For checking what an error log claims ("element X not found") against
+    the live model. An element is looked up in the dimension's same-named
+    hierarchy, which is where TI lookups and cell writes resolve it.
+    """
+
+    if kind == "element":
+        if not dimension_name:
+            raise ValueError("An element check needs its dimension.")
+        call, args = client.elements.exists, (dimension_name, dimension_name, name)
+    elif kind == "cube":
+        call, args = client.cubes.exists, (name,)
+    elif kind == "dimension":
+        call, args = client.dimensions.exists, (name,)
+    elif kind == "process":
+        call, args = client.processes.exists, (name,)
+    else:
+        raise ValueError(f"Cannot check existence of a {kind}.")
+
+    return bool(await call_with_resilience(connection_id, call, *args, **resilience_kwargs))

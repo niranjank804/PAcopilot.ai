@@ -134,7 +134,8 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "get_process_error_log": _c("diagnostics", R, "TM1 REST · process error log", LIVE, "process_name", "file_name"),
     "map_log_error_to_code": _c("diagnostics", R, "Process error log + process source", LIVE, "process_name"),
     "get_process_execution_history": _c("diagnostics", R, "TM1 REST · message log (TM1.Process)", LIVE, "process_name"),
-    "diagnose_process_failure": _c("diagnostics", R, "Process source, error log, message log", LIVE, "process_name"),
+    "diagnose_process_failure": _c("diagnostics", R, "Process source, error log, message log, live checks", LIVE, "process_name"),
+    "get_change_status": _c("change_management", R, "PA-Copilot change records", REFERENCE, "change_id", "target_name"),
     # --- Development ---
     "diff_process": _c("development", R, "TM1 REST · process source", LIVE, "process_name"),
     "validate_process_code": _c("development", V, "TM1 compile (unsaved) + static analysis", LIVE, "process_name"),
