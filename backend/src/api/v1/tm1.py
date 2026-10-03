@@ -30,6 +30,7 @@ from src.schemas.tm1 import (
     DependencyNode,
     DependencyPathResponse,
     DimensionResponse,
+    ExecuteChangeRequest,
     ExtractionRecordResponse,
     ExtractionSummaryResponse,
     ObjectRelationshipsResponse,
@@ -49,6 +50,7 @@ from src.ai.visualization import _cube_from_mdx, generate_visualization, run_mdx
 from src.services.audit_service import audit_service
 from src.tm1.deployment.change_service import change_service
 from src.tm1.metadata import dependency_analyzer
+from src.tm1.impact.analyzer import analyze_impact
 from src.tm1.metadata import history as extraction_history
 from src.tm1.service import tm1_integration_service
 
@@ -666,6 +668,33 @@ async def extract_connection_metadata(
             relationships_created=summary.relationships_created,
             unresolved_references=summary.unresolved_references,
             changes=record.changes,
+        ),
+    )
+
+
+@router.get(
+    "/connections/{connection_id}/metadata/impact",
+    response_model=ApiResponse[dict],
+)
+async def metadata_impact(
+    connection_id: uuid.UUID,
+    object_type: str = Query(pattern="^(cube|dimension|process|chore|view|subset)$"),
+    name: str = Query(min_length=1, max_length=255),
+    change_kind: str = Query(default="modify", pattern="^(modify|delete)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+):
+    """What changing or deleting one object would affect, ranked by
+    severity, from the dependency map."""
+
+    await tm1_integration_service.get_connection(
+        db, connection_id, current_user.organization_id
+    )
+    return ApiResponse(
+        success=True,
+        data=await analyze_impact(
+            db, connection_id, current_user.organization_id, object_type, name,
+            change_kind=change_kind,
         ),
     )
 
@@ -1472,6 +1501,7 @@ async def execute_change(
     connection_id: uuid.UUID,
     change_id: uuid.UUID,
     http_request: Request,
+    body: ExecuteChangeRequest | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("tm1.deploy")),
 ):
@@ -1495,7 +1525,12 @@ async def execute_change(
         db, connection_id, current_user.organization_id
     )
 
-    change = await change_service.execute_change(db, change, current_user.id)
+    change = await change_service.execute_change(
+        db,
+        change,
+        current_user.id,
+        acknowledge_impact=bool(body and body.acknowledge_impact),
+    )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
 

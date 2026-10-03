@@ -85,6 +85,12 @@ class ExtractionSummaryResponse(BaseModel):
     changes: dict | None = None
 
 
+class ExecuteChangeRequest(BaseModel):
+    # Required when the change's impact includes critical or high-severity
+    # objects: the approver confirms they have read it.
+    acknowledge_impact: bool = False
+
+
 class ExtractionRecordResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

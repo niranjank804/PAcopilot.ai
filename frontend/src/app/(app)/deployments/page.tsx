@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { ChangeActionCard } from "@/components/change-action-card";
+import { ImpactSummary } from "@/components/impact-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,7 +46,6 @@ import { ApiError, apiRequest } from "@/lib/api-client";
 import { CHANGE_TYPE_LABEL, PROCESS_FIELD_MAP, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
 import type {
-  RelatedObject,
   TM1ChangeDetail,
   TM1ChangeSummary,
   TM1Connection,
@@ -53,10 +53,6 @@ import type {
 
 function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
-}
-
-function isNote(item: RelatedObject | { note: string }): item is { note: string } {
-  return "note" in item;
 }
 
 function DiffBlock({ label, before, after }: { label: string; before: string; after: string }) {
@@ -447,23 +443,10 @@ export default function DeploymentsPage() {
                 {/* A run's impact is its plan, shown above by RunPlan. */}
                 <div hidden={selectedDetail.change.change_type === "run_process"}>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Impact ({selectedDetail.change.impact?.length ?? 0}{" "}
-                    downstream objects)
+                    Impact — what this change affects
                   </p>
-                  <div className="max-h-40 overflow-auto rounded-md border p-2 text-xs">
-                    {selectedDetail.change.impact?.length ? (
-                      selectedDetail.change.impact.map((entry, index) => (
-                        <div key={index} className="py-0.5">
-                          {isNote(entry)
-                            ? entry.note
-                            : `${entry.object_type} ${entry.name} (${entry.relationship_type})`}
-                        </div>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground">
-                        No impact recorded.
-                      </span>
-                    )}
+                  <div className="max-h-72 overflow-auto rounded-md border p-2">
+                    <ImpactSummary entries={selectedDetail.change.impact} />
                   </div>
                 </div>
 

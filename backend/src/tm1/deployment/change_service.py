@@ -18,6 +18,7 @@ from src.repositories.tm1_change_repository import tm1_change_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment import ti_analysis
 from src.tm1.exceptions import TM1ConnectionError, TM1NotFoundError
+from src.tm1.impact.analyzer import analyze_impact, needs_acknowledgement
 from src.tm1.metadata import dependency_analyzer, extractor
 from src.tm1.service import tm1_integration_service
 from src.tm1.services import cube_service, log_service, process_service
@@ -332,20 +333,29 @@ class ChangeService:
         organization_id: uuid.UUID,
         object_type: str,
         name: str,
+        change_type: str,
     ) -> list:
-        try:
-            return await dependency_analyzer.find_dependents(
-                db, connection_id, organization_id, object_type, name
-            )
-        except NotFoundException:
-            return [
-                {
-                    "note": (
-                        f"{object_type} '{name}' is not in the metadata graph — "
-                        "run metadata extraction for impact analysis."
-                    )
-                }
-            ]
+        """What this change affects, ranked (src/tm1/impact/analyzer.py),
+        stored on the draft so the approver sees it and approval can
+        require it was read."""
+
+        result = await analyze_impact(
+            db,
+            connection_id,
+            organization_id,
+            object_type,
+            name,
+            change_kind="delete" if change_type == "delete_process" else "modify",
+            rules_change=change_type == "update_rules",
+        )
+
+        if not result["in_graph"]:
+            return [{"note": result["not_covered"][0]}]
+
+        entries: list = list(result["items"])
+        if result["graph"].get("note"):
+            entries.append({"note": result["graph"]["note"]})
+        return entries
 
     async def create_change(
         self,
@@ -484,7 +494,7 @@ class ChangeService:
             run_impact
             if change_type == "run_process"
             else await self._impact(
-                db, connection.id, organization_id, object_type, target_name
+                db, connection.id, organization_id, object_type, target_name, change_type
             )
         )
 
@@ -576,6 +586,7 @@ class ChangeService:
         db: AsyncSession,
         change: TM1Change,
         executed_by: uuid.UUID,
+        acknowledge_impact: bool = False,
     ) -> TM1Change:
 
         change = await self._lock(db, change)
@@ -588,6 +599,18 @@ class ChangeService:
         if change.validation_errors:
             raise ValidationException(
                 "This draft has validation errors and cannot be executed."
+            )
+
+        # A change that reaches critical or high-severity objects is applied
+        # only once the approver has confirmed reading what it affects.
+        if needs_acknowledgement(change.impact) and not acknowledge_impact:
+            serious = sum(
+                1 for e in change.impact
+                if isinstance(e, dict) and e.get("severity") in ("critical", "high")
+            )
+            raise ValidationException(
+                f"This change affects {serious} critical or high-severity "
+                "object(s). Review its impact and confirm before applying it."
             )
 
         connection = await tm1_integration_service.get_connection(

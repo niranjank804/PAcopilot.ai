@@ -20,6 +20,7 @@ import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
 import { ModelHistory } from "@/components/model-history";
+import { ObjectImpact } from "@/components/object-impact";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -503,6 +504,7 @@ function MetadataExplorer() {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="relationships">Relationships</TabsTrigger>
                 <TabsTrigger value="graph">Graph</TabsTrigger>
+                <TabsTrigger value="impact">Impact</TabsTrigger>
                 <TabsTrigger value="changes">
                   Recent Changes {objectChanges.length ? `(${objectChanges.length})` : ""}
                 </TabsTrigger>
@@ -825,6 +827,27 @@ function MetadataExplorer() {
                     onViewDeployments={viewDeploymentsFor}
                   />
                 ) : null}
+              </TabsContent>
+
+              <TabsContent value="impact">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Impact</CardTitle>
+                    <CardDescription>
+                      What changing or deleting &quot;{selected.name}&quot; would
+                      affect, ranked by severity, from the dependency map.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {activeConnectionId ? (
+                      <ObjectImpact
+                        connectionId={activeConnectionId}
+                        objectType={selected.type}
+                        name={selected.name}
+                      />
+                    ) : null}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="changes">

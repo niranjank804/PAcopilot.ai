@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { ImpactSummary, needsAcknowledgement } from "@/components/impact-summary";
 import { RunPlan } from "@/components/run-plan";
 import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import type { TM1ChangeDetail, TM1ChangeSummary } from "@/lib/types";
@@ -51,6 +52,9 @@ export function ChangeActionCard({
   const [confirmKind, setConfirmKind] = useState<
     "execute" | "rollback" | "reject" | null
   >(null);
+  // Critical or high impact: approval needs this ticked, here and on the
+  // server (the API refuses without acknowledge_impact).
+  const [impactRead, setImpactRead] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: ["tm1-change-detail", connectionId, changeId],
@@ -64,7 +68,9 @@ export function ChangeActionCard({
     mutationFn: (kind: "execute" | "rollback" | "reject") =>
       apiRequest<TM1ChangeSummary>(
         `/tm1/connections/${connectionId}/changes/${changeId}/${kind}`,
-        { method: "POST" },
+        kind === "execute"
+          ? { method: "POST", body: { acknowledge_impact: impactRead } }
+          : { method: "POST" },
       ),
     onSuccess: (updated, kind) => {
       if (updated.change_type === "run_process" && kind === "execute") {
@@ -87,6 +93,7 @@ export function ChangeActionCard({
         );
       }
       setConfirmKind(null);
+      setImpactRead(false);
       queryClient.invalidateQueries({
         queryKey: ["tm1-change-detail", connectionId, changeId],
       });
@@ -113,6 +120,7 @@ export function ChangeActionCard({
   const { change } = detailQuery.data;
   const hasErrors = Boolean(change.validation_errors?.length);
   const isRun = change.change_type === "run_process";
+  const mustReadImpact = !isRun && needsAcknowledgement(change.impact);
   const aiGenerated = Boolean(change.new_content?.ai_generated);
 
   return (
@@ -199,7 +207,10 @@ export function ChangeActionCard({
       <AlertDialog
         open={confirmKind !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmKind(null);
+          if (!open) {
+            setConfirmKind(null);
+            setImpactRead(false);
+          }
         }}
       >
         <AlertDialogContent>
@@ -228,11 +239,35 @@ export function ChangeActionCard({
               <RunPlan change={change} />
             </div>
           ) : null}
+          {confirmKind === "execute" && !isRun && change.impact?.length ? (
+            <div className="space-y-3">
+              <div className="max-h-60 overflow-y-auto rounded-md border p-3">
+                <ImpactSummary entries={change.impact} maxItems={15} />
+              </div>
+              {mustReadImpact ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={impactRead}
+                    onChange={(event) => setImpactRead(event.target.checked)}
+                  />
+                  <span>
+                    I have reviewed what this change affects, including the
+                    critical and high-severity objects above.
+                  </span>
+                </label>
+              ) : null}
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => confirmKind && actionMutation.mutate(confirmKind)}
-              disabled={actionMutation.isPending}
+              disabled={
+                actionMutation.isPending ||
+                (confirmKind === "execute" && mustReadImpact && !impactRead)
+              }
               variant={confirmKind === "reject" ? "destructive" : "default"}
             >
               {actionMutation.isPending

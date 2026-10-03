@@ -4,6 +4,7 @@ from src.ai.tools.tm1.analysis import (
     DependencyPathTool,
     FindDependenciesTool,
     FindDependentsTool,
+    AnalyzeChangeImpactTool,
     FindUnusedObjectsTool,
     GetModelChangesTool,
 )
@@ -131,6 +132,7 @@ TOOLS: dict[str, Tool] = {
         DependencyPathTool(),
         FindUnusedObjectsTool(),
         GetModelChangesTool(),
+        AnalyzeChangeImpactTool(),
         ProposeRuleUpdateTool(),
         ProposeProcessUpdateTool(),
         ProposeProcessCopyTool(),

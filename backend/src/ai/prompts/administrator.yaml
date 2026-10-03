@@ -15,6 +15,7 @@ system_prompt: >-
   have a process run, propose_process_run drafts the run — a person with the
   right to run processes approves it.
 tool_names:
+  - analyze_change_impact
   - list_chores
   - get_chore
   - list_processes

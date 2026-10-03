@@ -18,6 +18,7 @@ system_prompt: >-
   v12 readiness pass version v12. analyze_cube_rules checks rules and
   feeders statically.
 tool_names:
+  - analyze_change_impact
   - list_cubes
   - get_cube
   - get_cube_rules

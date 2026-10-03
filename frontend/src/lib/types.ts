@@ -58,6 +58,10 @@ export interface RelatedObject {
   object_type: string;
   name: string;
   relationship_type: string;
+  // Set on a change's impact (backend/src/tm1/impact/analyzer.py).
+  severity?: "critical" | "high" | "medium" | "low";
+  reason?: string;
+  depth?: number;
 }
 
 // Raw shape of TM1's /CompileProcess REST response — surfaced verbatim by

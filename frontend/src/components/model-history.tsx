@@ -53,8 +53,12 @@ export interface ExtractionRecord {
 // Mirrors STALE_AFTER_DAYS in backend/src/tm1/metadata/history.py.
 const STALE_AFTER_DAYS = 7;
 
+function ageInDays(iso: string): number {
+  return (Date.now() - new Date(iso).getTime()) / 86_400_000;
+}
+
 function ago(iso: string): string {
-  const days = (Date.now() - new Date(iso).getTime()) / 86_400_000;
+  const days = ageInDays(iso);
   if (days < 1 / 24) return "just now";
   if (days < 1) return `${Math.round(days * 24)} h ago`;
   return `${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"} ago`;
@@ -105,7 +109,7 @@ export function ModelHistory({
 
   const latest = history.data?.find((r) => r.status === "succeeded");
   const stale =
-    latest && (Date.now() - new Date(latest.started_at).getTime()) / 86_400_000 > STALE_AFTER_DAYS;
+    latest && ageInDays(latest.started_at) > STALE_AFTER_DAYS;
 
   return (
     <Card>

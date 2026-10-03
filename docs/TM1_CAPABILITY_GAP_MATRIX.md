@@ -117,6 +117,29 @@ Limits: error-text patterns are English (TM1's server language); the source
 data a run read (file rows, view values) is not read; checks are existence
 checks only.
 
+### Phase 4 — impact analysis (2026-10-03)
+
+`src/tm1/impact/analyzer.py` turns the dependency map into a ranked answer
+to "what does changing (or deleting) this affect?":
+
+- **Every object reached**, up to 4 steps away, with a severity
+  (critical / high / medium / low) and a one-line reason. Severity is a
+  fixed rule: the kind of dependency sets the base (a cube built on a
+  dimension, a chore running a process and a rule reading a cube are
+  critical when the object is deleted, medium or high when it is modified),
+  and each further step lowers it one level. A process change also counts
+  the cubes and dimensions it writes; a rules change counts the cube itself
+  and every cube whose rules read it.
+- **What it cannot see is listed**, not implied safe: security, reports and
+  books, other servers, runtime-built references, and how old the map is.
+- **Every draft records it**, and a change with any critical or high item
+  cannot be applied until the approver confirms reading the impact (the
+  API refuses without `acknowledge_impact`; the approval dialog shows the
+  impact and a checkbox).
+- **Agents ask it** with `analyze_change_impact`; people see it on the
+  Deployments page, in the approval dialog, and in a new Impact tab on
+  Metadata Explorer (`GET …/metadata/impact`).
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

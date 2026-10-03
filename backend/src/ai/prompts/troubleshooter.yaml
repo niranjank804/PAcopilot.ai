@@ -47,6 +47,7 @@ system_prompt: >-
      get_change_status and report what TM1 actually recorded. Never say a
      fix worked without that.
 tool_names:
+  - analyze_change_impact
   - list_cubes
   - get_cube
   - get_cube_rules

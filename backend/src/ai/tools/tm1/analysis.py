@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.tools.base import Tool
 from src.core.exceptions import PermissionDeniedException
 from src.repositories.auth_repository import auth_repository
+from src.tm1.impact.analyzer import analyze_impact
 from src.tm1.metadata import dependency_analyzer
 from src.tm1.metadata.history import graph_freshness, list_extractions
 
@@ -329,3 +330,58 @@ class GetModelChangesTool(Tool):
                 "graph": await graph_freshness(db, connection_id),
             }
         )
+
+
+class AnalyzeChangeImpactTool(Tool):
+
+    name = "analyze_change_impact"
+    description = (
+        "Before a change: everything modifying or deleting one TM1 object "
+        "would affect, each with a severity (critical / high / medium / low) "
+        "and a one-line reason, plus a count per severity. Covers cubes built "
+        "on a dimension, rules that read a cube, processes that read, write or "
+        "call it, chores that run it, views and subsets, and the data a "
+        "process writes. Also lists what the dependency map cannot see "
+        "(security, reports, other systems). Use it whenever the user asks "
+        "what a change would break, before drafting any change to a shared "
+        "object, and present the counts first."
+    )
+    required_permission = "tm1.read"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": {"type": "string", "description": "The ID of the TM1 connection to query."},
+            "object_type": {**_OBJECT_TYPE_SCHEMA, "description": "The type of object to change."},
+            "name": {"type": "string", "description": "Its name (view / subset: 'Cube:View', 'Dimension:Subset')."},
+            "change_kind": {
+                "type": "string",
+                "enum": ["modify", "delete"],
+                "description": "Modify its content or structure (default), or delete it.",
+            },
+        },
+        "required": ["connection_id", "object_type", "name"],
+    }
+
+    async def execute(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        **kwargs,
+    ) -> str:
+
+        await _check_permission(db, user_id)
+
+        change_kind = kwargs.get("change_kind") if kwargs.get("change_kind") in ("modify", "delete") else "modify"
+        result = await analyze_impact(
+            db,
+            uuid.UUID(str(kwargs["connection_id"])),
+            organization_id,
+            str(kwargs["object_type"]),
+            str(kwargs["name"]),
+            change_kind=change_kind,
+        )
+
+        return json.dumps(result)
+
