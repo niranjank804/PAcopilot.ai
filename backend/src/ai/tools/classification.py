@@ -110,6 +110,8 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "get_cube_dependencies": _c("dependencies", R, "Metadata graph", SNAPSHOT, "cube_name"),
     "get_dimension_dependents": _c("dependencies", R, "Metadata graph", SNAPSHOT, "dimension_name"),
     "get_model_changes": _c("governance", R, "Metadata extraction history", SNAPSHOT),
+    "search_engineering_memory": _c("knowledge", R, "Approved engineering memory", REFERENCE, "query"),
+    "propose_engineering_memory": _c("knowledge", W, "Memory proposal for human approval", DRAFT, "object_name"),
     "get_model_health": _c("governance", R, "Scored health scans (rule parser + TI review at scan time)", ANALYSIS),
     "get_performance_report": _c("diagnostics", R, "Process run history from TM1's message log", LIVE),
     "analyze_change_impact": _c("dependencies", R, "Metadata graph, ranked by severity rules", SNAPSHOT, "object_type", "name"),

@@ -15,6 +15,8 @@ system_prompt: >-
   have a process run, propose_process_run drafts the run — a person with the
   right to run processes approves it.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - get_performance_report
   - get_model_health
   - analyze_change_impact

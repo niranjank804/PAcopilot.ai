@@ -245,6 +245,30 @@ every tool is tested on these), AUTO by default, one-step fallback.
   an estimate (the same tokens priced at BEST), labelled as one. Migration
   `e6a1c8d3f5b7` adds agent, tier, route_reason and fell_back to `ai_usage`.
 
+### Phase 10 — engineering memory (2026-10-03)
+
+`engineering_memories` (migration `a8c2e6f0b4d1`,
+`src/services/engineering_memory_service.py`): what the team knows that
+TM1 cannot say — conventions, run sequences, cautions, known issues —
+organization-scoped, optionally about one connection and one object.
+
+- **People vouch, the AI only suggests.** A memory written by someone with
+  `knowledge.write` is approved at once; anyone else's, and every one the
+  assistant suggests (`propose_engineering_memory`, with its evidence as the
+  rationale), is a proposal until a person with `knowledge.write` approves
+  it. The assistant's guesses never become memory on their own.
+- **Only approved memory reaches the assistant**: up to 40 entries in every
+  conversation's context (org-wide, plus those about connections the user
+  may use), labelled ORGANIZATION KNOWLEDGE and to be cited as such — and
+  contradicted out loud when live TM1 evidence disagrees.
+  `search_engineering_memory` finds them by object or text.
+- **Versioned and audited**: an edit is a new version superseding the old,
+  which is archived, never overwritten; every create, approve, reject, edit
+  and archive is in the audit log.
+- **Engineering Memory page** (AI engineering menu): proposals to approve or
+  reject with the assistant's reasoning, memory in use with search, edit,
+  history and archive.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

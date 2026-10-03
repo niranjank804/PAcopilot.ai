@@ -51,6 +51,7 @@ from src.repositories.ai_usage_repository import ai_usage_repository
 from src.repositories.organization_repository import organization_repository
 from src.schemas.ai import AttachmentInput
 from src.services.audit_service import audit_service
+from src.services.engineering_memory_service import engineering_memory_service
 from src.tm1.exceptions import TM1NotFoundError
 from src.tm1.resilience import CircuitState, peek_circuit_breaker
 from src.tm1.service import tm1_integration_service
@@ -497,8 +498,15 @@ class AIOrchestrator:
         # `system` is the caller-supplied override, which on the knowledge
         # path carries the retrieved document excerpts — different for
         # every question, so it belongs here rather than in the stable half.
+        # What the team knows that TM1 cannot say — approved memories only,
+        # never the assistant's unapproved proposals.
+        memory_context = await engineering_memory_service.prompt_block(
+            db, organization_id, [c.id for c in reachable]
+        )
+
         volatile_parts = [
             connection_context,
+            memory_context,
             system,
         ]
 

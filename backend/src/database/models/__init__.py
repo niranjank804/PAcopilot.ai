@@ -3,6 +3,7 @@ from .ai_message import AIMessage
 from .ai_tool_execution import AIToolExecution
 from .ai_usage import AIUsage
 from .audit_log import AuditLog
+from .engineering_memory import EngineeringMemory
 from .knowledge_chunk import KnowledgeChunk
 from .knowledge_document import KnowledgeDocument
 from .visual_page import VisualPage
@@ -48,6 +49,7 @@ __all__ = [
     "AIUsage",
     "KnowledgeDocument",
     "VisualPage",
+    "EngineeringMemory",
     "KnowledgeChunk",
     "TM1Change",
     "TM1CodingConvention",

@@ -47,6 +47,8 @@ system_prompt: >-
      get_change_status and report what TM1 actually recorded. Never say a
      fix worked without that.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - get_performance_report
   - analyze_change_impact
   - list_cubes

@@ -18,6 +18,8 @@ system_prompt: >-
   v12 readiness pass version v12. analyze_cube_rules checks rules and
   feeders statically.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - get_model_health
   - analyze_change_impact
   - list_cubes

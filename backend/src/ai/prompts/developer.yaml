@@ -71,6 +71,8 @@ system_prompt: >-
   marks drafts you propose with one AI GENERATED comment line; that line is
   the only authorship note — add none of your own.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - analyze_change_impact
   - search_knowledge_base
   - lookup_tm1_function

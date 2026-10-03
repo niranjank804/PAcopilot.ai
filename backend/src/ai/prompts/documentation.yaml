@@ -17,6 +17,8 @@ system_prompt: >-
   reports missing header comments and parameter prompts — list those as
   documentation gaps.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - list_cubes
   - get_cube
   - get_cube_rules

@@ -43,6 +43,12 @@ def orchestrator(monkeypatch):
         "list_connections",
         AsyncMock(return_value=[]),
     )
+    # No database here: no engineering memory either.
+    monkeypatch.setattr(
+        module.engineering_memory_service,
+        "prompt_block",
+        AsyncMock(return_value=None),
+    )
 
     return AIOrchestrator()
 

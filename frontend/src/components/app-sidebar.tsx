@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  Brain,
   Database,
   FileSpreadsheet,
   HeartPulse,
@@ -96,6 +97,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: BookOpen,
         tour: "nav-knowledge",
         help: "Upload your own documentation so answers cite your material. Includes Explain Error: paste a TM1 error and get the cause and the fix.",
+      },
+      {
+        label: "Engineering Memory",
+        href: "/memory",
+        icon: Brain,
+        help: "What your team knows about the model that TM1 cannot say — run sequences, conventions, cautions, known issues. Approved entries go to the assistant in every conversation; its own suggestions wait for approval.",
       },
       {
         label: "Coding Standards",

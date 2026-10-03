@@ -8,6 +8,7 @@ from src.api.v1.gateway import admin_router as gateway_admin_router
 from src.api.v1.gateway import agent_router as gateway_agent_router
 from src.api.v1.health import router as health_router
 from src.api.v1.knowledge import router as knowledge_router
+from src.api.v1.memory import router as memory_router
 from src.api.v1.learning import router as learning_router
 from src.api.v1.monitoring import router as monitoring_router
 from src.api.v1.permissions import router as permissions_router
@@ -32,6 +33,7 @@ api_router.include_router(users_router)
 api_router.include_router(signups_router)
 api_router.include_router(permissions_router)
 api_router.include_router(ai_router)
+api_router.include_router(memory_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(gateway_admin_router)
 api_router.include_router(tm1_router)

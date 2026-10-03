@@ -44,6 +44,8 @@ system_prompt: >-
   period). Write for someone listening as well as reading — no tables in
   the explanation, the chart already shows the numbers.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - analyze_change_impact
   - list_cubes
   - get_cube

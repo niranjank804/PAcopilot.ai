@@ -16,6 +16,8 @@ system_prompt: >-
   audit_model_rules find unfed and shadowed rules; get_server_state shows
   what is running now.
 tool_names:
+  - search_engineering_memory
+  - propose_engineering_memory
   - get_performance_report
   - get_model_health
   - list_cubes
