@@ -12,6 +12,7 @@ import { z } from "zod";
 import { ChangeActionCard } from "@/components/change-action-card";
 import { ChangeChecks, ChangeLifecycle } from "@/components/change-lifecycle";
 import { ImpactSummary } from "@/components/impact-summary";
+import { PromotionPanel } from "@/components/promotion-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -474,6 +475,21 @@ export default function DeploymentsPage() {
                     Requires deploy permission; fully audited.
                   </span>
                 </div>
+
+                {activeConnectionId ? (
+                  <PromotionPanel
+                    key={selectedDetail.change.id}
+                    change={selectedDetail.change}
+                    connections={connectionsQuery.data ?? []}
+                    environment={
+                      connectionsQuery.data?.find((c) => c.id === activeConnectionId)?.environment ?? "dev"
+                    }
+                    onPromoted={(nextConnection, nextChange) => {
+                      setConnectionId(nextConnection);
+                      setSelectedChangeId(nextChange);
+                    }}
+                  />
+                ) : null}
 
                 {activeConnectionId ? (
                   <ChangeActionCard

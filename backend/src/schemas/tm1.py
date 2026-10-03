@@ -253,6 +253,13 @@ class ChangeResponse(BaseModel):
     execution_result: dict | None = None
     # Pre-deployment checklist: [{name, status, detail, items?}].
     checks: list | None = None
+    # The change this was promoted from (DEV -> QA -> PROD).
+    promoted_from: uuid.UUID | None = None
+
+
+class PromoteChangeRequest(BaseModel):
+    # A connection one environment up: DEV -> QA, QA -> PROD.
+    target_connection_id: uuid.UUID
 
 
 class ChangeDetailResponse(BaseModel):

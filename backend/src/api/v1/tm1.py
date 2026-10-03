@@ -31,6 +31,7 @@ from src.schemas.tm1 import (
     DependencyPathResponse,
     DimensionResponse,
     ExecuteChangeRequest,
+    PromoteChangeRequest,
     ExtractionRecordResponse,
     ExtractionSummaryResponse,
     ObjectRelationshipsResponse,
@@ -48,6 +49,7 @@ from src.schemas.tm1 import (
 )
 from src.ai.visualization import _cube_from_mdx, generate_visualization, run_mdx
 from src.services.audit_service import audit_service
+from src.tm1.deployment import promotion
 from src.tm1.deployment.change_service import change_service
 from src.tm1.metadata import dependency_analyzer
 from src.tm1.impact.analyzer import analyze_impact
@@ -1655,3 +1657,74 @@ async def rollback_change(
     )
 
     return ApiResponse(success=True, data=ChangeResponse.model_validate(change))
+
+
+@router.post(
+    "/connections/{connection_id}/changes/{change_id}/promote",
+    response_model=ApiResponse[ChangeResponse],
+    status_code=201,
+)
+async def promote_change(
+    connection_id: uuid.UUID,
+    change_id: uuid.UUID,
+    request: PromoteChangeRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.write")),
+):
+    """Draft an applied change on the next environment (DEV -> QA -> PROD).
+    The new draft is checked against that server and approved under its
+    rules; nothing is applied here."""
+
+    start = time.monotonic()
+
+    source = await _get_change_checked(
+        db, connection_id, change_id, current_user.organization_id
+    )
+    draft = await promotion.promote(
+        db,
+        source,
+        target_connection_id=request.target_connection_id,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+    )
+    target = await tm1_integration_service.get_connection(
+        db, request.target_connection_id, current_user.organization_id
+    )
+
+    await _log_tm1_access(
+        db,
+        current_user,
+        http_request,
+        action="promote_change",
+        connection=target,
+        elapsed_ms=int((time.monotonic() - start) * 1000),
+        extra={
+            "from_change_id": str(source.id),
+            "change_id": str(draft.id),
+            "target": draft.target_name,
+        },
+    )
+
+    return ApiResponse(success=True, data=ChangeResponse.model_validate(draft))
+
+
+@router.get(
+    "/connections/{connection_id}/changes/{change_id}/package",
+    response_model=ApiResponse[dict],
+)
+async def change_package(
+    connection_id: uuid.UUID,
+    change_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+):
+    """The deployment package: manifest, the environments it passed through
+    with who approved each, evidence, diff, impact, approval rule and
+    rollback plan."""
+
+    change = await _get_change_checked(
+        db, connection_id, change_id, current_user.organization_id
+    )
+    return ApiResponse(success=True, data=await promotion.package(db, change))
+

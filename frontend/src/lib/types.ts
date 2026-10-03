@@ -340,6 +340,8 @@ export interface TM1ChangeSummary {
   execution_result?: Record<string, unknown> | null;
   // Pre-deployment checklist (backend change_service._check).
   checks?: ChangeCheck[] | null;
+  // The change this was promoted from (DEV -> QA -> PROD).
+  promoted_from?: string | null;
 }
 
 export interface LifecycleStep {

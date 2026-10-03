@@ -182,6 +182,23 @@ connection out of PROD needs `tm1.deploy.prod`, so relabelling cannot get
 round the rules. Organization Admins hold all three deploy rights; other
 roles get them through custom roles.
 
+### Phase 7 — change promotion (2026-10-03)
+
+`src/tm1/deployment/promotion.py`: a change that was applied, verified and
+not rolled back can be promoted one environment up — DEV to QA, QA to PROD,
+never DEV straight to PROD. Promotion makes a new draft on the target
+connection from the same content (linked by `tm1_changes.promoted_from`,
+migration `c4e8a2d6f1b9`); that draft is compiled, impact-analysed and
+fingerprinted against the target server and approved under the target's
+rules, so PROD still needs a second person. Process runs are not promoted.
+
+The **deployment package** (`GET …/changes/{id}/package`, Deployments →
+"Deployment package", downloadable as JSON): manifest (what, where, content
+hash), the stages it passed through with requester and approver at each,
+evidence (where it was verified; whether the content stayed identical), the
+checks on this server, diff, impact, the approval rule that applies, and the
+rollback plan.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

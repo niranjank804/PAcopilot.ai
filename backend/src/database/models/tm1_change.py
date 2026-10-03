@@ -148,3 +148,12 @@ class TM1Change(BaseModel, OrganizationScoped):
         JSONB,
         nullable=True,
     )
+
+    # The change this one was promoted from (DEV -> QA -> PROD), so the
+    # chain of environments, approvals and verifications can be followed.
+    promoted_from: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tm1_changes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
