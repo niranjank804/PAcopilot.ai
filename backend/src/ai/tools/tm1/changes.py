@@ -513,3 +513,87 @@ class ProposeProcessRunTool(Tool):
         draft["note"] = _RUN_REVIEW_NOTE
 
         return json.dumps(draft)
+
+
+class ProposeCellWriteTool(Tool):
+
+    name = "propose_cell_write"
+    description = (
+        "Propose writing values to cube cells as a DRAFT change for human "
+        "review — for example correcting an input, a rate or a driver. Give "
+        "each cell's coordinates as one element per cube dimension, in the "
+        "cube's dimension order (use get_cube first), and the new value. "
+        "Only leaf cells that no rule calculates can be written; the draft "
+        "shows the current values next to the new ones. At most 200 cells; "
+        "a data load belongs in a TurboIntegrator process. You cannot "
+        "execute changes — a human administrator applies drafts, and can "
+        "roll them back to the values saved when applying."
+    )
+    required_permission = "tm1.write"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": {
+                "type": "string",
+                "description": "The ID of the TM1 connection.",
+            },
+            "cube_name": {
+                "type": "string",
+                "description": "The cube to write to.",
+            },
+            "cells": {
+                "type": "array",
+                "description": "The cells to write.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "coordinates": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "One element per dimension, in the cube's dimension order.",
+                        },
+                        "value": {
+                            "type": ["number", "string"],
+                            "description": "The new value.",
+                        },
+                    },
+                    "required": ["coordinates", "value"],
+                },
+            },
+            "reason": {
+                "type": "string",
+                "description": "Why these values change, for the approver.",
+            },
+        },
+        "required": ["connection_id", "cube_name", "cells", "reason"],
+    }
+
+    async def execute(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        **kwargs,
+    ) -> str:
+
+        if not await auth_repository.user_has_permission(
+            db, user_id, self.required_permission
+        ):
+            raise PermissionDeniedException(
+                "You do not have permission to draft TM1 changes."
+            )
+
+        return await _create_draft(
+            db,
+            organization_id=organization_id,
+            user_id=user_id,
+            connection_id=kwargs["connection_id"],
+            change_type="write_cells",
+            target_name=str(kwargs["cube_name"]),
+            new_content={
+                "cells": kwargs.get("cells") or [],
+                "reason": str(kwargs.get("reason") or "")[:2000],
+                "ai_generated": True,
+            },
+        )

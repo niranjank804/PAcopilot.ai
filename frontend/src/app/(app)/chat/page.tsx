@@ -395,6 +395,7 @@ const TOOL_PROMPTS: Record<string, string> = {
   propose_process_update: "Draft a new TI process named [process name] that ",
   propose_process_copy:
     "Create a copy of the [process name] process named [new process name].",
+  propose_cell_write: "In the [cube name] cube, set [element, element, ...] to [value] because ",
 };
 
 function toolPrompt(tool: string): string {
@@ -443,6 +444,7 @@ const NAME_ARG_KEYS = [
 // safe to parse directly rather than needing a dedicated field.
 const DRAFT_TOOL_NAMES = new Set([
   "propose_rule_update",
+  "propose_cell_write",
   "propose_process_update",
   "propose_process_copy",
   "propose_process_run",

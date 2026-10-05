@@ -48,6 +48,7 @@ tool_names:
   - get_work_item
   - get_monitor_alerts
   - propose_monitor
+  - propose_cell_write
   - propose_engineering_memory
   - analyze_change_impact
   - list_cubes

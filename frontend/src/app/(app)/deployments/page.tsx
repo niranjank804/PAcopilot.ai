@@ -9,6 +9,7 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { CellWriteTable } from "@/components/cell-write-table";
 import { ChangeActionCard } from "@/components/change-action-card";
 import { ChangeChecks, ChangeLifecycle } from "@/components/change-lifecycle";
 import { ImpactSummary } from "@/components/impact-summary";
@@ -99,6 +100,20 @@ function ChangeDiff({ detail }: { detail: TM1ChangeDetail }) {
 
   if (change.change_type === "run_process") {
     return <RunPlan change={change} />;
+  }
+
+  if (change.change_type === "write_cells") {
+    const proposed = (change.new_content ?? {}) as {
+      cells?: { coordinates: string[]; value: number | string }[];
+      reason?: string;
+    };
+    return (
+      <CellWriteTable
+        current={(preview.current as { cells?: { coordinates: string[]; value: number | string | null }[] } | null)?.cells}
+        proposed={proposed.cells ?? []}
+        reason={proposed.reason}
+      />
+    );
   }
 
   if (change.change_type === "delete_process") {

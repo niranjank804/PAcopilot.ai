@@ -52,8 +52,8 @@ async def promote(
 
     if source.change_type not in PROMOTABLE:
         raise ValidationException(
-            "A process run is not promoted: it acts on one server's data. "
-            "Propose the run on the target connection instead."
+            "A process run or a cell write is not promoted: it acts on one "
+            "server's data. Propose it on the target connection instead."
         )
     if source.status != "executed" or source.rolled_back_at is not None:
         raise ValidationException(
@@ -125,6 +125,12 @@ def _rollback_plan(change: TM1Change, connection_name: str) -> str:
         return (
             f"The process is saved before it is deleted; Roll back restores it on "
             f"{connection_name}, unless a process of that name exists again."
+        )
+    if change.change_type == "write_cells":
+        return (
+            f"The current values of the cells are saved when the change is applied. "
+            f"Roll back writes them back on {connection_name}, and refuses if anyone "
+            "has written those cells since."
         )
     what = "rules" if change.change_type == "update_rules" else "process"
     return (

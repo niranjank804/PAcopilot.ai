@@ -170,6 +170,32 @@ async def read_cells(
     return await call_with_resilience(connection_id, fetch, **resilience_kwargs)
 
 
+async def write_cells(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    cube_name: str,
+    dimensions: list[str],
+    values: list[tuple[list[str], float | str]],
+    **resilience_kwargs,
+) -> None:
+    """Write values to leaf cells, all in one request.
+
+    Only ever reached from change_service for an approved `write_cells`
+    change, or its rollback writing the saved values back. Setting a value
+    is idempotent, so the usual retry is safe.
+    """
+
+    def write() -> None:
+        client.cells.write_values(
+            cube_name,
+            {tuple(coordinates): value for coordinates, value in values},
+            dimensions=dimensions,
+        )
+
+    write.__name__ = "write_values"
+    await call_with_resilience(connection_id, write, **resilience_kwargs)
+
+
 async def read_attribute_values(
     client: TM1Service,
     connection_id: uuid.UUID,

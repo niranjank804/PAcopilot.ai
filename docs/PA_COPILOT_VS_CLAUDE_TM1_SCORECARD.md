@@ -1,6 +1,7 @@
 # PA-Copilot vs the Claude + TM1 benchmark — scorecard
 
-Date: 2026-10-05. Repository state: `main` after phase 12 (monitoring).
+Date: 2026-10-05. Repository state: `main` after phase 12 (monitoring) and
+cell write-back.
 
 **The benchmark** is the Claude + IBM Planning Analytics read-write setup
 described in the PA-Copilot Enterprise brief: live TM1 Dev access over MCP,
@@ -26,21 +27,22 @@ does unless the evidence column shows the extra capability.
 | | Count |
 |---|---|
 | Benchmark capability rows (the 114-row brief) | 103 exist, 10 partial, 0 missing, 1 blocked by the TM1 API ([gap matrix](TM1_CAPABILITY_GAP_MATRIX.md)) |
-| Benchmark actions **not** matched | **Cell write-back** (the benchmark's "write") — PA-Copilot cannot write cell values |
-| Scorecard rows (23, over the brief's 22 categories) | PA-Copilot ahead on 11, equal on 2, behind on 1 (cell write-back); 9 rows the benchmark does not attempt — 8 built, Analytics partial |
+| Benchmark actions **not** matched | None by automated evidence. Cell write-back (the benchmark's "write") was the last; it now exists as a governed change |
+| Scorecard rows (23, over the brief's 22 categories) | PA-Copilot ahead on 12, equal on 2, behind on 0; 9 rows the benchmark does not attempt — 8 built, Analytics partial |
 | Golden workflows (12) | 10 automated end to end with evidence, 2 partial (explain calculation is unit-tested, incident analysis has no dedicated mode) |
 | Live TM1 verification | Read paths confirmed by the owner; write paths **not verified** live |
 
-So: PA-Copilot is **not yet ≥ the benchmark on every benchmark
-capability** — cell write-back is missing — and is ahead on the enterprise
-platform capabilities, by automated evidence, not live measurement.
+So: by automated evidence PA-Copilot is **≥ the benchmark on every
+benchmark capability** and ahead on the enterprise platform capabilities.
+That is not yet a live result: the write paths, cell writes included, have
+not been run against a real TM1 server.
 
 ## Scorecard
 
 | Category | Capability | Claude benchmark (as described) | PA-Copilot | Evidence | Status | Advantage |
 |---|---|---|---|---|---|---|
 | TM1 access | Connect to TM1 / PAaaS | Live Dev access over MCP | Native, v12 SaaS and PA Cloud auth; on-premises through an outbound gateway; credentials encrypted at rest; connections private to their creator unless shared | `tests/unit/tm1/test_service.py`, `test_pa_cloud_connection.py`, `tests/integration/tm1/test_connection_isolation.py`; live read confirmed 2026-09-28 | Verified (read live) | PA-Copilot |
-| TM1 access | Write cell values | "write" listed | **Not built.** Data changes go through a governed process run only | — | **Missing** | **Benchmark** |
+| TM1 access | Write cell values | "write" listed | A governed change (`write_cells`, `propose_cell_write`): leaf, non-rule cells of the right type only, up to 200; current values shown in the draft, saved and re-checked for drift when applying; the write is verified and undone if the server does not hold it; rollback writes the saved values back and refuses over later writes; never promoted; PROD two-person, AI read-only on PROD | `tests/integration/tm1/test_cell_writes.py` | Verified (not live) | PA-Copilot (approval, drift, verify, rollback) |
 | Model discovery | Cubes, dimensions, hierarchies, elements, attributes, subsets, views, chores | Yes | 18 discovery tools, plus a persistent metadata graph with history and freshness | `tests/unit/ai/test_structure_tools.py`, `test_metadata_tools.py`, `tests/unit/tm1/test_extractor.py`, `test_metadata_history.py` | Verified | PA-Copilot (persistent graph) |
 | Process engineering | Inspect, search, call tree, references | Yes | `get_process`, `search_process_code`, `get_process_call_tree`, `analyze_process_references` | `tests/unit/ai/test_process_tools.py`, `test_engineering_tools.py` | Verified | = |
 | TI development | Generate and modify TI, server-side compile, review | Generation, modification, compile | Draft create/update/copy; compile on the server without saving (`validate_process_code`); TI review with dangerous-operation list; organization coding standards learned from exported processes | `tests/unit/ai/test_change_tools.py`, `test_engineering_tools.py`, `tests/unit/tm1/test_ti_review.py`; golden step 04 | Verified | PA-Copilot (standards, review) |
@@ -105,7 +107,7 @@ latency, cost, safety and deployment reliability.
 
 | Measure | Result |
 |---|---|
-| Capability coverage | 103 / 114 rows exist, 10 partial, 1 blocked; plus cell write-back missing |
+| Capability coverage | 103 / 114 rows exist, 10 partial, 1 blocked; plus cell write-back, which the 114 rows did not list |
 | Workflow completion | 10 / 12 golden workflows automated end to end; 2 partial |
 | Safety | Every write is a draft; no tool calls TM1's mutating APIs (enforced by `test_tool_classification.py`); PROD two-person and AI read-only enforced |
 | Accuracy | **Not measured.** No evaluation of answer quality against a real model has been run |
@@ -116,13 +118,11 @@ latency, cost, safety and deployment reliability.
 
 ## What would close the gaps
 
-1. **Cell write-back** as a governed change: values and their current
-   values snapshotted, approval, rollback by writing the snapshot back.
-2. **Incident mode**: one command that identifies the environment and cube,
+1. **Incident mode**: one command that identifies the environment and cube,
    lists recent changes and runs, compares snapshots, diagnoses, proposes a
    mitigation as a draft, and keeps the incident timeline (a work item can
    hold it).
-3. **Live validation**: run `backend/tests/live/` against a real Dev server
+2. **Live validation**: run `backend/tests/live/` against a real Dev server
    (see `backend/docs/live_validation/`), then the golden workflow against it.
-4. **Power BI**, once there is a Microsoft Entra app registration.
-5. **Accuracy evaluation**: a fixed question set scored against a real model.
+3. **Power BI**, once there is a Microsoft Entra app registration.
+4. **Accuracy evaluation**: a fixed question set scored against a real model.

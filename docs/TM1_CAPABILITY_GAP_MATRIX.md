@@ -347,6 +347,29 @@ Migration `d6b2f8e4a1c7`: `monitor_rules`, `monitor_alerts`
 - Tests: `tests/integration/test_monitoring_rules.py` (11), Alerts page
   tests in the frontend.
 
+### Cell write-back (2026-10-05)
+
+The benchmark's "write" — setting cell values — was not among the 114 rows
+and was missing; the scorecard found it. It is now a governed change type,
+`write_cells` (`change_service`, `cell_service.write_cells`), drafted from
+the API or by the assistant (`propose_cell_write`, Developer and Analyst):
+
+- **Draft**: every cell checked against the cube — elements exist, one per
+  dimension; not consolidated (a write would spread); not calculated by a
+  rule; a string only into a string cell; no duplicates; at most 200 cells
+  (a data load is a process). The draft shows each cell's current value next
+  to the new one. Nothing is written.
+- **Apply** (deploy rights for the environment; PROD needs a second person):
+  the current values are read again — if they changed since the draft,
+  nothing is written — and saved; the values are written in one request,
+  read back, and if the server does not hold them the saved values are
+  written back and the change is marked failed.
+- **Rollback** writes the saved values back, and refuses if anyone has
+  written those cells since.
+- **Not promoted**: data belongs to one server; promotion refuses it.
+- Tests: `tests/integration/tm1/test_cell_writes.py` (9). Not verified
+  against a real TM1 server.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

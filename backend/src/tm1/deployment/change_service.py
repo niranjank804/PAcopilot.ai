@@ -21,7 +21,7 @@ from src.tm1.exceptions import TM1ConnectionError, TM1NotFoundError
 from src.tm1.impact.analyzer import analyze_impact, needs_acknowledgement
 from src.tm1.metadata import dependency_analyzer, extractor
 from src.tm1.service import tm1_integration_service
-from src.tm1.services import cube_service, log_service, process_service
+from src.tm1.services import cell_service, cube_service, log_service, process_service
 from src.tm1.ti.parser import parse_process_code
 from src.tm1.ti.review import review
 
@@ -33,7 +33,12 @@ VALID_CHANGE_TYPES = (
     "update_process",
     "delete_process",
     "run_process",
+    "write_cells",
 )
+
+# Cells one write_cells change may set. A change is something a person
+# reads before approving; beyond this it is a data load, which is a process.
+MAX_CELL_WRITES = 200
 
 # Characters of a failed run's error log kept on the change. Enough for
 # the lines that matter; the full file stays on the server.
@@ -328,7 +333,9 @@ def _hash(value) -> str:
     ).hexdigest()
 
 
-async def _server_fingerprint(client, connection_id, change_type: str, target: str) -> str | None:
+async def _server_fingerprint(
+    client, connection_id, change_type: str, target: str, content: dict | None = None
+) -> str | None:
     """The target as the server holds it now, hashed: the rules text, or a
     process's four code sections. None where no later edit could be lost
     (a new process is re-checked for existence instead; a run has no
@@ -338,7 +345,68 @@ async def _server_fingerprint(client, connection_id, change_type: str, target: s
         return _hash(_rules_text(await cube_service.get_cube_rules(client, connection_id, target)))
     if change_type in ("update_process", "delete_process"):
         return _hash(_code_of(await process_service.get_process_body(client, connection_id, target)))
+    if change_type == "write_cells":
+        coordinates = [c for c, _ in _cell_writes(content)]
+        return _hash([_normal(v) for v in await _read_values(client, connection_id, target, coordinates)])
     return None
+
+
+def _normal(value):
+    """A value as drift and rollback compare it: empty numeric is 0."""
+
+    if value is None:
+        return 0.0
+    return round(float(value), 9) if isinstance(value, (int, float)) else value
+
+
+def _cell_writes(new_content: dict | None) -> list[tuple[list[str], float | str]]:
+    """The (coordinates, value) pairs of a write_cells change, checked for
+    shape. Raises ValidationException for a request no one could approve."""
+
+    cells = (new_content or {}).get("cells")
+    if not isinstance(cells, list) or not cells:
+        raise ValidationException("write_cells requires new_content.cells: a list of {coordinates, value}.")
+    if len(cells) > MAX_CELL_WRITES:
+        raise ValidationException(
+            f"A change can write at most {MAX_CELL_WRITES} cells; use a TurboIntegrator "
+            "process for a data load."
+        )
+    writes = []
+    for position, cell in enumerate(cells):
+        coordinates = cell.get("coordinates") if isinstance(cell, dict) else None
+        value = cell.get("value") if isinstance(cell, dict) else None
+        if not isinstance(coordinates, list) or not coordinates or not all(
+            isinstance(e, str) and e for e in coordinates
+        ):
+            raise ValidationException(f"Cell {position + 1}: coordinates must be a list of element names.")
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            raise ValidationException(f"Cell {position + 1}: value must be a number or a string.")
+        writes.append((coordinates, value))
+    return writes
+
+
+def _same_value(a, b) -> bool:
+    """TM1 reports an empty numeric cell as 0 or None, an empty string cell
+    as '' or None; numbers compare with a little float tolerance."""
+
+    if isinstance(a, (int, float)) or isinstance(b, (int, float)):
+        try:
+            x, y = float(a or 0), float(b or 0)
+        except (TypeError, ValueError):
+            return False
+        return abs(x - y) <= 1e-9 * max(1.0, abs(x), abs(y))
+    return (a or "") == (b or "")
+
+
+async def _read_values(client, connection_id, cube: str, coordinates: list[list[str]]) -> list:
+    result = await cell_service.read_cells(client, connection_id, cube, coordinates)
+    if "cells" not in result:
+        raise ValidationException(
+            result.get("error")
+            or "These elements do not exist: "
+            + ", ".join(f"{i['dimension']}:{i['element']}" for i in result.get("invalid", []))
+        )
+    return [cell["value"] for cell in result["cells"]]
 
 
 def _check(name: str, status: str, detail: str, items: list | None = None) -> dict:
@@ -583,6 +651,60 @@ class ChangeService:
             object_type = None
             run_impact = run_plan(process.parameters, given, record)
 
+        elif change_type == "write_cells":
+            writes = _cell_writes(new_content)
+            coordinates = [c for c, _ in writes]
+            result = await cell_service.read_cells(client, connection.id, target_name, coordinates)
+            if "cells" not in result:
+                validation_errors.append(
+                    result.get("error")
+                    or "These elements do not exist: "
+                    + ", ".join(f"{i['dimension']}:{i['element']}" for i in result.get("invalid", []))
+                )
+                cells = []
+            else:
+                cells = result["cells"]
+
+            seen = set()
+            changing = 0
+            for (coords, value), cell in zip(writes, cells):
+                where = ", ".join(coords)
+                if tuple(coords) in seen:
+                    validation_errors.append(f"{where}: listed more than once.")
+                seen.add(tuple(coords))
+                if cell.get("consolidated"):
+                    validation_errors.append(
+                        f"{where}: a consolidated cell. Writing it would spread the value "
+                        "over its children; write the leaf cells instead."
+                    )
+                elif cell.get("rule_derived"):
+                    validation_errors.append(f"{where}: calculated by a rule, so it cannot be written.")
+                current = cell.get("value")
+                if isinstance(current, str) != isinstance(value, str) and current is not None:
+                    validation_errors.append(
+                        f"{where}: a {'string' if isinstance(current, str) else 'numeric'} cell; "
+                        f"the value {value!r} does not fit."
+                    )
+                if not _same_value(current, value):
+                    changing += 1
+
+            checks += [
+                _check(
+                    "Cells",
+                    "fail" if validation_errors else "pass",
+                    f"{len(validation_errors)} problem(s)" if validation_errors
+                    else f"{len(writes)} leaf cell(s), {changing} with a new value; none consolidated or rule-calculated",
+                    validation_errors,
+                ),
+                _check(
+                    "Current values",
+                    "info",
+                    "Read from the server now; they are saved again when the change is "
+                    "applied, and if they have changed by then nothing is written",
+                ),
+            ]
+            object_type = "cube"
+
         else:  # delete_process
             exists = await process_service.process_exists(
                 client, connection.id, target_name
@@ -609,7 +731,10 @@ class ChangeService:
                 "The current version is saved when the change is applied, and "
                 "can be restored with Roll back",
             ))
-        base_fingerprint = await _server_fingerprint(client, connection.id, change_type, target_name)
+        # A draft that can never be applied has nothing to protect from drift.
+        base_fingerprint = None if validation_errors else await _server_fingerprint(
+            client, connection.id, change_type, target_name, new_content
+        )
 
         # An agent that calls propose_process_update several times in one
         # turn produces several proposals against the same target. Each one
@@ -664,6 +789,14 @@ class ChangeService:
                     "rules": await cube_service.get_cube_rules(
                         client, connection.id, change.target_name
                     )
+                }
+            elif change.change_type == "write_cells":
+                coordinates = [c for c, _ in _cell_writes(change.new_content)]
+                values = await _read_values(client, connection.id, change.target_name, coordinates)
+                current = {
+                    "cells": [
+                        {"coordinates": c, "value": v} for c, v in zip(coordinates, values)
+                    ]
                 }
             else:
                 current = {
@@ -796,7 +929,7 @@ class ChangeService:
         # edit — refuse, and say so, rather than lose someone's work.
         if change.base_fingerprint:
             current = await _server_fingerprint(
-                client, connection.id, change.change_type, change.target_name
+                client, connection.id, change.change_type, change.target_name, change.new_content
             )
             if current != change.base_fingerprint:
                 raise ConflictException(
@@ -953,6 +1086,50 @@ class ChangeService:
         elif change.change_type == "run_process":
             return await self._run(db, change, client, connection)
 
+        elif change.change_type == "write_cells":
+            writes = _cell_writes(change.new_content)
+            coordinates = [c for c, _ in writes]
+            dimensions = (await cube_service.get_cube(client, connection.id, change.target_name)).dimensions
+            before = await _read_values(client, connection.id, change.target_name, coordinates)
+            change.previous_content = {
+                "cells": [{"coordinates": c, "value": v} for c, v in zip(coordinates, before)],
+            }
+
+            async def restore_cells():
+                await cell_service.write_cells(
+                    client, connection.id, change.target_name, dimensions,
+                    [(c, v if v is not None else 0) for c, v in zip(coordinates, before)],
+                )
+
+            await cell_service.write_cells(client, connection.id, change.target_name, dimensions, writes)
+
+            try:
+                after = await _read_values(client, connection.id, change.target_name, coordinates)
+            except Exception as exc:  # noqa: BLE001
+                await _restore_then_raise(restore_cells, exc)
+
+            wrong = [
+                f"{', '.join(c)}: wrote {v!r}, the server holds {a!r}"
+                for (c, v), a in zip(writes, after)
+                if not _same_value(a, v)
+            ]
+            if wrong:
+                await restore_cells()
+                change.status = "failed"
+                change.validation_errors = wrong
+                change.error_message = (
+                    "The server did not hold the written values; the previous values were "
+                    "written back."
+                )
+                return await tm1_change_repository.update(db, change)
+
+            change.previous_content = {
+                **change.previous_content,
+                # What this change left there, so a rollback can tell whether
+                # anyone has written these cells since.
+                "applied": [_normal(v) for v in after],
+            }
+
         else:  # delete_process
             base = await process_service.get_process_body(
                 client, connection.id, change.target_name
@@ -1088,6 +1265,18 @@ class ChangeService:
             ) != previous["applied"]:
                 raise _changed_since(change.target_name)
 
+        elif change.change_type == "write_cells":
+            saved = previous.get("cells") or []
+            now = await _read_values(
+                client, connection.id, change.target_name, [c["coordinates"] for c in saved]
+            )
+            if [_normal(v) for v in now] != previous.get("applied"):
+                raise ConflictException(
+                    f"Cells in '{change.target_name}' have been written since this change "
+                    "was applied. Rolling back would overwrite those values, so nothing "
+                    "was changed."
+                )
+
         elif change.change_type == "delete_process":
             if await process_service.process_exists(client, connection.id, change.target_name):
                 raise ConflictException(
@@ -1114,6 +1303,14 @@ class ChangeService:
             await cube_service.update_cube_rules(
                 client, connection.id, change.target_name,
                 change.previous_content.get("rules") or "",
+            )
+
+        elif change.change_type == "write_cells":
+            saved = change.previous_content.get("cells") or []
+            dimensions = (await cube_service.get_cube(client, connection.id, change.target_name)).dimensions
+            await cell_service.write_cells(
+                client, connection.id, change.target_name, dimensions,
+                [(c["coordinates"], c["value"] if c["value"] is not None else 0) for c in saved],
             )
 
         elif change.change_type == "create_process":

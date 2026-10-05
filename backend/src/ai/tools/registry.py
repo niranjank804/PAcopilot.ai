@@ -15,6 +15,7 @@ from src.ai.tools.tm1.changes import (
     ProposeProcessCopyTool,
     ProposeProcessRunTool,
     ProposeProcessUpdateTool,
+    ProposeCellWriteTool,
     ProposeRuleUpdateTool,
 )
 from src.ai.tools.memory import ProposeEngineeringMemoryTool, SearchEngineeringMemoryTool
@@ -145,6 +146,7 @@ TOOLS: dict[str, Tool] = {
         GetModelChangesTool(),
         AnalyzeChangeImpactTool(),
         ProposeRuleUpdateTool(),
+        ProposeCellWriteTool(),
         ProposeProcessUpdateTool(),
         ProposeProcessCopyTool(),
         ProposeProcessRunTool(),

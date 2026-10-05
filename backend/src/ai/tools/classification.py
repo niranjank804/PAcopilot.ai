@@ -153,6 +153,7 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "get_coding_standards": _c("development", R, "Learned organization standards", REFERENCE),
     # --- Change management (drafts only) ---
     "propose_rule_update": _c("change_management", W, "Draft for human review", DRAFT, "cube_name"),
+    "propose_cell_write": _c("change_management", W, "Cell write draft for human review", DRAFT, "cube_name"),
     "propose_process_update": _c("change_management", W, "Draft for human review", DRAFT, "process_name"),
     "propose_process_copy": _c("change_management", W, "Draft for human review", DRAFT, "source_process", "new_process_name"),
     # --- Execution (drafts only) ---

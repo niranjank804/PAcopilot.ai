@@ -53,7 +53,8 @@ export type ChangeType =
   | "create_process"
   | "update_process"
   | "delete_process"
-  | "run_process";
+  | "run_process"
+  | "write_cells";
 
 export type ChangeStatus =
   | "draft"

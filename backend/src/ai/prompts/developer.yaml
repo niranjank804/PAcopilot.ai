@@ -93,6 +93,7 @@ tool_names:
   - find_dependencies
   - dependency_path
   - propose_rule_update
+  - propose_cell_write
   - propose_process_update
   - propose_process_copy
   - search_model_objects
