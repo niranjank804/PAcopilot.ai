@@ -2,6 +2,7 @@ import uuid
 
 from TM1py import TM1Service
 
+from src.tm1 import compat
 from src.tm1.resilience import call_with_resilience
 
 
@@ -95,14 +96,22 @@ async def check_cube_rules(
 ) -> list:
     """Server-side syntax check of the cube's PERSISTED rules (error list —
     empty = valid). There is no dry-run for rules in TM1: validation happens
-    after apply, which is why the change pipeline snapshots first."""
+    after apply, which is why the change pipeline snapshots first.
 
-    return await call_with_resilience(
-        connection_id,
-        client.cubes.check_rules,
-        cube_name,
-        **resilience_kwargs,
-    )
+    None when the server has no rule check (TM1 11.0). Such a server
+    refuses invalid rule syntax when the rules are saved, so a save that
+    succeeded is the check that was available."""
+
+    def check():
+        try:
+            return client.cubes.check_rules(cube_name)
+        except Exception as exc:
+            if compat.is_unsupported_action(exc, "CheckRules"):
+                return None
+            raise
+
+    check.__name__ = "check_rules"
+    return await call_with_resilience(connection_id, check, **resilience_kwargs)
 
 
 async def list_cubes_with_rules(

@@ -2,6 +2,7 @@ import uuid
 
 from TM1py import TM1Service
 
+from src.tm1 import compat
 from src.tm1.resilience import call_with_resilience
 
 # Cap on cells returned per MDX query — same discipline as MAX_ELEMENTS /
@@ -186,11 +187,17 @@ async def write_cells(
     """
 
     def write() -> None:
-        client.cells.write_values(
-            cube_name,
-            {tuple(coordinates): value for coordinates, value in values},
-            dimensions=dimensions,
-        )
+        cells = {tuple(coordinates): value for coordinates, value in values}
+        try:
+            client.cells.write_values(cube_name, cells, dimensions=dimensions)
+        except Exception as exc:
+            if not compat.wants_text_values(exc):
+                raise
+            # TM1 11.0 refuses the whole payload (nothing is written) unless
+            # every value is text.
+            client.cells.write_values(
+                cube_name, {k: compat.as_text(v) for k, v in cells.items()}, dimensions=dimensions
+            )
 
     write.__name__ = "write_values"
     await call_with_resilience(connection_id, write, **resilience_kwargs)

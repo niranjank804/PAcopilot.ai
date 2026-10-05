@@ -965,6 +965,16 @@ class ChangeService:
             except Exception as exc:  # noqa: BLE001
                 await _restore_then_raise(restore_rules, exc)
 
+            if errors is None:
+                # TM1 11.0: no rule check exists; the server validated the
+                # syntax when it accepted the save. Say which check ran.
+                change.checks = [*(change.checks or []), _check(
+                    "Server rule check", "info",
+                    "This TM1 version has no separate rule check; it validated the rule "
+                    "syntax when it accepted the save",
+                )]
+                errors = []
+
             if errors:
                 # No rule dry-run exists: restore the snapshot immediately.
                 await cube_service.update_cube_rules(
@@ -1204,6 +1214,7 @@ class ChangeService:
             change.status = "failed"
             change.error_message = (
                 f"TM1 reported {result['status']}."
+                + (f" {result['error_detail']}" if result.get("error_detail") else "")
                 + (
                     f" Error log: {result['error_log_file']}."
                     if result.get("error_log_file")

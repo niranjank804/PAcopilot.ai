@@ -4,6 +4,7 @@ from sqlalchemy import select
 from src.ai.orchestrator import ai_orchestrator
 from src.core.config import settings
 from src.database.models.ai_tool_execution import AIToolExecution
+from tests.fixtures.factories import grant_system_role
 
 
 @pytest.fixture
@@ -20,6 +21,8 @@ async def test_developer_agent_lists_real_cubes_via_tool_call(
     db_session, live_connection, require_anthropic_key
 ):
     org, user, connection = live_connection
+    # Reading TM1 needs tm1.read; a user with no role is refused, as it should be.
+    await grant_system_role(db_session, user.id, "Organization Admin")
 
     result = await ai_orchestrator.chat(
         db_session,

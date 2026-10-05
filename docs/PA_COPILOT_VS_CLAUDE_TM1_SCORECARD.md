@@ -12,10 +12,12 @@ column records what the brief says it does.
 
 **PA-Copilot's column** records what the code does, with the test or file
 that shows it. "Verified" below means verified by automated tests against a
-faked TM1 server, unless it says live. Against a real server, only
-connecting, listing cubes and answering questions through the gateway were
-confirmed (by the owner, 2026-09-28); compile, save, run and rollback
-against a real Dev server are **not verified**.
+faked TM1 server; "Verified live" means also run against a real TM1 server:
+the live suite (`backend/tests/live/`, 25 tests) passed against TM1 11.0.1
+(Planning Sample) on 2026-10-05 — connection, discovery, dependencies,
+rules, security, an AI tool call, and every write path: compile refusal,
+create, update, run, delete, a failing run, cell writes, drift refusal,
+rules, and the rollbacks. Report: [`evidence/live/live-run-2026-10-05_2028.txt`](evidence/live/live-run-2026-10-05_2028.txt).
 
 How to read **Advantage**: `=` both have it; **PA-Copilot** or
 **Benchmark** where one clearly has more; `n/a` where the benchmark does not
@@ -30,27 +32,40 @@ does unless the evidence column shows the extra capability.
 | Benchmark actions **not** matched | None by automated evidence. Cell write-back (the benchmark's "write") was the last; it now exists as a governed change |
 | Scorecard rows (23, over the brief's 22 categories) | PA-Copilot ahead on 12, equal on 2, behind on 0; 9 rows the benchmark does not attempt — 8 built, Analytics partial |
 | Golden workflows (12) | 11 automated with evidence; 1 unit-tested only (explain calculation) |
-| Live TM1 verification | Read paths confirmed by the owner; write paths **not verified** live |
+| Live TM1 verification | 25 / 25 live tests passed on TM1 11.0.1, reads and writes; the first run found 3 compatibility defects with older servers, fixed (see below) |
 
-So: by automated evidence PA-Copilot is **≥ the benchmark on every
-benchmark capability** and ahead on the enterprise platform capabilities.
-That is not yet a live result: the write paths, cell writes included, have
-not been run against a real TM1 server.
+So: PA-Copilot is **≥ the benchmark on every benchmark capability** and
+ahead on the enterprise platform capabilities — by automated tests, and for
+the write paths also live, against TM1 11.0.1. Not yet measured: answer
+accuracy, latency and cost against a real model, and a head-to-head run
+with the benchmark setup.
+
+### What the live run found
+
+The first live run failed 3 of 6 write tests. All three were real defects
+with older TM1 servers that a faked server could not show, fixed in
+`src/tm1/compat.py`; the modern call is still tried first:
+
+| Defect on TM1 11.0.1 | Fix |
+|---|---|
+| No `tm1.ExecuteWithReturn`: every approved process run failed to start | Fall back to `tm1.Execute`; a failing process is recorded with TM1's outcome and error line |
+| Cell writes refused: the server takes every value as text | Resend the values as text; nothing is written by the refused attempt |
+| No `tm1.CheckRules`: every rules change failed after saving | The server already refuses invalid rule syntax on save; the change records which check ran |
 
 ## Scorecard
 
 | Category | Capability | Claude benchmark (as described) | PA-Copilot | Evidence | Status | Advantage |
 |---|---|---|---|---|---|---|
 | TM1 access | Connect to TM1 / PAaaS | Live Dev access over MCP | Native, v12 SaaS and PA Cloud auth; on-premises through an outbound gateway; credentials encrypted at rest; connections private to their creator unless shared | `tests/unit/tm1/test_service.py`, `test_pa_cloud_connection.py`, `tests/integration/tm1/test_connection_isolation.py`; live read confirmed 2026-09-28 | Verified (read live) | PA-Copilot |
-| TM1 access | Write cell values | "write" listed | A governed change (`write_cells`, `propose_cell_write`): leaf, non-rule cells of the right type only, up to 200; current values shown in the draft, saved and re-checked for drift when applying; the write is verified and undone if the server does not hold it; rollback writes the saved values back and refuses over later writes; never promoted; PROD two-person, AI read-only on PROD | `tests/integration/tm1/test_cell_writes.py` | Verified (not live) | PA-Copilot (approval, drift, verify, rollback) |
+| TM1 access | Write cell values | "write" listed | A governed change (`write_cells`, `propose_cell_write`): leaf, non-rule cells of the right type only, up to 200; current values shown in the draft, saved and re-checked for drift when applying; the write is verified and undone if the server does not hold it; rollback writes the saved values back and refuses over later writes; never promoted; PROD two-person, AI read-only on PROD | `tests/integration/tm1/test_cell_writes.py` | Verified live (TM1 11.0.1) | PA-Copilot (approval, drift, verify, rollback) |
 | Model discovery | Cubes, dimensions, hierarchies, elements, attributes, subsets, views, chores | Yes | 18 discovery tools, plus a persistent metadata graph with history and freshness | `tests/unit/ai/test_structure_tools.py`, `test_metadata_tools.py`, `tests/unit/tm1/test_extractor.py`, `test_metadata_history.py` | Verified | PA-Copilot (persistent graph) |
 | Process engineering | Inspect, search, call tree, references | Yes | `get_process`, `search_process_code`, `get_process_call_tree`, `analyze_process_references` | `tests/unit/ai/test_process_tools.py`, `test_engineering_tools.py` | Verified | = |
 | TI development | Generate and modify TI, server-side compile, review | Generation, modification, compile | Draft create/update/copy; compile on the server without saving (`validate_process_code`); TI review with dangerous-operation list; organization coding standards learned from exported processes | `tests/unit/ai/test_change_tools.py`, `test_engineering_tools.py`, `tests/unit/tm1/test_ti_review.py`; golden step 04 | Verified | PA-Copilot (standards, review) |
 | Diagnostics | Logs, failure diagnosis, incidents | Logs, inspection | `diagnose_process_failure` maps the error log to the code line, marks evidence verified / inferred / unknown; message and transaction logs; incident mode ranks suspects for a wrong cube or failed process from changes, runs, model differences, rules and alerts, with a governed mitigation for each | `tests/unit/tm1/test_failure_diagnosis.py`, `tests/unit/ai/test_log_tools.py`, `tests/integration/test_incidents.py`; golden step 03 | Verified | PA-Copilot |
 | Dependency analysis | What depends on what; impact of a change | Dependency / impact analysis | Persistent graph; severity-ranked impact (critical/high/medium/low) on every draft; acknowledgement required for high impact | `tests/unit/tm1/test_impact_analysis.py`, `test_dependency_analyzer.py`; golden step 09 | Verified | PA-Copilot |
-| Execution | Run a process | Run with confirmation | Run only as an approved change, parameters checked against the process, never retried, result and error log kept | `tests/unit/tm1/test_change_runs_and_guards.py`; golden step 07 | Verified (not live) | = |
-| Deployment | Save to the server; promote | Save after confirmation, Dev only | Draft → impact → validation → approval → snapshot → apply → server verify; promotion DEV → QA → PROD with a deployment package (manifest, diff, impact, evidence, rollback plan) | `tests/unit/tm1/test_change_service.py`, `tests/integration/tm1/test_promotion.py`; golden steps 05, 06, 14 | Verified (not live) | PA-Copilot |
-| Rollback | Restore the previous version | Baseline before overwrite, rollback | Snapshot on apply; rollback refuses if someone edited the object since; drift check refuses an apply over a changed server | `test_change_runs_and_guards.py`, `test_change_service.py`; golden step 15 | Verified (not live) | PA-Copilot (drift guards) |
+| Execution | Run a process | Run with confirmation | Run only as an approved change, parameters checked against the process, never retried, result and error log kept | `tests/unit/tm1/test_change_runs_and_guards.py`; golden step 07 | Verified live (TM1 11.0.1) | = |
+| Deployment | Save to the server; promote | Save after confirmation, Dev only | Draft → impact → validation → approval → snapshot → apply → server verify; promotion DEV → QA → PROD with a deployment package (manifest, diff, impact, evidence, rollback plan) | `tests/unit/tm1/test_change_service.py`, `tests/integration/tm1/test_promotion.py`; golden steps 05, 06, 14 | Verified live (TM1 11.0.1) | PA-Copilot |
+| Rollback | Restore the previous version | Baseline before overwrite, rollback | Snapshot on apply; rollback refuses if someone edited the object since; drift check refuses an apply over a changed server | `test_change_runs_and_guards.py`, `test_change_service.py`; golden step 15 | Verified live (TM1 11.0.1) | PA-Copilot (drift guards) |
 | Security | Who may do what | Dev-only operation | RBAC per tool; private connections; PROD needs a second person; AI read-only on PROD; organization isolation; SSRF policy on addresses; encrypted credentials | `tests/unit/ai/test_tool_classification.py`, `tests/integration/tm1/test_environments.py`, `test_connection_isolation.py`; golden step 13 | Verified | PA-Copilot |
 | Governance | Confirmation, audit | Explicit confirmation, logging | Every write is a draft a person approves; DEV / QA / PROD rights; audit log of every change, approval, rollback, share, memory and monitor action | `test_environments.py`, `test_promotion.py`; golden step 18 | Verified | PA-Copilot |
 | Agents | Specialists over one tool registry | One general assistant | 9 specialist agents (troubleshooter, TI, developer, analyst, architect, reviewer, performance, administrator, documentation) over one registry of 69 tools, each with an allowlist | `tests/unit/ai/test_agents.py`; golden step 10 | Verified | PA-Copilot |
@@ -113,12 +128,13 @@ latency, cost, safety and deployment reliability.
 | Accuracy | **Not measured.** No evaluation of answer quality against a real model has been run |
 | Latency | **Not measured** against a real server. The product records it per request (p95 on the AI Cost panel) |
 | Cost | **Not measured** in a benchmark run. The product records it per request |
-| Deployment reliability | **Not measured live.** Automated: snapshot, drift refusal, rollback guards |
+| Deployment reliability | Live on TM1 11.0.1: apply, verify, drift refusal and rollback for processes, rules and cells all passed. Not measured over time |
 | Head-to-head with the benchmark | **Not run.** The benchmark setup was not available here |
 
 ## What would close the gaps
 
-1. **Live validation**: run `backend/tests/live/` against a real Dev server
-   (see `backend/docs/live_validation/`), then the golden workflow against it.
+1. **More live servers**: the live suite ran on TM1 11.0.1. Run it on
+   the TM1 or Planning Analytics versions customers use (11.8, v12 / PAaaS)
+   with `backend/scripts/run_live_validation.ps1`.
 2. **Power BI**, once there is a Microsoft Entra app registration.
 3. **Accuracy evaluation**: a fixed question set scored against a real model.

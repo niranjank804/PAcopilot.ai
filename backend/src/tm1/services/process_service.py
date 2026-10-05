@@ -1,9 +1,9 @@
-import functools
 import time
 import uuid
 
 from TM1py import TM1Service
 
+from src.tm1 import compat
 from src.tm1.resilience import call_with_resilience
 
 # Keyword names TM1py's ExecuteWithReturn takes for itself. A TI parameter
@@ -281,25 +281,42 @@ async def execute_process(
             f"passed: {', '.join(sorted(reserved))}."
         )
 
-    run = functools.partial(
-        client.processes.execute_with_return,
-        process_name=process_name,
-        timeout=timeout,
-        cancel_at_timeout=True,
-        **parameters,
-    )
-    # The resilience layer logs the callable's name on failure. A partial's
-    # repr would include the parameter values; the name alone is enough.
+    def run():
+        try:
+            success, status, error_log_file = client.processes.execute_with_return(
+                process_name=process_name, timeout=timeout, cancel_at_timeout=True, **parameters
+            )
+            return success, status, error_log_file, None
+        except Exception as exc:
+            if not compat.is_unsupported_action(exc, "ExecuteWithReturn"):
+                raise
+        # An older server (TM1 11.0) has no ExecuteWithReturn; the run has
+        # not started. tm1.Execute answers 204 on success and raises with the
+        # outcome and TM1's error text otherwise.
+        try:
+            client.processes.execute(process_name, timeout=timeout, cancel_at_timeout=True, **parameters)
+            return True, "CompletedSuccessfully", None, None
+        except Exception as exc:
+            outcome = compat.run_outcome(exc)
+            if outcome is None:
+                raise
+            return False, outcome[0], None, outcome[1]
+
+    # The resilience layer logs the callable's name on failure; the name
+    # alone is enough (parameter values stay out of the log).
     run.__name__ = "execute_with_return"
 
     started = time.monotonic()
-    success, status, error_log_file = await call_with_resilience(
+    success, status, error_log_file, error_detail = await call_with_resilience(
         connection_id, run, timeout=timeout, max_retries=0
     )
 
-    return {
+    result = {
         "success": bool(success),
         "status": status or ("CompletedSuccessfully" if success else "Unknown"),
         "error_log_file": error_log_file or None,
         "duration_ms": int((time.monotonic() - started) * 1000),
     }
+    if error_detail:
+        result["error_detail"] = error_detail[:2000]
+    return result

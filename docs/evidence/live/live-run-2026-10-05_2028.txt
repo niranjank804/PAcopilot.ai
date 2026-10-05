@@ -1,0 +1,51 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- C:\Projects\PA-Copilot\backend\.venv\Scripts\python.exe
+rootdir: C:\Projects\PA-Copilot\backend
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: anyio-4.14.2, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=session, asyncio_default_test_loop_scope=session
+collecting ... collected 25 items
+
+tests/live/test_ai_tools.py::test_developer_agent_lists_real_cubes_via_tool_call PASSED [  4%]
+tests/live/test_connection.py::test_test_connection_succeeds_with_real_credentials PASSED [  8%]
+tests/live/test_connection.py::test_test_connection_fails_with_wrong_password PASSED [ 12%]
+tests/live/test_dependencies.py::test_extract_metadata_completes_within_generous_ceiling PASSED [ 16%]
+tests/live/test_dependencies.py::test_dependency_traversal_is_internally_consistent PASSED [ 20%]
+tests/live/test_metadata.py::test_list_cubes_returns_real_cube_names PASSED [ 24%]
+tests/live/test_metadata.py::test_get_cube_returns_real_shape PASSED     [ 28%]
+tests/live/test_metadata.py::test_list_dimensions_returns_real_dimension_names PASSED [ 32%]
+tests/live/test_metadata.py::test_get_dimension_returns_real_shape PASSED [ 36%]
+tests/live/test_metadata.py::test_every_cube_dimension_is_a_real_dimension PASSED [ 40%]
+tests/live/test_monitoring.py::test_circuit_breaker_reads_closed_after_real_success PASSED [ 44%]
+tests/live/test_monitoring.py::test_usage_summary_endpoint_does_not_error_against_real_data PASSED [ 48%]
+tests/live/test_processes.py::test_list_processes_returns_real_process_names PASSED [ 52%]
+tests/live/test_processes.py::test_get_process_returns_real_shape PASSED [ 56%]
+tests/live/test_processes.py::test_datasource_types_seen_across_real_processes PASSED [ 60%]
+tests/live/test_rules.py::test_get_cube_rules_does_not_error_on_real_cubes_with_rules PASSED [ 64%]
+tests/live/test_rules.py::test_reference_parser_against_a_known_real_rule_cube PASSED [ 68%]
+tests/live/test_security.py::test_list_security_groups_returns_real_group_names PASSED [ 72%]
+tests/live/test_security.py::test_get_security_group_returns_real_shape PASSED [ 76%]
+tests/live/test_write_paths.py::test_a_broken_process_is_refused_before_it_is_saved PASSED [ 80%]
+tests/live/test_write_paths.py::test_process_create_update_run_delete_and_rollbacks PASSED [ 84%]
+tests/live/test_write_paths.py::test_a_failing_run_is_recorded_as_failed PASSED [ 88%]
+tests/live/test_write_paths.py::test_cell_writes_apply_verify_refuse_and_roll_back PASSED [ 92%]
+tests/live/test_write_paths.py::test_a_value_changed_after_the_draft_refuses_the_apply PASSED [ 96%]
+tests/live/test_write_paths.py::test_rules_apply_are_checked_and_roll_back PASSED [100%]
+
+============================== warnings summary ===============================
+tests/live/test_ai_tools.py::test_developer_agent_lists_real_cubes_via_tool_call
+  C:\Projects\PA-Copilot\backend\.venv\Lib\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for argon2-cffi's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+tests/live/test_connection.py::test_test_connection_succeeds_with_real_credentials
+tests/live/test_write_paths.py::test_a_broken_process_is_refused_before_it_is_saved
+tests/live/test_write_paths.py::test_process_create_update_run_delete_and_rollbacks
+tests/live/test_write_paths.py::test_a_failing_run_is_recorded_as_failed
+tests/live/test_write_paths.py::test_cell_writes_apply_verify_refuse_and_roll_back
+tests/live/test_write_paths.py::test_a_value_changed_after_the_draft_refuses_the_apply
+tests/live/test_write_paths.py::test_rules_apply_are_checked_and_roll_back
+  C:\Projects\PA-Copilot\backend\.venv\Lib\site-packages\TM1py\Services\TM1Service.py:147: DeprecationWarning: Server Service will be moved to a new location in a future version
+    self._server = ServerService(self._tm1_rest)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 25 passed, 8 warnings in 68.53s (0:01:08) ==================

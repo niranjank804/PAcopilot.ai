@@ -401,7 +401,13 @@ look (`src/services/incident_service.py`).
 
 ### Live verification
 
-Unit and integration tests run against a faked TM1. Connecting, listing
+**2026-10-05: the live suite passed against TM1 11.0.1 (Planning Sample),
+25 / 25, reads and writes** — report in
+`docs/evidence/live/live-run-2026-10-05_2028.txt`. The first run found three
+defects with older servers (no ExecuteWithReturn, cell values as text only,
+no CheckRules), fixed with fallbacks in `src/tm1/compat.py`.
+
+Before that: unit and integration tests run against a faked TM1. Connecting, listing
 cubes and answering questions about a real on-premises server through the
 gateway were confirmed by the owner on 2026-09-28. Compile, save, run and
 rollback against a real Dev server are the remaining live checks before
