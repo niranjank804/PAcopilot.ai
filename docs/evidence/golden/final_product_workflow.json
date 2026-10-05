@@ -1,0 +1,222 @@
+{
+  "01_inspect_process": {
+    "process": "Load Sales",
+    "datasource": "TM1CubeView"
+  },
+  "02_inspect_cube_and_dimension_order": {
+    "cube": {
+      "name": "Sales",
+      "dimensions": [
+        "Region",
+        "Product"
+      ],
+      "has_rules": true
+    }
+  },
+  "03_identify_writer_inspect_logs_diagnose": {
+    "writes_cubes": [
+      "Missing",
+      "Sales"
+    ],
+    "error_log": "TM1ProcessError_20261005_Load Sales.log",
+    "errors": [
+      {
+        "section": "data",
+        "line_number": 1,
+        "message": "\"NA\" : member not found in dimension Region",
+        "code_line": "CellPutN(1, 'Sales', 'NA'); CellPutN(2, 'Missing', 'x');",
+        "context": [
+          {
+            "line_number": 1,
+            "text": "CellPutN(1, 'Sales', 'NA'); CellPutN(2, 'Missing', 'x');",
+            "is_error_line": true
+          }
+        ]
+      }
+    ]
+  },
+  "04_generate_fix_and_compile": {
+    "validated": {
+      "process": "Load Sales",
+      "existing_process": true,
+      "saved": false,
+      "valid": true,
+      "server_compile": {
+        "ok": true,
+        "errors": []
+      },
+      "static_errors": [],
+      "function_issues": [],
+      "tabs_checked": [
+        "data"
+      ],
+      "evidence": {
+        "verified": [
+          "Compiled by the TM1 server (/CompileProcess, not saved)",
+          "Static analysis and the TM1 function reference"
+        ],
+        "inferred": [],
+        "unknown": [
+          "Compilation does not run the code: data errors, missing files and wrong element names surface only at run time"
+        ]
+      }
+    }
+  },
+  "05_diff": {
+    "change_id": "48499ba5-c6f3-4d0a-9890-c2e5281f1138",
+    "preview_keys": [
+      "current",
+      "impact",
+      "proposed",
+      "validation_errors"
+    ],
+    "lifecycle": [
+      "Requested",
+      "Impact analysed",
+      "Validated",
+      "Diff ready",
+      "Approval",
+      "Snapshot",
+      "Applied",
+      "Verified"
+    ]
+  },
+  "06_approve_and_save": {
+    "status": "executed"
+  },
+  "07_run": {
+    "status": "executed",
+    "result": {
+      "status": "CompletedSuccessfully",
+      "success": true,
+      "duration_ms": 0,
+      "error_log_file": null
+    }
+  },
+  "08_verify": {
+    "status": {
+      "changes": [
+        {
+          "change_id": "60ce8a38-dab7-403b-9717-a9d03719c3aa",
+          "type": "run_process",
+          "target": "Load Sales",
+          "status": "executed",
+          "created_at": "2026-10-05 06:19:04.086499+00:00",
+          "executed_at": "2026-10-05 06:19:04.813641+00:00",
+          "rolled_back_at": null,
+          "error_message": null,
+          "validation_errors": null,
+          "execution_result": {
+            "status": "CompletedSuccessfully",
+            "success": true,
+            "duration_ms": 0,
+            "error_log_file": null
+          }
+        }
+      ],
+      "evidence": {
+        "verified": [
+          "PA-Copilot's change records (status as recorded at approval)"
+        ],
+        "inferred": [],
+        "unknown": []
+      }
+    }
+  },
+  "09_impact_analysis": {
+    "reached": [
+      "chore:Load Sales Nightly",
+      "cube:Sales",
+      "process:Load Sales"
+    ],
+    "summary": {
+      "critical": 0,
+      "high": 0,
+      "medium": 2,
+      "low": 1
+    }
+  },
+  "10_specialist_agents": {
+    "troubleshooter_tools": 42,
+    "ti_tools": 34
+  },
+  "11_organization_knowledge": {
+    "in_prompt": true
+  },
+  "12_dependency_graph": {
+    "extractions": 1
+  },
+  "13_security_policy": {
+    "ai_on_prod": "'Planning PROD' is a PROD connection, where the assistant is read-only: it can read and analyse, but not draft changes or runs. Draft this on a DEV or QA connection, or ask a person with production ri",
+    "prod_self_approval": "A production change must be approved by someone other than the person who requested it."
+  },
+  "14_change_approval_and_deployment": {
+    "qa_change": "68b09fd5-941e-4373-ac68-b8901f1ff5a0",
+    "qa_status": "executed",
+    "package_keys": [
+      "approval_rule",
+      "diff",
+      "evidence",
+      "impact",
+      "manifest",
+      "rollback_plan",
+      "stages"
+    ]
+  },
+  "15_rollback": {
+    "status": "rolled_back"
+  },
+  "16_model_health": {
+    "score": 100,
+    "grade": "A",
+    "deductions": [
+      "critical_rule_findings",
+      "process_errors",
+      "rule_warnings",
+      "regressions",
+      "failed_processes",
+      "process_issues",
+      "unused_objects"
+    ]
+  },
+  "17_performance_analysis": {
+    "regressions": [
+      {
+        "process": "Load Sales",
+        "usual_seconds": 97.5,
+        "latest_seconds": 400.0,
+        "latest_at": "2026-10-05T06:24:05.221231+00:00",
+        "increase_percent": 310,
+        "based_on_runs": 4,
+        "summary": "Load Sales normally runs in 1 min 38 s (median of 4 runs). Latest run: 6 min 40 s on 2026-10-05 06:24. Regression: +310%."
+      }
+    ]
+  },
+  "18_audit": {
+    "actions": [
+      "execute_change",
+      "memory_created",
+      "promote_change",
+      "rollback_change"
+    ]
+  },
+  "19_ai_cost_tracking": {
+    "report_keys": [
+      "auto_routing",
+      "avg_latency_ms",
+      "by_agent",
+      "by_model",
+      "by_tier",
+      "by_user",
+      "cache_savings_usd",
+      "cost_per_request_usd",
+      "days",
+      "fallback_rate",
+      "notes",
+      "p95_latency_ms",
+      "requests",
+      "tool_calls",
+      "total_cost_usd"
+    ]
+  }
+}
