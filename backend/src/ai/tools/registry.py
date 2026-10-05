@@ -18,6 +18,7 @@ from src.ai.tools.tm1.changes import (
     ProposeRuleUpdateTool,
 )
 from src.ai.tools.memory import ProposeEngineeringMemoryTool, SearchEngineeringMemoryTool
+from src.ai.tools.work_items import GetWorkItemTool
 from src.ai.tools.tm1.intelligence import GetModelHealthTool, GetPerformanceReportTool
 from src.ai.tools.tm1.development import ReviewProcessCodeTool, ValidateProcessCodeTool
 from src.ai.tools.tm1.diagnostics import (
@@ -125,6 +126,7 @@ TOOLS: dict[str, Tool] = {
         GetPerformanceReportTool(),
         SearchEngineeringMemoryTool(),
         ProposeEngineeringMemoryTool(),
+        GetWorkItemTool(),
         DiagnoseProcessFailureTool(),
         ValidateProcessCodeTool(),
         ReviewProcessCodeTool(),

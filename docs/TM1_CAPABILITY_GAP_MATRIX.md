@@ -269,6 +269,44 @@ organization-scoped, optionally about one connection and one object.
   reject with the assistant's reasoning, memory in use with search, edit,
   history and archive.
 
+### Phase 11 — voice and team collaboration (2026-10-05)
+
+Migration `c3f8a1d5e9b2`: `ai_conversations.visibility`, `work_items`,
+`work_item_links`. Power BI was deferred by the owner (it needs a
+Microsoft Entra app registration); nothing for it was built.
+
+- **Voice** stays in the browser (speech never leaves the machine) and on
+  the one chat path, so RBAC, approvals, audit and usage are inherited, not
+  re-implemented. New: when a spoken answer drafted a change, the reply ends
+  with "This answer drafted a change that needs approval. Review it on
+  screen; approvals are never taken by voice." There is no voice approval.
+- **Shared conversations.** Private by default; the owner shares one from
+  the chat history (people icon) and everyone in the organization can read
+  it — never continue, rename, share or delete it. Sharing and unsharing are
+  audited. The share notice says it includes any TM1 data shown in it.
+- **Work items** (`src/services/work_item_service.py`, `/team/work-items`):
+  a team reference such as "PBI #1234", unique per organization, with
+  status, root cause and resolution written by people. Shared conversations
+  and TM1 changes are linked to it; its timeline is read from those records
+  each time — investigation, fix proposed, validated, approved, applied,
+  rolled back, status moves, root cause recorded — with who and when.
+  Progress: investigation, root cause, proposed fix, approval, deployment,
+  verified (applied and the item resolved by a person).
+- **No widening of access.** Only a shared conversation can be linked. A
+  linked conversation shows only to people who may read it, a linked change
+  only to people who may use its connection; anyone else sees "a change on a
+  TM1 connection you cannot use" with no name, target or detail. Linking a
+  private connection's change is refused with the same 404 as a missing one.
+- **Team page** (AI engineering menu): work items with status filter and
+  search; changes waiting for approval; shared conversations (read-only
+  view); recent changes; the latest health score per server — all limited
+  to connections the viewer may use.
+- **`get_work_item`** (all agents): the assistant reads a work item by its
+  reference, so "investigate PBI #1234" starts from what the team has.
+  Read-only; linking and status are for people.
+- Tests: `tests/integration/test_team_collaboration.py` (9), voice notice
+  and Team page tests in the frontend.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

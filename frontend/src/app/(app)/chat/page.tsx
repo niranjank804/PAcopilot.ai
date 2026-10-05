@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Square,
   Trash2,
+  UsersRound,
   User,
   Volume2,
   VolumeX,
@@ -77,7 +78,7 @@ import { useRememberedChoice, useRememberedFlag } from "@/lib/use-remembered-fla
 import { cn } from "@/lib/utils";
 import { directUpload } from "@/lib/uploads";
 import { newCharts, placeCharts, type ChatChart } from "@/lib/chat-charts";
-import { useVoice } from "@/lib/voice";
+import { useVoice, withApprovalNotice } from "@/lib/voice";
 import type {
   AgentInfo,
   ModelRoute,
@@ -816,6 +817,24 @@ export default function ChatPage() {
     enabled: conversationId !== null,
   });
 
+  const shareMutation = useMutation({
+    mutationFn: ({ id, share }: { id: string; share: boolean }) =>
+      apiRequest<ConversationSummary>(`/ai/conversations/${id}/visibility`, {
+        method: "PUT",
+        body: { visibility: share ? "organization" : "private" },
+      }),
+    onSuccess: (conversation) => {
+      toast.success(
+        conversation.visibility === "organization"
+          ? "Shared: everyone in your organization can read it on the Team page, including any TM1 data in it. Only you can continue it."
+          : "Private again: only you can see it.",
+      );
+      queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["team"] });
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
   const renameMutation = useMutation({
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       apiRequest<ConversationSummary>(`/ai/conversations/${id}`, {
@@ -993,6 +1012,8 @@ export default function ChatPage() {
       // the doubled full stop it produced.
       let assistantText = "";
       let lastEventWasTool = false;
+      // A change drafted this turn is announced when the answer is spoken.
+      let draftedChange = false;
 
       for await (const event of stream) {
         if (event.type === "start") {
@@ -1029,6 +1050,7 @@ export default function ChatPage() {
           scrollToBottom();
         } else if (event.type === "tool_call") {
           lastEventWasTool = true;
+          if (event.tool_requires_approval && event.tool_status !== "error") draftedChange = true;
           setStreamActivity(
             event.tool_status === "error"
               ? `${event.tool_name} could not run — continuing…`
@@ -1094,7 +1116,7 @@ export default function ChatPage() {
           // streamed; this flushes a trailing fragment with no closing
           // punctuation so the last words are not dropped.
           if (speakReply) {
-            voice.speakStreaming(assistantText, { final: true });
+            voice.speakStreaming(withApprovalNotice(assistantText, draftedChange), { final: true });
             setLastInputWasVoice(false);
           }
         } else if (event.type === "error") {
@@ -1258,6 +1280,39 @@ export default function ChatPage() {
                             title={conversation.title ?? "Untitled conversation"}
                           >
                             {conversation.title || "Untitled conversation"}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={
+                              conversation.visibility === "organization"
+                                ? "Shared with your organization — make private"
+                                : "Share with your organization (read-only)"
+                            }
+                            title={
+                              conversation.visibility === "organization"
+                                ? "Shared with your organization. Click to make it private."
+                                : "Share with your organization, read-only"
+                            }
+                            className={cn(
+                              "shrink-0",
+                              conversation.visibility === "organization" ? "block" : "hidden group-hover:block",
+                            )}
+                            disabled={shareMutation.isPending}
+                            onClick={() =>
+                              shareMutation.mutate({
+                                id: conversation.id,
+                                share: conversation.visibility !== "organization",
+                              })
+                            }
+                          >
+                            <UsersRound
+                              className={cn(
+                                "h-3.5 w-3.5",
+                                conversation.visibility === "organization"
+                                  ? "text-primary"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            />
                           </button>
                           <button
                             type="button"

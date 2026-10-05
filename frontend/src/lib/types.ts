@@ -249,6 +249,8 @@ export interface ChatResponseBody {
 export interface ConversationSummary {
   id: string;
   title: string | null;
+  /** private: only you. organization: everyone in it may read (not continue) it. */
+  visibility?: "private" | "organization";
   created_at: string;
   updated_at: string;
 }

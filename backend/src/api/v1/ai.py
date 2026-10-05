@@ -30,12 +30,15 @@ from src.schemas.ai import (
     ChatResponse,
     ConversationRenameRequest,
     ConversationSummary,
+    ConversationVisibilityRequest,
     MessageResponse,
     ToolExecutionResponse,
     UsageResponse,
 )
 from src.schemas.auth import UserResponse
 from src.schemas.response import ApiResponse
+from src.services.audit_service import audit_service
+from src.services.work_item_service import can_read_conversation
 
 router = APIRouter(
     prefix="/ai",
@@ -55,6 +58,25 @@ async def _get_owned_conversation(
     conversation = await ai_conversation_repository.get_by_id(db, conversation_id)
 
     if conversation is None or conversation.user_id != user_id:
+        raise NotFoundException("Conversation not found.")
+
+    return conversation
+
+
+async def _get_readable_conversation(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    current_user: UserResponse,
+) -> AIConversation:
+    """The owner's conversation, or one its owner shared with the
+    organization. Reading only: sending, renaming, sharing and deleting
+    stay with the owner (`_get_owned_conversation`)."""
+
+    conversation = await ai_conversation_repository.get_by_id(db, conversation_id)
+
+    if conversation is None or not can_read_conversation(
+        conversation, current_user.organization_id, current_user.id
+    ):
         raise NotFoundException("Conversation not found.")
 
     return conversation
@@ -166,7 +188,7 @@ async def list_conversation_messages(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("ai.chat")),
 ):
-    await _get_owned_conversation(db, conversation_id, current_user.id)
+    await _get_readable_conversation(db, conversation_id, current_user)
 
     messages = await ai_message_repository.list_by_conversation(
         db,
@@ -188,7 +210,7 @@ async def list_conversation_tool_executions(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("ai.chat")),
 ):
-    await _get_owned_conversation(db, conversation_id, current_user.id)
+    await _get_readable_conversation(db, conversation_id, current_user)
 
     executions = await ai_tool_execution_repository.list_by_conversation(
         db,
@@ -218,6 +240,40 @@ async def rename_conversation(
         conversation,
         request.title,
     )
+
+    return ApiResponse(success=True, data=ConversationSummary.model_validate(conversation))
+
+
+@router.put(
+    "/conversations/{conversation_id}/visibility",
+    response_model=ApiResponse[ConversationSummary],
+)
+async def set_conversation_visibility(
+    conversation_id: uuid.UUID,
+    request: ConversationVisibilityRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("ai.chat")),
+):
+    """Share a conversation with the organization (read-only for others),
+    or make it private again. Only its owner can."""
+
+    conversation = await _get_owned_conversation(db, conversation_id, current_user.id)
+
+    if conversation.visibility != request.visibility:
+        old = conversation.visibility
+        conversation.visibility = request.visibility
+        await db.flush()
+        await db.refresh(conversation)
+        await audit_service.log(
+            db,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action="conversation_shared" if request.visibility == "organization" else "conversation_unshared",
+            entity="AIConversation",
+            entity_id=conversation.id,
+            old_values={"visibility": old},
+            new_values={"visibility": request.visibility},
+        )
 
     return ApiResponse(success=True, data=ConversationSummary.model_validate(conversation))
 

@@ -9,7 +9,27 @@
 
 import { describe, expect, it } from "vitest";
 
-import { newSpeech, nextSpeakableChunk, speakableText } from "../voice";
+import {
+  APPROVAL_NOTICE,
+  newSpeech,
+  nextSpeakableChunk,
+  speakableText,
+  withApprovalNotice,
+} from "../voice";
+
+describe("withApprovalNotice", () => {
+  it("says a drafted change needs approval on screen, never by voice", () => {
+    const spoken = withApprovalNotice("I drafted the rule fix.  ", true);
+
+    expect(spoken.endsWith(APPROVAL_NOTICE)).toBe(true);
+    expect(spoken).toContain("never taken by voice");
+    expect(speakableText(spoken)).toBe("I drafted the rule fix.. " + APPROVAL_NOTICE);
+  });
+
+  it("leaves an answer without a draft alone", () => {
+    expect(withApprovalNotice("Load Sales failed on Year.", false)).toBe("Load Sales failed on Year.");
+  });
+});
 
 describe("speakableText", () => {
   it("does not read emphasis markers aloud", () => {

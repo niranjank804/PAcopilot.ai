@@ -80,6 +80,21 @@ export function speakableText(markdown: string): string {
 
 
 /**
+ * Said after a spoken answer that drafted a change. The change itself is a
+ * card on screen; approving it is a button press by someone with deploy
+ * rights, and there is deliberately no way to do that by voice.
+ */
+export const APPROVAL_NOTICE =
+  "This answer drafted a change that needs approval. Review it on screen; approvals are never taken by voice.";
+
+/** The answer as it should be spoken: with the approval notice when the
+ * turn drafted a change. */
+export function withApprovalNotice(answer: string, drafted: boolean): string {
+  return drafted ? `${answer.trimEnd()}\n\n${APPROVAL_NOTICE}` : answer;
+}
+
+
+/**
  * The next whole sentence that is safe to speak, given how much of the
  * stream has already been spoken.
  *

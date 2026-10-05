@@ -19,6 +19,7 @@ import {
   Server,
   Settings,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -97,6 +98,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: BookOpen,
         tour: "nav-knowledge",
         help: "Upload your own documentation so answers cite your material. Includes Explain Error: paste a TM1 error and get the cause and the fix.",
+      },
+      {
+        label: "Team",
+        href: "/team",
+        icon: UsersRound,
+        help: "Work items such as PBI #1234 with their whole story — investigation, root cause, fix, approval, deployment — plus conversations your colleagues shared and what changed on your TM1 servers.",
       },
       {
         label: "Engineering Memory",

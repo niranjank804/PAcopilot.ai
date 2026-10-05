@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -61,8 +62,18 @@ class ConversationSummary(BaseModel):
 
     id: uuid.UUID
     title: str | None
+    visibility: str = "private"
     created_at: datetime
     updated_at: datetime
+
+
+class ConversationVisibilityRequest(BaseModel):
+    visibility: Literal["private", "organization"]
+
+
+class SharedConversationSummary(ConversationSummary):
+    owner_id: uuid.UUID
+    owner_name: str
 
 
 class MessageResponse(BaseModel):

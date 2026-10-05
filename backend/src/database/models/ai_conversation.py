@@ -44,6 +44,16 @@ class AIConversation(BaseModel, OrganizationScoped):
         nullable=True,
     )
 
+    # private: only the owner. organization: everyone in the organization
+    # may read it (never continue it — only the owner can send messages).
+    # The owner chooses; nothing shares a conversation by itself.
+    visibility: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="private",
+        server_default="private",
+    )
+
     messages = relationship(
         "AIMessage",
         back_populates="conversation",
