@@ -3,6 +3,7 @@
 import {
   Activity,
   BarChart3,
+  BellRing,
   BookOpen,
   Brain,
   Database,
@@ -175,6 +176,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Intelligence",
     items: [
+      {
+        label: "Alerts",
+        href: "/alerts",
+        icon: BellRing,
+        help: "Rules that watch your TM1 servers every 15 minutes — failed or unusually slow processes, dimension growth, security, model and deployment changes — and the alerts they raise. Rules only read; nothing is changed.",
+      },
       {
         label: "Monitoring",
         href: "/monitoring",

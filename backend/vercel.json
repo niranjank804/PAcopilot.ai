@@ -20,6 +20,10 @@
     {
       "path": "/internal/cron/model-health",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/internal/cron/monitors",
+      "schedule": "0 5 * * *"
     }
   ]
 }

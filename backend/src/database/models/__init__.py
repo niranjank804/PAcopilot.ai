@@ -34,6 +34,7 @@ from .tm1_relationship import TM1Relationship
 from .user import User
 from .user_role import UserRole
 from .work_item import WorkItem, WorkItemLink
+from .monitor import MonitorAlert, MonitorRule
 
 __all__ = [
     "Organization",
@@ -52,6 +53,8 @@ __all__ = [
     "VisualPage",
     "EngineeringMemory",
     "WorkItem",
+    "MonitorRule",
+    "MonitorAlert",
     "WorkItemLink",
     "KnowledgeChunk",
     "TM1Change",

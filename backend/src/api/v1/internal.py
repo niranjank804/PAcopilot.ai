@@ -14,6 +14,7 @@ from src.core.config import settings
 from src.core.exceptions import AuthenticationException
 from src.reports.tasks import reap_stale_executions
 from src.schemas.response import ApiResponse
+from src.services.monitoring_rules_service import run_due_monitors
 from src.tm1.health.score import scan_due_connections
 from src.tm1.metadata.history import refresh_due_connections
 
@@ -57,4 +58,18 @@ async def model_health(request: Request):
     _require_cron_secret(request)
 
     return ApiResponse(success=True, data=await scan_due_connections())
+
+
+@router.api_route("/monitors", methods=["GET", "POST"], response_model=ApiResponse[dict])
+async def monitors(request: Request):
+    """Check every monitoring rule that is due.
+
+    Vercel Hobby runs its cron once a day, so this is also meant to be
+    called every 15 minutes by an outside scheduler (any service that can
+    send the CRON_SECRET bearer header). Calling it more often is harmless:
+    a rule is checked only when its interval has passed."""
+
+    _require_cron_secret(request)
+
+    return ApiResponse(success=True, data=await run_due_monitors())
 

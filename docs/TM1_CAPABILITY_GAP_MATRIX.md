@@ -307,6 +307,46 @@ Microsoft Entra app registration); nothing for it was built.
 - Tests: `tests/integration/test_team_collaboration.py` (9), voice notice
   and Team page tests in the frontend.
 
+### Phase 12 — continuous monitoring and alerts (2026-10-05)
+
+Migration `d6b2f8e4a1c7`: `monitor_rules`, `monitor_alerts`
+(`src/services/monitoring_rules_service.py`, `/monitoring/rules`,
+`/monitoring/alerts`).
+
+- **Kinds**: a process fails (any, or one by name); a process takes more
+  than N times its average over D days (the earlier successful runs in the
+  window, at least three); a dimension grows more than X%; users or group
+  membership change (needs `tm1.security.read`; a user added to ADMIN is
+  critical); the model's objects change (from metadata extractions); a
+  change is applied, fails or is rolled back.
+- **Not built: server memory.** TM1 exposes it only through }StatsByServer
+  with Performance Monitor on, and the element names have not been verified
+  against a real server. Shipping guessed MDX would be a monitor that is
+  silently wrong.
+- **Only reads.** Checks read TM1's message log, element counts and
+  security, and PA-Copilot's records. Nothing is written to TM1, run or
+  drafted. A rule the assistant proposes (`propose_monitor`) is `proposed`
+  and never checked until its requester or an admin turns it on.
+- **Baseline, then once per occurrence.** A first check never alerts on the
+  past; growth and security compare with what it saw. Each failed run, slow
+  run, growth step, security difference and change event alerts once
+  (unique `dedup_key`). An unreachable server is one alert after three
+  failed checks in a row, not one per check.
+- **Schedule.** `/internal/cron/monitors` (CRON_SECRET bearer) checks every
+  active rule whose 15-minute interval has passed, server by server, inside
+  a 200 s budget. Vercel Hobby crons run daily, so a daily Vercel cron is the
+  backstop and an outside scheduler is to call it every 15 minutes.
+- **Delivery.** The Alerts page and a bell in the header (open count,
+  red when critical), and email to the rule's subscribers who may still use
+  the connection — only when SMTP is configured; the page says so when not.
+- **Access follows the connection**: rules and alerts on a private
+  connection are invisible to others; changing or deleting a rule is for its
+  maker or an admin. Every create, change, delete, acknowledge and resolve
+  is audited.
+- `get_monitor_alerts` lets the assistant answer "any alerts on DEV?".
+- Tests: `tests/integration/test_monitoring_rules.py` (11), Alerts page
+  tests in the frontend.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

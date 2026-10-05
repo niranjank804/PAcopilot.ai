@@ -111,6 +111,8 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "get_dimension_dependents": _c("dependencies", R, "Metadata graph", SNAPSHOT, "dimension_name"),
     "get_model_changes": _c("governance", R, "Metadata extraction history", SNAPSHOT),
     "search_engineering_memory": _c("knowledge", R, "Approved engineering memory", REFERENCE, "query"),
+    "get_monitor_alerts": _c("governance", R, "Alerts raised by monitoring rules", REFERENCE),
+    "propose_monitor": _c("governance", W, "Monitoring rule proposal for the user to turn on", DRAFT, "kind"),
     "get_work_item": _c("knowledge", R, "Team work item and its linked records", REFERENCE, "reference"),
     "propose_engineering_memory": _c("knowledge", W, "Memory proposal for human approval", DRAFT, "object_name"),
     "get_model_health": _c("governance", R, "Scored health scans (rule parser + TI review at scan time)", ANALYSIS),

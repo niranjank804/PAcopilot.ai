@@ -46,6 +46,8 @@ system_prompt: >-
 tool_names:
   - search_engineering_memory
   - get_work_item
+  - get_monitor_alerts
+  - propose_monitor
   - propose_engineering_memory
   - analyze_change_impact
   - list_cubes

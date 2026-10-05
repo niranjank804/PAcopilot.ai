@@ -4,6 +4,7 @@ import { HelpCircle, LogOut, Menu, PlayCircle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { AlertsBell } from "@/components/alerts-bell";
 import { NAV_DESTINATIONS, SidebarBrand, SidebarNav } from "@/components/app-sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -105,6 +106,7 @@ export function AppHeader() {
             route. Renders nothing elsewhere, so it needs no per-page
             wiring. */}
         <FeatureTourButton />
+        <AlertsBell />
         {/* Help. Also the last stop on the product tour, which is how
             someone learns the tour can be replayed from here. */}
         <DropdownMenu>
