@@ -40,7 +40,26 @@ PYTHONPATH=. python tests/performance/benchmark_graph.py
 PYTHONPATH=. python tests/performance/benchmark_ai.py   # also needs ANTHROPIC_API_KEY
 ```
 
-Every live test and benchmark creates its own throwaway `Organization`/`User`/`TM1Connection` row (via the same `db_session` savepoint-rollback fixture — or, for the standalone benchmark scripts, an explicit cleanup at the end) — nothing is left behind in your database, and nothing is written to the TM1 server itself; every operation exercised is read-only.
+Every live test and benchmark creates its own throwaway `Organization`/`User`/`TM1Connection` row (via the same `db_session` savepoint-rollback fixture — or, for the standalone benchmark scripts, an explicit cleanup at the end) — nothing is left behind in your database. Everything except `tests/live/test_write_paths.py` only reads from the TM1 server.
+
+## Write paths (opt-in, DEV only)
+
+`tests/live/test_write_paths.py` checks the change engine on the real server: a broken process refused by TM1's compiler before saving; create, update, run, delete and the rollbacks; a failing run recorded as failed; cell writes applied, read back, refused for consolidated, rule-calculated and mistyped cells, refused after a value changed since the draft, and rolled back; rules applied, checked by TM1 and rolled back.
+
+It writes only to objects it creates — a process, two dimensions and a cube named `zzPACopilotLive_<random>` — and deletes them afterwards, pass or fail. It runs only when both are set:
+
+| Variable | Value |
+|---|---|
+| `TM1_LIVE_WRITE` | `1` |
+| `TM1_LIVE_WRITE_SERVER` | the server's name exactly as TM1 reports it; any other server makes these tests skip |
+
+The easy way, on Windows, from `backend/`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_live_validation.ps1
+```
+
+It asks for the address, port, user and (hidden) password, asks whether to include the write paths, runs everything, and saves a report with results only to `docs/evidence/live/`. A local DEV server has a private address, so the script sets `TM1_ALLOW_PRIVATE_ADDRESSES=true` for that run only.
 
 ## Known gap: CAM / IBMid auth cannot be tested yet
 
