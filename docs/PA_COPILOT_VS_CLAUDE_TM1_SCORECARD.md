@@ -36,9 +36,44 @@ does unless the evidence column shows the extra capability.
 
 So: PA-Copilot is **≥ the benchmark on every benchmark capability** and
 ahead on the enterprise platform capabilities — by automated tests, and for
-the write paths also live, against TM1 11.0.1. Not yet measured: answer
-accuracy, latency and cost against a real model, and a head-to-head run
-with the benchmark setup.
+the write paths also live, against TM1 11.0.1. Answer accuracy is measured
+(below). Not yet run: a head-to-head with the benchmark setup itself.
+
+### Answer accuracy (live, 2026-10-05)
+
+`backend/tests/live/test_answer_accuracy.py` asks 11 questions through the
+real orchestrator, model and tools on Planning Sample, and checks each
+answer against the truth read from TM1 with TM1py — not through
+PA-Copilot's tools — with deterministic checks, no model grading.
+
+| Run | Correct | Median | Slowest | Cost |
+|---|---|---|---|---|
+| 1 | 10 / 11 (91%) | 12.5 s | 66 s | $0.50 |
+| 2 | 10 / 11 (91%) | 8.3 s | 73 s | $0.53 |
+
+Reports: [`evidence/accuracy/run1`](evidence/accuracy/run1/report.md),
+[`run2`](evidence/accuracy/run2/report.md). Correct both times: the cube
+list, a cube's dimensions in order, which cubes have rules, a dimension's
+element count, a cell value, whether a cell is rule-calculated, which cube
+a process writes, a process's datasource, and saying plainly that a named
+cube or process does not exist. Missed both times: the TI generation case —
+the TI agent gave the right PAW advice but asked for the file layout and
+target cube instead of writing the process, so the "functions are real"
+check had no code to inspect.
+
+**What the first run found:** 4 / 11. Every specialist agent was also given
+the plain-chat instruction "No TM1 server is connected in this mode", after
+its own instructions and the chosen connection, and often obeyed it —
+refusing its tools and telling the user to connect a server they had
+connected. Fixed (`_base_system` in `src/ai/orchestrator.py`, regression
+test `tests/unit/ai/test_agent_system_prompt.py`). This affected agent
+chats in production until the fix is deployed.
+
+Also seen: results vary run to run (the same code scored 9 and 8 of 11
+before the checks were corrected); the element-count question is slow
+(60–75 s, ~$0.19) because no tool returns a count directly; TM1 11.0
+reports a cell's RuleDerived flag differently depending on the query shape
+for a cell a rule covers but STETs.
 
 ### What the live run found
 
@@ -125,9 +160,9 @@ latency, cost, safety and deployment reliability.
 | Capability coverage | 103 / 114 rows exist, 10 partial, 1 blocked; plus cell write-back, which the 114 rows did not list |
 | Workflow completion | 11 / 12 golden workflows automated; explain calculation unit-tested only |
 | Safety | Every write is a draft; no tool calls TM1's mutating APIs (enforced by `test_tool_classification.py`); PROD two-person and AI read-only enforced |
-| Accuracy | **Not measured.** No evaluation of answer quality against a real model has been run |
-| Latency | **Not measured** against a real server. The product records it per request (p95 on the AI Cost panel) |
-| Cost | **Not measured** in a benchmark run. The product records it per request |
+| Accuracy | 10 / 11 (91%) in two live runs on Planning Sample; truth from TM1, deterministic checks. One set of 11 questions on one sample model — a start, not a benchmark |
+| Latency | Median 8–13 s per answer with tool calls, slowest 66–73 s (live runs above) |
+| Cost | About $0.05 per answer on average, $0.50 per 11-question run (live runs above) |
 | Deployment reliability | Live on TM1 11.0.1: apply, verify, drift refusal and rollback for processes, rules and cells all passed. Not measured over time |
 | Head-to-head with the benchmark | **Not run.** The benchmark setup was not available here |
 
@@ -137,4 +172,5 @@ latency, cost, safety and deployment reliability.
    the TM1 or Planning Analytics versions customers use (11.8, v12 / PAaaS)
    with `backend/scripts/run_live_validation.ps1`.
 2. **Power BI**, once there is a Microsoft Entra app registration.
-3. **Accuracy evaluation**: a fixed question set scored against a real model.
+3. **A larger accuracy set**: more questions, on a customer-sized model,
+   and a direct element-count tool for the slowest case.

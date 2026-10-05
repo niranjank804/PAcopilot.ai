@@ -210,6 +210,21 @@ EVIDENCE_RULES = (
     "review_process_code before answering."
 )
 
+def _base_system(system: str | None, persona, tools_requested: bool) -> str | None:
+    """The caller's system text, or the plain-chat instructions — but only
+    for plain chat. Given to an agent, "No TM1 server is connected in this
+    mode" sat after the agent's instructions and the chosen connection, and
+    the model often obeyed it: it refused to call its tools and told the
+    user to connect a server they had connected. Found by the live accuracy
+    run (tests/live/test_answer_accuracy.py), 2026-10-05."""
+
+    if system is not None:
+        return system
+    if persona is not None or tools_requested:
+        return None
+    return PLAIN_CHAT_SYSTEM_PROMPT
+
+
 PLAIN_CHAT_SYSTEM_PROMPT = (
     "You are an assistant for IBM Planning Analytics (TM1). No TM1 server "
     "is connected in this mode, so you cannot see the organization's cubes, "
@@ -1175,7 +1190,7 @@ class AIOrchestrator:
             await self._build_tool_system_prompt(
                 db,
                 organization_id,
-                system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
+                _base_system(system, persona, caller_requested_all_tools),
                 persona,
                 connection_id,
             )
@@ -1389,18 +1404,13 @@ class AIOrchestrator:
         )
 
         tools: list[ToolDefinition] | None = None
-        resolved_system = (
-            system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT
-        )
         allowed_tools: list[str] | None = None
-
-        resolved_system_context: str | None = None
 
         resolved_system, resolved_system_context = (
             await self._build_tool_system_prompt(
                 db,
                 organization_id,
-                system if system is not None else PLAIN_CHAT_SYSTEM_PROMPT,
+                _base_system(system, persona, caller_requested_all_tools),
                 persona,
                 connection_id,
             )
