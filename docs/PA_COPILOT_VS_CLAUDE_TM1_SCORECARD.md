@@ -50,6 +50,8 @@ PA-Copilot's tools — with deterministic checks, no model grading.
 |---|---|---|---|---|
 | 1 | 10 / 11 (91%) | 12.5 s | 66 s | $0.50 |
 | 2 | 10 / 11 (91%) | 8.3 s | 73 s | $0.53 |
+| 3 (after the fixes below) | 10 / 11 (91%) | 8.6 s | 174 s | $0.61 |
+| 4 (after the fixes below) | 10 / 11 (91%) | 8.5 s | see note | $1.07 |
 
 Reports: [`evidence/accuracy/run1`](evidence/accuracy/run1/report.md),
 [`run2`](evidence/accuracy/run2/report.md). Correct both times: the cube
@@ -68,6 +70,27 @@ refusing its tools and telling the user to connect a server they had
 connected. Fixed (`_base_system` in `src/ai/orchestrator.py`, regression
 test `tests/unit/ai/test_agent_system_prompt.py`). This affected agent
 chats in production until the fix is deployed.
+
+**Runs 3 and 4**, after two fixes the first runs pointed at:
+
+- `get_dimension` now returns element counts per hierarchy, counted by
+  TM1. The element-count question went from 60–75 s and ~$0.19 to 6–9 s
+  and ~$0.02, still correct.
+- The TI agent, missing the file layout and target cube, now writes the
+  complete process with `<Placeholders>` and checks it with
+  `check_tm1_code` before asking — it no longer answers with questions
+  only. The TI case still fails, for a different reason each time: in
+  run 3 the code uses CubeGetLogChanges / CubeSetLogChanges, which the
+  function reference marks unavailable on v12, and the case requires code
+  that runs on v11 and v12 (the agent copied the logging pattern of the
+  v11 server's own processes — right for this server, not for both); in
+  run 4 the check found no fenced code block.
+- Run 4's slowest answer (the TI case) took 8,680 s with 28 tool calls,
+  across a night in which the PC slept; not reproduced, but the TI agent's
+  many separate function lookups are worth reducing.
+- Run 4's missing-cube answer ("There's no 'Sales_Forecast_2031'") was
+  correct; the check's pattern missed it and was fixed. Re-scored with no
+  new model call, as the report says.
 
 Also seen: results vary run to run (the same code scored 9 and 8 of 11
 before the checks were corrected); the element-count question is slow

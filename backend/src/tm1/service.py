@@ -539,16 +539,23 @@ class TM1IntegrationService:
         connection_id: uuid.UUID,
         organization_id: uuid.UUID,
         dimension_name: str,
+        *,
+        with_counts: bool = False,
     ) -> DimensionInfo:
 
         connection = await self.get_connection(db, connection_id, organization_id)
         client = await tm1_connection_manager.get_client(connection)
 
-        return await dimension_service.get_dimension(
+        dimension = await dimension_service.get_dimension(
             client,
             connection.id,
             dimension_name,
         )
+        if with_counts:
+            dimension.element_counts = await dimension_service.count_elements(
+                client, connection.id, dimension.name, dimension.hierarchy_names
+            )
+        return dimension
 
     async def get_cube_rules(
         self,

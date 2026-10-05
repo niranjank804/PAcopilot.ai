@@ -7,9 +7,11 @@ from src.tm1.resilience import call_with_resilience
 
 class DimensionInfo:
 
-    def __init__(self, name: str, hierarchy_names: list[str]):
+    def __init__(self, name: str, hierarchy_names: list[str], element_counts: dict | None = None):
         self.name = name
         self.hierarchy_names = hierarchy_names
+        # {hierarchy: {total, leaf, consolidated, string}} when asked for.
+        self.element_counts = element_counts
 
 
 async def list_dimensions(
@@ -43,6 +45,40 @@ async def get_dimension(
         name=dimension.name,
         hierarchy_names=list(dimension.hierarchy_names),
     )
+
+
+# Hierarchies counted per request; a dimension with more lists the rest
+# without counts.
+MAX_COUNTED_HIERARCHIES = 5
+
+
+async def count_elements(
+    client: TM1Service,
+    connection_id: uuid.UUID,
+    dimension_name: str,
+    hierarchy_names: list[str],
+    **resilience_kwargs,
+) -> dict:
+    """How many elements each hierarchy has, counted by the server.
+
+    "How many elements does X have?" used to be answered by listing
+    elements (capped at 200) or by trying several tools: about 70 seconds
+    in the live accuracy run. TM1 counts them in one request each.
+    """
+
+    def count() -> dict:
+        counts = {}
+        for hierarchy in hierarchy_names[:MAX_COUNTED_HIERARCHIES]:
+            counts[hierarchy] = {
+                "total": client.elements.get_number_of_elements(dimension_name, hierarchy),
+                "leaf": client.elements.get_number_of_leaf_elements(dimension_name, hierarchy),
+                "consolidated": client.elements.get_number_of_consolidated_elements(dimension_name, hierarchy),
+                "string": client.elements.get_number_of_string_elements(dimension_name, hierarchy),
+            }
+        return counts
+
+    count.__name__ = "count_elements"
+    return await call_with_resilience(connection_id, count, **resilience_kwargs)
 
 
 MAX_ELEMENTS = 200

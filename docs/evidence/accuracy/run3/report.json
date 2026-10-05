@@ -1,0 +1,221 @@
+{
+  "summary": {
+    "run_at": "2026-10-05T16:12:14+00:00",
+    "tm1_version": "11.0.00100.927",
+    "cases": 11,
+    "passed": 10,
+    "accuracy": 0.909,
+    "median_latency_s": 8.6,
+    "max_latency_s": 173.9,
+    "total_cost_usd": 0.6085,
+    "models": [
+      "claude-sonnet-5"
+    ]
+  },
+  "cases": [
+    {
+      "id": "list_cubes",
+      "agent": "developer",
+      "question": "Which cubes are on this server? Leave out control cubes.",
+      "truth": [
+        "PA_COPILOT_TEST",
+        "plan_BudgetPlan",
+        "plan_BudgetPlanLineItem",
+        "plan_Control",
+        "plan_ExchangeRate",
+        "plan_Report"
+      ],
+      "passed": true,
+      "latency_s": 5.3,
+      "cost_usd": 0.0779,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "list_cubes:success"
+      ],
+      "answer": "Verified from TM1: this server has 6 non-control cubes:\n\n- PA_COPILOT_TEST\n- plan_BudgetPlan\n- plan_BudgetPlanLineItem\n- plan_Control\n- plan_ExchangeRate\n- plan_Report\n\nLet me know if you'd like details on any of them \u2014 dimensions, rules, or what reads/writes them."
+    },
+    {
+      "id": "dimension_order",
+      "agent": "developer",
+      "question": "List the dimensions of the plan_BudgetPlan cube, in their order.",
+      "truth": [
+        "plan_version",
+        "plan_business_unit",
+        "plan_department",
+        "plan_chart_of_accounts",
+        "plan_exchange_rates",
+        "plan_source",
+        "plan_time"
+      ],
+      "passed": true,
+      "latency_s": 4.3,
+      "cost_usd": 0.0159,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "get_cube:success"
+      ],
+      "answer": "Verified from TM1: the **plan_BudgetPlan** cube has these dimensions, in order:\n\n1. plan_version\n2. plan_business_unit\n3. plan_department\n4. plan_chart_of_accounts\n5. plan_exchange_rates\n6. plan_source\n7. plan_time\n\nIt also has rules defined."
+    },
+    {
+      "id": "cubes_with_rules",
+      "agent": "developer",
+      "question": "Which cubes have rules?",
+      "truth": [
+        "plan_BudgetPlan",
+        "plan_BudgetPlanLineItem",
+        "plan_ExchangeRate",
+        "plan_Report"
+      ],
+      "passed": true,
+      "latency_s": 10.7,
+      "cost_usd": 0.0359,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "list_cubes:success",
+        "get_cube:success",
+        "get_cube:success",
+        "get_cube:success",
+        "get_cube:success",
+        "get_cube:success",
+        "get_cube:success"
+      ],
+      "answer": "Out of the 6 cubes on this server, four have rules (Verified from TM1):\n\n- **plan_BudgetPlan**\n- **plan_BudgetPlanLineItem**\n- **plan_ExchangeRate**\n- **plan_Report**\n\nThe other two, **PA_COPILOT_TEST** and **plan_Control**, have no rules."
+    },
+    {
+      "id": "element_count",
+      "agent": "developer",
+      "question": "How many elements does the plan_department dimension have, in total?",
+      "truth": 11,
+      "passed": true,
+      "latency_s": 9.2,
+      "cost_usd": 0.0237,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "search_model_objects:success",
+        "get_dimension:success"
+      ],
+      "answer": "Verified from TM1: the **plan_department** dimension has **11 elements** in total \u2014 8 leaf elements and 3 consolidated elements (no string elements)."
+    },
+    {
+      "id": "cell_value",
+      "agent": "analyst",
+      "question": "What is the value in plan_ExchangeRate for JPY, beginning, Jan-2005?",
+      "truth": 0.0095,
+      "passed": true,
+      "latency_s": 8.6,
+      "cost_usd": 0.0813,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "get_cube:success",
+        "list_dimension_elements:success",
+        "list_dimension_elements:success",
+        "search_model_objects:success",
+        "get_cell_values:success"
+      ],
+      "answer": "Verified from TM1: the value in **plan_ExchangeRate** for JPY, beginning, Jan-2005 is **0.0095**. It's a directly entered input (not rule-derived, not a consolidation)."
+    },
+    {
+      "id": "rule_derived",
+      "agent": "developer",
+      "question": "In plan_ExchangeRate, is the cell JPY, local, Jan-2005 typed in or calculated by a rule?",
+      "truth": "calculated by a rule (['local'] = 1)",
+      "passed": true,
+      "latency_s": 10.9,
+      "cost_usd": 0.0402,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "search_model_objects:success",
+        "get_cube:success",
+        "inspect_cell:success"
+      ],
+      "answer": "That cell is calculated by a rule, not typed in.\n\n**Verified from TM1:** `JPY, local, Jan-2005` in plan_ExchangeRate has value **1**, and TM1 reports it as `rule_derived: true` (not updateable as a leaf input). The rule statement applying to it is:\n\n```\n['local']=1\n```\n\n(line 3 of the cube's rules) \u2014 it sets every cell on the `local` measure to a constant 1, under `SKIPCHECK`.\n\nOne thing worth flagging: this statement is under SKIPCHECK and the rule parser reports it as **not fed**. That's just informational for this flat constant assignment (since it doesn't depend on other cells, feeding isn't really needed for the leaf value itself), but it does mean any consolidation above this cell in `plan_currency` or `plan_time` would read zero for the `local` measure, since nothing feeds it up.\n\n**Unknown:** actual runtime feeder state isn't exposed by the TM1 REST API, so that SKIPCHECK/no-feeder read is from PA-Copilot's static rule analysis, not a live runtime check."
+    },
+    {
+      "id": "process_writes",
+      "agent": "developer",
+      "question": "Which cube does the process plan_load_budget_to_report_cube write data to?",
+      "truth": [
+        "plan_Report"
+      ],
+      "passed": true,
+      "latency_s": 7.5,
+      "cost_usd": 0.0304,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "search_model_objects:success",
+        "analyze_process_references:success"
+      ],
+      "answer": "Verified from TM1: `plan_load_budget_to_report_cube` writes to the **plan_Report** cube (in its Data section). It reads from **Plan_BudgetPlan** (its datasource view) and references several dimensions (plan_time, plan_version, plan_exchange_rates, plan_source, plan_business_unit, plan_department, plan_chart_of_accounts) along with some dynamically-named subsets/views used for staging during the load."
+    },
+    {
+      "id": "process_datasource",
+      "agent": "developer",
+      "question": "What kind of datasource does the process plan_load_budget_ascii read from?",
+      "truth": "ASCII",
+      "passed": true,
+      "latency_s": 8.1,
+      "cost_usd": 0.0382,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "search_model_objects:success",
+        "get_process:success"
+      ],
+      "answer": "Verified from TM1: **plan_load_budget_ascii** uses an **ASCII** datasource \u2014 a delimited text file at `.\\data_load\\budget_input\\Plan_Load_Budget_ascii.csv`.\n\nDetails of that source:\n- Delimiter: comma (`,`), with `\"` as the quote character\n- 1 header record (skipped)\n- Decimal separator `.`, thousand separator `,`\n- Source columns mapped to variables: `V1` (date string), `Dept`, `BU`, `Account`, `Value` (numeric)\n\nThe process then parses `V1` and the parameters (`PStartDate`/`PEndDate`) to derive month/year, and in the Data tab writes the value into the `plan_BudgetPlan` cube via `CellPutN` when the record's date falls within the requested budget period."
+    },
+    {
+      "id": "missing_cube",
+      "agent": "developer",
+      "question": "What dimensions does the cube Sales_Forecast_2031 have?",
+      "truth": "does not exist",
+      "passed": true,
+      "latency_s": 5.7,
+      "cost_usd": 0.025,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "search_model_objects:success",
+        "list_cubes:success"
+      ],
+      "answer": "I checked the live TM1 model and there is no cube called **Sales_Forecast_2031** on this connection (Live Validation).\n\nThe cubes that actually exist here are:\n- PA_COPILOT_TEST\n- plan_BudgetPlan\n- plan_BudgetPlanLineItem\n- plan_Control\n- plan_ExchangeRate\n- plan_Report\n\nCould you double-check the name, or did you mean one of these? If you meant one of the `plan_` cubes, let me know and I'll pull its dimensions."
+    },
+    {
+      "id": "missing_process",
+      "agent": "developer",
+      "question": "Show me the data tab of the process Load_Payroll_Unicorn.",
+      "truth": "does not exist",
+      "passed": true,
+      "latency_s": 9.4,
+      "cost_usd": 0.0388,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "get_process:not_found",
+        "search_model_objects:success",
+        "search_model_objects:success",
+        "search_model_objects:success"
+      ],
+      "answer": "There's no process called \"Load_Payroll_Unicorn\" on this TM1 server (connection \"Live Validation\"). I searched for \"Payroll,\" \"Unicorn,\" and \"Load\" and found no matching process by that name \u2014 a \"payroll\" process doesn't exist here at all, and no process name even contains \"Unicorn.\"\n\nThe processes that do exist with \"Load\" in the name are:\n- plan_load_actual_ascii\n- plan_load_budget_ascii\n- plan_load_budget_odbc\n- plan_load_budget_to_report_cube\n- plan_load_exchange_rate_ascii\n- plan_load_exchange_rate_odbc\n\nDid you mean one of these, or is the process perhaps on a different connection? Let me know and I can pull up its Data tab."
+    },
+    {
+      "id": "ti:paw_fixed_width_load",
+      "agent": "ti",
+      "question": "I need to load a fixed-width file in Planning Analytics Workspace (PAW). Generate a TI process for it.",
+      "truth": "deterministic checks in evals/cases/ti",
+      "passed": false,
+      "latency_s": 173.9,
+      "cost_usd": 0.2012,
+      "model": "claude-sonnet-5",
+      "tools": [
+        "search_knowledge_base:success",
+        "search_knowledge_base:success",
+        "get_coding_standards:success",
+        "search_model_objects:success",
+        "get_process:success",
+        "get_process:success",
+        "check_tm1_code:success"
+      ],
+      "answer": "Here's the complete process:\n\n```\n# PROLOG\n\n# Validate that the source file parameter was supplied\nIF(LONG(pSourceFile) = 0);\n   ProcessError;\nENDIF;\n\n# Target cube and expected fixed-width record length\nsCubeName = '<TargetCube>';\nnExpectedLength = <RecordLength>;\n\n# Suspend cube logging during the load, restore it in Epilog\nnOldLogChanges = CUBEGETLOGCHANGES(sCubeName);\nCUBESETLOGCHANGES(sCubeName, 0);\n\n# Counters for the run summary\nnRecordsRead = 0;\nnRecordsLoaded = 0;\nnRecordsRejected = 0;\n```\n\n```\n# METADATA\n(no metadata steps required - elements are assumed to exist in <Dim1> / <Dim2>)\n```\n\n```\n# DATA\n\nnRecordsRead = nRecordsRead + 1;\n\n# Reject any line that is not the expected fixed-width length\nnLineLength = LONG(V1);\nIF(nLineLength <> nExpectedLength);\n   nRecordsRejected = nRecordsRejected + 1;\n   ItemSkip;\nENDIF;\n\n# Cut fields out of the wide record by start position and length\nsField1 = TRIM(SUBST(V1, <Field1Start>, <Field1Length>));\nsField2 = TRIM(SUBST(V1, <Field2Start>, <Field2Length>));\nsAmount = TRIM(SUBST(V1, <AmountStart>, <AmountLength>));\nnAmount = NUMBR(sAmount);\n\n# Reject rows whose dimension elements do not exist\nIF(DIMIX('<Dim1>', sField1) = 0 % DIMIX('<Dim2>', sField2) = 0);\n   nRecordsRejected = nRecordsRejected + 1;\n   ItemSkip;\nENDIF;\n\nCellPutN(nAmount, sCubeName, sField1, sField2);\nnRecordsLoaded = nRecordsLoaded + 1;\n```\n\n```\n# EPILOG\n\n# Restore the cube's original logging setting\nCUBESETLOGCHANGES(sCubeName, nOldLogChanges);\n\n# Write a run sum",
+      "failures": [
+        "critical: functions_are_real"
+      ]
+    }
+  ]
+}

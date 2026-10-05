@@ -41,7 +41,7 @@ pytestmark = pytest.mark.live
 # Said in many ways: "does not exist", "there's no cube called", "no cube by
 # that name", "found nothing", "couldn't find it".
 NOT_FOUND = re.compile(
-    r"\b(does not|doesn't|doesnt|did not|didn't) exist|\bnot exist|\bnot found|\bfound nothing|\bno (such )?(cube|process)\b|\b(couldn't|could not|unable to|can't|cannot) find|\bthere (is|'s) no\b|\bis not an? (cube|process)|\bisn't an? (cube|process)"
+    r"\b(does not|doesn't|doesnt|did not|didn't) exist|\bnot exist|\bnot found|\bfound nothing|\bno (such )?(cube|process)\b|\b(couldn't|could not|unable to|can't|cannot) find|\bthere(?: is|'s) no\b|\bis not an? (cube|process)|\bisn't an? (cube|process)"
 )
 
 

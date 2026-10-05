@@ -66,7 +66,12 @@ class ListDimensionsTool(Tool):
 class GetDimensionTool(Tool):
 
     name = "get_dimension"
-    description = "Get details about a specific TM1 dimension, including its hierarchies."
+    description = (
+        "Get a TM1 dimension's hierarchies and how many elements each has "
+        "(total, leaf, consolidated, string), counted by the server. Use it "
+        "to answer how many elements a dimension has — do not list elements "
+        "to count them."
+    )
     required_permission = "tm1.read"
     input_schema = {
         "type": "object",
@@ -103,13 +108,14 @@ class GetDimensionTool(Tool):
         dimension_name = str(kwargs["dimension_name"])
 
         dimension = await tm1_integration_service.get_dimension(
-            db, connection_id, organization_id, dimension_name
+            db, connection_id, organization_id, dimension_name, with_counts=True
         )
 
         return json.dumps(
             {
                 "name": dimension.name,
                 "hierarchy_names": dimension.hierarchy_names,
+                "element_counts": dimension.element_counts,
             }
         )
 

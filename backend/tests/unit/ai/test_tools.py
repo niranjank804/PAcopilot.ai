@@ -144,6 +144,11 @@ async def test_get_dimension_tool_returns_dimension_details(
 ):
     org, admin = await create_org_admin(db_session)
     connection = await _create_connection(db_session, org.id, admin.id)
+    elements = fake_tm1_client.elements
+    elements.get_number_of_elements.return_value = 12
+    elements.get_number_of_leaf_elements.return_value = 10
+    elements.get_number_of_consolidated_elements.return_value = 2
+    elements.get_number_of_string_elements.return_value = 0
 
     result = await GetDimensionTool().execute(
         db_session,
@@ -153,9 +158,12 @@ async def test_get_dimension_tool_returns_dimension_details(
         dimension_name="Region",
     )
 
+    # Counted by the server, per hierarchy: "how many elements" in one call.
+    counts = {"total": 12, "leaf": 10, "consolidated": 2, "string": 0}
     assert json.loads(result) == {
         "name": "Region",
         "hierarchy_names": ["Region", "Region Alt"],
+        "element_counts": {"Region": counts, "Region Alt": counts},
     }
 
 
