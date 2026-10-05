@@ -174,7 +174,7 @@ class EngineeringMemoryService:
             versions.append(earlier)
         return versions
 
-    async def list(
+    async def search(
         self,
         db,
         organization_id: uuid.UUID,

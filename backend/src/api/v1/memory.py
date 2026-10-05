@@ -65,7 +65,7 @@ async def list_memories(
     status: Literal["proposed", "approved", "rejected", "archived"] | None = Query(default=None),
     q: str | None = Query(default=None, max_length=200),
 ):
-    memories = await engineering_memory_service.list(db, current_user.organization_id, status=status, query=q)
+    memories = await engineering_memory_service.search(db, current_user.organization_id, status=status, query=q)
     return ApiResponse(success=True, data=[MemoryResponse.model_validate(m) for m in memories])
 
 

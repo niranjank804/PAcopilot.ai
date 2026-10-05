@@ -46,7 +46,7 @@ class SearchEngineeringMemoryTool(Tool):
     async def execute(self, db: AsyncSession, *, organization_id, user_id, **kwargs) -> str:
         await _authorize(db, user_id, self.required_permission)
         connection_id = kwargs.get("connection_id")
-        memories = await engineering_memory_service.list(
+        memories = await engineering_memory_service.search(
             db,
             organization_id,
             status="approved",
