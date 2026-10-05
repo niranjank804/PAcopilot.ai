@@ -20,6 +20,7 @@ from src.ai.tools.tm1.changes import (
 )
 from src.ai.tools.memory import ProposeEngineeringMemoryTool, SearchEngineeringMemoryTool
 from src.ai.tools.work_items import GetWorkItemTool
+from src.ai.tools.incidents import InvestigateIncidentTool
 from src.ai.tools.monitors import GetMonitorAlertsTool, ProposeMonitorTool
 from src.ai.tools.tm1.intelligence import GetModelHealthTool, GetPerformanceReportTool
 from src.ai.tools.tm1.development import ReviewProcessCodeTool, ValidateProcessCodeTool
@@ -129,6 +130,7 @@ TOOLS: dict[str, Tool] = {
         SearchEngineeringMemoryTool(),
         ProposeEngineeringMemoryTool(),
         GetWorkItemTool(),
+        InvestigateIncidentTool(),
         GetMonitorAlertsTool(),
         ProposeMonitorTool(),
         DiagnoseProcessFailureTool(),

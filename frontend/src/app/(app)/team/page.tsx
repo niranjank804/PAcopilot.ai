@@ -1,13 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Plus, Siren } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { EnvironmentBadge } from "@/components/environment-badge";
+import { ReportIncidentDialog } from "@/components/report-incident-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,7 @@ export default function TeamPage() {
   const [filter, setFilter] = useState<WorkItemStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [draft, setDraft] = useState({ reference: "", title: "", description: "" });
 
   const items = useQuery({
@@ -104,10 +106,16 @@ export default function TeamPage() {
             changed on the TM1 servers you can use.
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New work item
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setReporting(true)}>
+            <Siren className="mr-2 h-4 w-4" />
+            Report incident
+          </Button>
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New work item
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -160,6 +168,9 @@ export default function TeamPage() {
                     className="flex flex-wrap items-center justify-between gap-2 py-2.5 hover:bg-muted/40"
                   >
                     <span className="min-w-0">
+                      {item.kind === "incident" ? (
+                        <Badge variant="destructive" className="mr-1.5">incident</Badge>
+                      ) : null}
                       <span className="font-medium">{item.reference}</span>{" "}
                       <span className="text-sm">{item.title}</span>
                     </span>
@@ -289,6 +300,8 @@ export default function TeamPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ReportIncidentDialog open={reporting} onOpenChange={setReporting} />
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>

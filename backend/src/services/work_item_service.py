@@ -285,6 +285,12 @@ class WorkItemService:
             if values.get("resolution"):
                 event(row.created_at, "resolution", "Resolution recorded", detail=values["resolution"], actor=row.user_id)
 
+        if item.kind == "incident":
+            from src.services.incident_service import incident_service
+
+            for look in reversed(await incident_service.investigations(db, item, user_id) or []):
+                event(look.created_at, "investigation_run", "Investigated", detail=look.summary, actor=look.run_by)
+
         visible_changes: list[TM1Change] = []
         conversations = 0
         for link in await self.links(db, item):

@@ -370,6 +370,35 @@ the API or by the assistant (`propose_cell_write`, Developer and Analyst):
 - Tests: `tests/integration/tm1/test_cell_writes.py` (9). Not verified
   against a real TM1 server.
 
+### Incident mode (2026-10-05)
+
+Migration `e8c4a2f6b9d3`: incidents are work items (`kind` incident, with
+severity, server, cube or process); `incident_investigations` keeps each
+look (`src/services/incident_service.py`).
+
+- **Report incident** (Team page, `POST /team/incidents`): reference, what
+  is wrong, the server, the cube that looks wrong or the process that
+  failed, severity, how far back to look. It is investigated at once.
+- **The investigation reads only**: the environment; the affected cube (or
+  the cubes the failed process writes); from the dependency map, the
+  processes that write it and the cubes its rules read, with their writers;
+  PA-Copilot changes applied, failed or rolled back there; runs of the
+  writers (TM1's message log, collected now, and PA-Copilot runs) —
+  failures and slow runs; model differences between extractions; the
+  cube's rules analysed; open alerts.
+- **Suspects, ranked**: a rules change on the cube or a cube its rules read
+  first, then cell writes, process changes, a writer whose last run failed,
+  a PA-Copilot run, model differences, alerts, slow runs, critical rule
+  findings. Each has its evidence and a mitigation: roll back the change
+  (opens it in Deployments, where a person with rights rolls it back),
+  diagnose and re-run the process, or review. **Nothing is applied.**
+- **Verify**: Investigate again after a fix; the page lists what cleared.
+  Every look is on the incident's timeline; the findings are hidden from
+  people who may not use the server.
+- `investigate_incident` (Troubleshooter, Analyst, Administrator): the same
+  investigation in chat, read-only and not saved.
+- Tests: `tests/integration/test_incidents.py` (6), Incident page tests.
+
 ### Live verification
 
 Unit and integration tests run against a faked TM1. Connecting, listing

@@ -20,6 +20,51 @@ export interface WorkItem {
   created_by: string;
   created_at: string;
   updated_at: string;
+  kind?: "work" | "incident";
+  severity?: IncidentSeverity | null;
+  connection_id?: string | null;
+  cube_name?: string | null;
+  process_name?: string | null;
+}
+
+export type IncidentSeverity = "low" | "medium" | "high" | "critical";
+
+export interface Suspect {
+  score: number;
+  kind: string;
+  title: string;
+  detail: string | null;
+  at: string | null;
+  mitigation: {
+    action: "rollback" | "diagnose" | "review";
+    label: string;
+    change_id?: string;
+    process?: string;
+    alert_id?: string;
+  };
+}
+
+export interface Investigation {
+  id: string;
+  created_at: string;
+  window_hours: number;
+  summary: string;
+  findings: {
+    summary: string;
+    environment: Environment;
+    connection: string;
+    window_hours: number;
+    affected: {
+      cubes: string[];
+      rule_sources: string[];
+      writers: Record<string, string[]>;
+      reported_process: string | null;
+    };
+    suspects: Suspect[];
+    evidence: { changes: unknown[]; runs: unknown[]; model_extractions: number; open_alerts: number };
+    notes: string[];
+    applied_nothing: string;
+  };
 }
 
 export interface TimelineEvent {
@@ -54,6 +99,8 @@ export interface WorkItemDetail {
   progress: { key: string; label: string; done: boolean }[];
   links: LinkedRecord[];
   events: TimelineEvent[];
+  /** Incidents, newest first; null when you may not use the server. */
+  investigations?: Investigation[] | null;
 }
 
 export interface SharedConversation {

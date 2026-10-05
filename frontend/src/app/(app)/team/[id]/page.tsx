@@ -8,6 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EnvironmentBadge } from "@/components/environment-badge";
+import { IncidentInvestigation } from "@/components/incident-investigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,6 +149,15 @@ export default function WorkItemPage() {
     onError: (error) => toast.error(message(error)),
   });
 
+  const investigate = useMutation({
+    mutationFn: () => apiRequest<WorkItemDetail>(`/team/work-items/${id}/investigate`, { method: "POST" }),
+    onSuccess: (data) => {
+      setDetail(data);
+      toast.success("Investigated again.");
+    },
+    onError: (error) => toast.error(message(error)),
+  });
+
   if (detail.isPending) return <Skeleton className="h-64 w-full" />;
   if (detail.isError) {
     return <p className="text-sm text-destructive">{message(detail.error)}</p>;
@@ -203,6 +213,15 @@ export default function WorkItemPage() {
             </Select>
           </div>
         </div>
+        {item.kind === "incident" ? (
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant={item.severity === "critical" || item.severity === "high" ? "destructive" : "outline"}>
+              Incident · {item.severity}
+            </Badge>
+            {item.cube_name ? <span>Cube: {item.cube_name}</span> : null}
+            {item.process_name ? <span>Process: {item.process_name}</span> : null}
+          </p>
+        ) : null}
         {item.description ? <p className="max-w-3xl whitespace-pre-wrap text-sm">{item.description}</p> : null}
       </div>
 
@@ -219,6 +238,15 @@ export default function WorkItemPage() {
           </li>
         ))}
       </ol>
+
+      {item.kind === "incident" && item.connection_id ? (
+        <IncidentInvestigation
+          investigations={detail.data.investigations}
+          connectionId={item.connection_id}
+          investigating={investigate.isPending}
+          onInvestigate={() => investigate.mutate()}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card>

@@ -1,7 +1,7 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import BaseModel
@@ -36,6 +36,41 @@ class WorkItem(BaseModel, OrganizationScoped):
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    # work | incident. An incident is a work item about something wrong on
+    # a TM1 server; it carries what was reported and its investigations.
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="work", server_default="work")
+    # Incidents: low | medium | high | critical
+    severity: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tm1_connections.id", ondelete="SET NULL"), nullable=True
+    )
+    cube_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    process_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class IncidentInvestigation(BaseModel, OrganizationScoped):
+    """One look at an incident's server: the evidence gathered, the
+    suspects ranked, the mitigations suggested. Kept, so the incident's
+    timeline shows what was known when, and a later look can show what
+    cleared."""
+
+    __tablename__ = "incident_investigations"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    work_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("work_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tm1_connections.id", ondelete="CASCADE"), nullable=False
+    )
+    run_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    window_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    findings: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
 class WorkItemLink(BaseModel, OrganizationScoped):

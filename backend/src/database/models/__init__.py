@@ -33,7 +33,7 @@ from .tm1_object import TM1Object
 from .tm1_relationship import TM1Relationship
 from .user import User
 from .user_role import UserRole
-from .work_item import WorkItem, WorkItemLink
+from .work_item import IncidentInvestigation, WorkItem, WorkItemLink
 from .monitor import MonitorAlert, MonitorRule
 
 __all__ = [
@@ -53,6 +53,7 @@ __all__ = [
     "VisualPage",
     "EngineeringMemory",
     "WorkItem",
+    "IncidentInvestigation",
     "MonitorRule",
     "MonitorAlert",
     "WorkItemLink",

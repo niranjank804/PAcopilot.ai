@@ -1,7 +1,7 @@
 # PA-Copilot vs the Claude + TM1 benchmark — scorecard
 
-Date: 2026-10-05. Repository state: `main` after phase 12 (monitoring) and
-cell write-back.
+Date: 2026-10-05. Repository state: `main` after phase 12 (monitoring), cell
+write-back and incident mode.
 
 **The benchmark** is the Claude + IBM Planning Analytics read-write setup
 described in the PA-Copilot Enterprise brief: live TM1 Dev access over MCP,
@@ -29,7 +29,7 @@ does unless the evidence column shows the extra capability.
 | Benchmark capability rows (the 114-row brief) | 103 exist, 10 partial, 0 missing, 1 blocked by the TM1 API ([gap matrix](TM1_CAPABILITY_GAP_MATRIX.md)) |
 | Benchmark actions **not** matched | None by automated evidence. Cell write-back (the benchmark's "write") was the last; it now exists as a governed change |
 | Scorecard rows (23, over the brief's 22 categories) | PA-Copilot ahead on 12, equal on 2, behind on 0; 9 rows the benchmark does not attempt — 8 built, Analytics partial |
-| Golden workflows (12) | 10 automated end to end with evidence, 2 partial (explain calculation is unit-tested, incident analysis has no dedicated mode) |
+| Golden workflows (12) | 11 automated with evidence; 1 unit-tested only (explain calculation) |
 | Live TM1 verification | Read paths confirmed by the owner; write paths **not verified** live |
 
 So: by automated evidence PA-Copilot is **≥ the benchmark on every
@@ -46,7 +46,7 @@ not been run against a real TM1 server.
 | Model discovery | Cubes, dimensions, hierarchies, elements, attributes, subsets, views, chores | Yes | 18 discovery tools, plus a persistent metadata graph with history and freshness | `tests/unit/ai/test_structure_tools.py`, `test_metadata_tools.py`, `tests/unit/tm1/test_extractor.py`, `test_metadata_history.py` | Verified | PA-Copilot (persistent graph) |
 | Process engineering | Inspect, search, call tree, references | Yes | `get_process`, `search_process_code`, `get_process_call_tree`, `analyze_process_references` | `tests/unit/ai/test_process_tools.py`, `test_engineering_tools.py` | Verified | = |
 | TI development | Generate and modify TI, server-side compile, review | Generation, modification, compile | Draft create/update/copy; compile on the server without saving (`validate_process_code`); TI review with dangerous-operation list; organization coding standards learned from exported processes | `tests/unit/ai/test_change_tools.py`, `test_engineering_tools.py`, `tests/unit/tm1/test_ti_review.py`; golden step 04 | Verified | PA-Copilot (standards, review) |
-| Diagnostics | Logs, failure diagnosis | Logs, inspection | `diagnose_process_failure` maps the error log to the code line, marks evidence verified / inferred / unknown; message and transaction logs; who changed what recently | `tests/unit/tm1/test_failure_diagnosis.py`, `tests/unit/ai/test_log_tools.py`; golden step 03 | Verified (incident mode partial — see golden 12) | PA-Copilot |
+| Diagnostics | Logs, failure diagnosis, incidents | Logs, inspection | `diagnose_process_failure` maps the error log to the code line, marks evidence verified / inferred / unknown; message and transaction logs; incident mode ranks suspects for a wrong cube or failed process from changes, runs, model differences, rules and alerts, with a governed mitigation for each | `tests/unit/tm1/test_failure_diagnosis.py`, `tests/unit/ai/test_log_tools.py`, `tests/integration/test_incidents.py`; golden step 03 | Verified | PA-Copilot |
 | Dependency analysis | What depends on what; impact of a change | Dependency / impact analysis | Persistent graph; severity-ranked impact (critical/high/medium/low) on every draft; acknowledgement required for high impact | `tests/unit/tm1/test_impact_analysis.py`, `test_dependency_analyzer.py`; golden step 09 | Verified | PA-Copilot |
 | Execution | Run a process | Run with confirmation | Run only as an approved change, parameters checked against the process, never retried, result and error log kept | `tests/unit/tm1/test_change_runs_and_guards.py`; golden step 07 | Verified (not live) | = |
 | Deployment | Save to the server; promote | Save after confirmation, Dev only | Draft → impact → validation → approval → snapshot → apply → server verify; promotion DEV → QA → PROD with a deployment package (manifest, diff, impact, evidence, rollback plan) | `tests/unit/tm1/test_change_service.py`, `tests/integration/tm1/test_promotion.py`; golden steps 05, 06, 14 | Verified (not live) | PA-Copilot |
@@ -85,7 +85,7 @@ run in [`evidence/golden/final_product_workflow.json`](evidence/golden/final_pro
 | 9 | Deploy DEV → QA | golden step 14 | Promoted draft applied on QA; package with manifest, diff, impact, evidence, rollback plan | Automated |
 | 10 | Rollback | golden step 15 | Restored from the snapshot | Automated |
 | 11 | Model health scan | golden step 16 | Score, grade and category deductions | Automated |
-| 12 | Production incident analysis | — | Pieces exist (recent model changes, change history, diagnosis, alerts, work items) but there is **no incident mode** that runs them as one timeline | **Partial** |
+| 12 | Production incident analysis | `tests/integration/test_incidents.py::test_a_rule_change_and_a_failed_writer_are_the_suspects_and_a_rollback_clears_one` | Environment, writers and rule sources of the cube; ranked suspects (a rules change applied today, a failed writer); the rollback as a governed change; a second look showing the change cleared; the incident timeline | Automated |
 
 ## Final product test (brief §30)
 
@@ -108,7 +108,7 @@ latency, cost, safety and deployment reliability.
 | Measure | Result |
 |---|---|
 | Capability coverage | 103 / 114 rows exist, 10 partial, 1 blocked; plus cell write-back, which the 114 rows did not list |
-| Workflow completion | 10 / 12 golden workflows automated end to end; 2 partial |
+| Workflow completion | 11 / 12 golden workflows automated; explain calculation unit-tested only |
 | Safety | Every write is a draft; no tool calls TM1's mutating APIs (enforced by `test_tool_classification.py`); PROD two-person and AI read-only enforced |
 | Accuracy | **Not measured.** No evaluation of answer quality against a real model has been run |
 | Latency | **Not measured** against a real server. The product records it per request (p95 on the AI Cost panel) |
@@ -118,11 +118,7 @@ latency, cost, safety and deployment reliability.
 
 ## What would close the gaps
 
-1. **Incident mode**: one command that identifies the environment and cube,
-   lists recent changes and runs, compares snapshots, diagnoses, proposes a
-   mitigation as a draft, and keeps the incident timeline (a work item can
-   hold it).
-2. **Live validation**: run `backend/tests/live/` against a real Dev server
+1. **Live validation**: run `backend/tests/live/` against a real Dev server
    (see `backend/docs/live_validation/`), then the golden workflow against it.
-3. **Power BI**, once there is a Microsoft Entra app registration.
-4. **Accuracy evaluation**: a fixed question set scored against a real model.
+2. **Power BI**, once there is a Microsoft Entra app registration.
+3. **Accuracy evaluation**: a fixed question set scored against a real model.

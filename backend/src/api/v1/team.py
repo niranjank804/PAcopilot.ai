@@ -26,6 +26,7 @@ from src.database.session import get_db
 from src.schemas.ai import SharedConversationSummary
 from src.schemas.auth import UserResponse
 from src.schemas.response import ApiResponse
+from src.services.incident_service import incident_service
 from src.services.work_item_service import user_names, work_item_service
 from src.tm1.service import tm1_integration_service
 
@@ -67,6 +68,36 @@ class WorkItemResponse(BaseModel):
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    kind: str = "work"
+    severity: str | None = None
+    connection_id: uuid.UUID | None = None
+    cube_name: str | None = None
+    process_name: str | None = None
+
+
+class IncidentCreate(BaseModel):
+    reference: str = Field(min_length=1, max_length=50)
+    title: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=10_000)
+    connection_id: uuid.UUID
+    severity: Literal["low", "medium", "high", "critical"] = "high"
+    cube_name: str | None = Field(default=None, max_length=255)
+    process_name: str | None = Field(default=None, max_length=255)
+    window_hours: int = Field(default=48, ge=1, le=720)
+
+
+class InvestigateRequest(BaseModel):
+    window_hours: int = Field(default=48, ge=1, le=720)
+
+
+class InvestigationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
+    window_hours: int
+    summary: str
+    findings: dict
 
 
 class TimelineEvent(BaseModel):
@@ -109,11 +140,15 @@ class WorkItemDetail(BaseModel):
     progress: list[ProgressStep]
     links: list[LinkedRecord]
     events: list[TimelineEvent]
+    # Incidents: newest first. None when the viewer may not use the server.
+    investigations: list[InvestigationResponse] | None = None
 
 
 async def _detail(db, item, user_id) -> WorkItemDetail:
     timeline = await work_item_service.timeline(db, item, user_id)
+    looks = await incident_service.investigations(db, item, user_id) if item.kind == "incident" else []
     return WorkItemDetail(
+        investigations=None if looks is None else [InvestigationResponse.model_validate(i) for i in looks],
         item=WorkItemResponse.model_validate(item),
         created_by_name=timeline["created_by_name"],
         progress=[ProgressStep(**p) for p in timeline["progress"]],
@@ -149,6 +184,40 @@ async def create_work_item(
         description=body.description,
     )
     return ApiResponse(success=True, data=WorkItemResponse.model_validate(item))
+
+
+@router.post("/incidents", response_model=ApiResponse[WorkItemDetail], status_code=201)
+async def report_incident(
+    body: IncidentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+):
+    """Report something wrong on a TM1 server, and investigate it at once."""
+
+    item = await incident_service.create_incident(
+        db, organization_id=current_user.organization_id, user_id=current_user.id,
+        reference=body.reference, title=body.title, description=body.description,
+        connection_id=body.connection_id, severity=body.severity,
+        cube_name=body.cube_name, process_name=body.process_name,
+    )
+    await incident_service.investigate(db, item, current_user.id, window_hours=body.window_hours)
+    return ApiResponse(success=True, data=await _detail(db, item, current_user.id))
+
+
+@router.post("/work-items/{work_item_id}/investigate", response_model=ApiResponse[WorkItemDetail])
+async def investigate_incident(
+    work_item_id: uuid.UUID,
+    body: InvestigateRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("tm1.read")),
+):
+    """Look again — after a fix, to see what cleared."""
+
+    item = await work_item_service.get(db, work_item_id, current_user.organization_id)
+    await incident_service.investigate(
+        db, item, current_user.id, window_hours=(body.window_hours if body else None)
+    )
+    return ApiResponse(success=True, data=await _detail(db, item, current_user.id))
 
 
 @router.get("/work-items/{work_item_id}", response_model=ApiResponse[WorkItemDetail])

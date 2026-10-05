@@ -106,3 +106,57 @@ describe("Work item page", () => {
     expect(screen.getByText("Approval").textContent).toContain("not yet");
   });
 });
+
+const INCIDENT = {
+  ...ITEM, id: "w1", reference: "INC-42", title: "Production allocation is wrong", kind: "incident",
+  severity: "high", connection_id: "k9", cube_name: "Allocation", process_name: null,
+};
+
+function incidentDetail(investigations: unknown) {
+  return {
+    item: INCIDENT, created_by_name: "Asha Rao", progress: [], links: [], events: [], investigations,
+  };
+}
+
+const LOOK = {
+  id: "i1", created_at: "2026-10-05T09:00:00Z", window_hours: 48, summary: "2 suspect(s)",
+  findings: {
+    summary: "2 suspect(s) in the last 48 h on Planning PROD (PROD). Most likely: Applied: update rules on Allocation.",
+    environment: "prod", connection: "Planning PROD", window_hours: 48,
+    affected: { cubes: ["Allocation"], rule_sources: ["Rates"], writers: { Allocation: ["Load Allocation"] }, reported_process: null },
+    suspects: [
+      { score: 90, kind: "change", title: "Applied: update rules on Allocation", detail: "Applied by Ben Lee",
+        at: "2026-10-05T07:00:00Z", mitigation: { action: "rollback", label: "Roll back this change (update rules on Allocation)", change_id: "ch7" } },
+      { score: 75, kind: "run_failed", title: "Load Allocation last ended 'aborted'", detail: null, at: null,
+        mitigation: { action: "diagnose", label: "Diagnose Load Allocation, fix it, then draft a re-run", process: "Load Allocation" } },
+    ],
+    evidence: { changes: [], runs: [], model_extractions: 0, open_alerts: 0 },
+    notes: [], applied_nothing: "This investigation only read. Every mitigation is a change a person approves.",
+  },
+};
+
+describe("Incident page", () => {
+  it("ranks the suspects and links each mitigation to a governed action", async () => {
+    mocks.apiRequest.mockResolvedValue(incidentDetail([LOOK]));
+    const user = userEvent.setup();
+    renderWith(<WorkItemPage />);
+
+    expect(await screen.findByText("Applied: update rules on Allocation")).toBeInTheDocument();
+    expect(screen.getByText("most likely")).toBeInTheDocument();
+    expect(screen.getByText(/Roll back this change/).closest("a")).toHaveAttribute(
+      "href", "/deployments?connection=k9&change=ch7",
+    );
+    expect(screen.getByText(/Diagnose Load Allocation/)).toBeInTheDocument();
+    expect(screen.getByText(/Every mitigation is a change a person approves/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Investigate again/ }));
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/team/work-items/w1/investigate", { method: "POST" });
+  });
+
+  it("hides the findings from someone who cannot use the server", async () => {
+    mocks.apiRequest.mockResolvedValue(incidentDetail(null));
+    renderWith(<WorkItemPage />);
+
+    expect(await screen.findByText(/Hidden: you cannot use this TM1 server/)).toBeInTheDocument();
+  });
+});
