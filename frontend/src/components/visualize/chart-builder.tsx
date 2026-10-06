@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, ImageDown, SlidersHorizontal } from "lucide-react";
+import { Download, FileSpreadsheet, ImageDown, SlidersHorizontal } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -48,8 +48,11 @@ import {
   formatNumber,
   membersOf,
   pivot,
+  pivotRows,
   pivotToCsv,
+  tableRows,
   tableToCsv,
+  type SheetRow,
   waterfall,
   type NumberFormat,
   type PivotResult,
@@ -207,6 +210,12 @@ export function download(filename: string, content: BlobPart, type: string) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** The workbook writer loads on first use, keeping it out of the page. */
+async function downloadXlsx(filename: string, rows: SheetRow[], title: string) {
+  const { buildXlsx, XLSX_TYPE } = await import("@/lib/xlsx");
+  download(filename, buildXlsx(rows, title) as BlobPart, XLSX_TYPE);
 }
 
 function safeName(text: string): string {
@@ -1060,6 +1069,26 @@ export function ChartBuilder({
         >
           <Download className="mr-2 h-3.5 w-3.5" />
           Export all cells (CSV)
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            void downloadXlsx(`${safeName(title)}.xlsx`, pivotRows(result, axis), title)
+          }
+        >
+          <FileSpreadsheet className="mr-2 h-3.5 w-3.5" />
+          Export view (Excel)
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            void downloadXlsx(`${safeName(title)}-cells.xlsx`, tableRows(table), title)
+          }
+        >
+          <FileSpreadsheet className="mr-2 h-3.5 w-3.5" />
+          Export all cells (Excel)
         </Button>
         {SVG_TYPES.includes(chartType) ? (
           <Button size="sm" variant="outline" onClick={exportPng}>

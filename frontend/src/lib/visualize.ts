@@ -254,20 +254,40 @@ function csvField(value: unknown): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+export type SheetRow = (string | number | null)[];
+
+/** The pivoted view, header first: axis down, legend across. */
+export function pivotRows(result: PivotResult, axisLabel: string): SheetRow[] {
+  return [
+    [axisLabel, ...result.series],
+    ...result.data.map((entry) => [
+      String(entry.category),
+      ...result.series.map((s) => entry[s] ?? null),
+    ]),
+  ];
+}
+
+/** Every cell as returned, header first, one column per dimension. */
+export function tableRows(table: VisualizeTable): SheetRow[] {
+  return [
+    [...table.dimensions, "Value"],
+    ...table.rows.map((row) => [
+      ...table.dimensions.map((d) => row.members[d] ?? ""),
+      row.value,
+    ]),
+  ];
+}
+
+function rowsToCsv(rows: SheetRow[]): string {
+  return rows.map((row) => row.map(csvField).join(",")).join("\r\n");
+}
+
 /** The pivoted view as CSV: axis down, legend across. */
 export function pivotToCsv(result: PivotResult, axisLabel: string): string {
-  const header = [axisLabel, ...result.series].map(csvField).join(",");
-  const lines = result.data.map((entry) =>
-    [entry.category, ...result.series.map((s) => entry[s] ?? "")].map(csvField).join(","),
-  );
-  return [header, ...lines].join("\r\n");
+  return rowsToCsv(pivotRows(result, axisLabel));
 }
 
 /** Every cell as returned, one column per dimension. */
 export function tableToCsv(table: VisualizeTable): string {
-  const header = [...table.dimensions, "Value"].map(csvField).join(",");
-  const lines = table.rows.map((row) =>
-    [...table.dimensions.map((d) => row.members[d] ?? ""), row.value].map(csvField).join(","),
-  );
-  return [header, ...lines].join("\r\n");
+  return rowsToCsv(tableRows(table));
 }
