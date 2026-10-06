@@ -348,6 +348,8 @@ interface ThreadMessage {
   // A server writing into a connection that died silently can still finish
   // and save the answer, so the thread offers a reload rather than a retry.
   interrupted?: boolean;
+  // The person pressed Stop: what arrived is kept, and nothing is lost.
+  stopped?: boolean;
   attachmentNames?: string[];
   // Charts the analyst showed during this turn (show_chart).
   charts?: ChatChart[];
@@ -933,6 +935,20 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedConversation]);
 
+  const markStopped = (id: string | null) => {
+    if (id) {
+      setConversationId(id);
+      queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
+    }
+
+    setMessages((previous) => {
+      const next = [...previous];
+      const last = next[next.length - 1];
+      if (last?.role === "assistant") next[next.length - 1] = { ...last, stopped: true };
+      return next;
+    });
+  };
+
   const markInterrupted = (id: string | null) => {
     if (id) {
       setConversationId(id);
@@ -947,6 +963,28 @@ export default function ChatPage() {
 
     toast.error("The connection dropped before the answer finished.");
   };
+
+  // The answer being streamed now, so Stop can end it.
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  const stop = () => {
+    streamAbortRef.current?.abort();
+    voice.stopSpeaking();
+  };
+
+  // Esc stops an answer in progress. Captured first, so it does not also
+  // leave the maximized view.
+  useEffect(() => {
+    if (!isStreaming) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.querySelector("[role=dialog],[role=listbox],[role=menu]")) {
+        event.preventDefault();
+        streamAbortRef.current?.abort();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [isStreaming]);
 
   const send = async (spoken?: string) => {
     const message = (typeof spoken === "string" ? spoken : input).trim();
@@ -993,6 +1031,8 @@ export default function ChatPage() {
     // looks finished.
     let finished = false;
     let streamConversationId = conversationId;
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
 
     try {
       const stream = streamRequest<StreamEvent>("/ai/chat/stream", {
@@ -1005,7 +1045,7 @@ export default function ChatPage() {
         attachments: attachmentsForThisMessage.length
           ? attachmentsForThisMessage
           : undefined,
-      });
+      }, controller.signal);
 
       voice.resetStream();
 
@@ -1139,11 +1179,15 @@ export default function ChatPage() {
         }
       }
 
-      if (!finished) {
+      if (!finished && controller.signal.aborted) {
+        markStopped(streamConversationId);
+      } else if (!finished) {
         markInterrupted(streamConversationId);
       }
     } catch (error) {
-      if (streamConversationId) {
+      if (controller.signal.aborted) {
+        markStopped(streamConversationId);
+      } else if (streamConversationId) {
         // Failed mid-answer rather than before it started: the answer may
         // still be completing on the server.
         markInterrupted(streamConversationId);
@@ -1157,6 +1201,7 @@ export default function ChatPage() {
         });
       }
     } finally {
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
       setIsStreaming(false);
       isStreamingRef.current = false;
       scrollToBottom();
@@ -1652,6 +1697,11 @@ export default function ChatPage() {
                           {streamActivity}
                         </p>
                       ) : null}
+                      {message.stopped ? (
+                        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                          Stopped. Anything a tool had already drafted stays a draft for review.
+                        </p>
+                      ) : null}
                       {message.interrupted ? (
                         <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2 text-xs">
                           <p className="text-muted-foreground">
@@ -1911,19 +1961,28 @@ export default function ChatPage() {
                 </Button>
               </Tip>
             ) : null}
-            <Tip content="Send (Enter). Shift+Enter starts a new line.">
-            <Button
-              onClick={() => send()}
-              disabled={isStreaming || (!input.trim() && pendingAttachments.length === 0)}
-              aria-label="Send message"
-            >
-              {isStreaming ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
+            {isStreaming ? (
+              <Tip content="Stop the answer (Esc). What has arrived is kept.">
+              <Button
+                variant="destructive"
+                onClick={stop}
+                aria-label="Stop generating"
+                data-tour="chat-stop"
+              >
+                <Square className="h-4 w-4 fill-current" />
+              </Button>
+              </Tip>
+            ) : (
+              <Tip content="Send (Enter). Shift+Enter starts a new line.">
+              <Button
+                onClick={() => send()}
+                disabled={!input.trim() && pendingAttachments.length === 0}
+                aria-label="Send message"
+              >
                 <Send className="h-4 w-4" />
-              )}
-            </Button>
-            </Tip>
+              </Button>
+              </Tip>
+            )}
             </div>
           </div>
         </Card>

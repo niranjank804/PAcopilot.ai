@@ -126,6 +126,34 @@ describe("sending a message", () => {
     );
   });
 
+  it("stops an answer in progress and keeps what arrived", async () => {
+    const user = userEvent.setup();
+
+    // A stream that sends one piece, then waits until the request is aborted.
+    streamRequest.mockImplementation((_path: string, _body: unknown, signal: AbortSignal) =>
+      (async function* () {
+        yield { type: "start", conversation_id: "c1" };
+        yield { type: "text_delta", text: "Partial answer" };
+        await new Promise((_, reject) =>
+          signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))),
+        );
+      })(),
+    );
+
+    renderChat();
+    await sendMessage(user, "explain the sales cube");
+
+    await screen.findByText(/Partial answer/);
+    await user.click(screen.getByRole("button", { name: /stop generating/i }));
+
+    expect(await screen.findByText(/^Stopped\./)).toBeInTheDocument();
+    expect(screen.getByText(/Partial answer/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send message/i })).toBeInTheDocument();
+    // A stop is the person's choice, not a dropped connection.
+    expect(screen.queryByText(/connection dropped/i)).not.toBeInTheDocument();
+    expect(streamRequest.mock.calls[0][2]).toBeInstanceOf(AbortSignal);
+  });
+
   it("does not send an empty message", async () => {
     const user = userEvent.setup();
     renderChat();

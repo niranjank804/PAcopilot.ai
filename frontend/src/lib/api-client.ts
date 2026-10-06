@@ -289,6 +289,9 @@ export async function uploadRequest<T>(
 export async function* streamRequest<T>(
   path: string,
   body: unknown,
+  // Aborting ends the request, which the server notices and stops the
+  // answer (it saves what it had and records the turn as interrupted).
+  signal?: AbortSignal,
 ): AsyncGenerator<T> {
   const doFetch = async (): Promise<Response> => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -302,6 +305,7 @@ export async function* streamRequest<T>(
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal,
     });
   };
 

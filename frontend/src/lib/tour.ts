@@ -640,7 +640,7 @@ export const FEATURE_TOURS: Record<string, TourStep[]> = {
     {
       target: "chat-input",
       title: "Ask your question",
-      body: "Type what you want to accomplish. Enter sends; Shift+Enter starts a new line.",
+      body: "Type what you want to accomplish. Enter sends; Shift+Enter starts a new line. While an answer is coming, the send button becomes Stop (or press Esc): what has arrived is kept.",
     },
     {
       target: "voice-input",
