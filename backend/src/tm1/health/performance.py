@@ -158,9 +158,17 @@ async def report(
     collected history of the last WINDOW_DAYS days."""
 
     since = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
+    # Only the four columns the analysis reads: a busy server logs tens of
+    # thousands of runs a month, and loading each as a full ORM object made
+    # this the slowest part of the Command Center.
     rows = (
         await db.execute(
-            select(TM1ProcessRun)
+            select(
+                TM1ProcessRun.process_name,
+                TM1ProcessRun.finished_at,
+                TM1ProcessRun.elapsed_seconds,
+                TM1ProcessRun.outcome,
+            )
             .where(
                 TM1ProcessRun.connection_id == connection_id,
                 TM1ProcessRun.organization_id == organization_id,
@@ -168,9 +176,9 @@ async def report(
             )
             .order_by(TM1ProcessRun.finished_at.asc())
         )
-    ).scalars().all()
+    ).all()
 
-    by_process: dict[str, list[TM1ProcessRun]] = {}
+    by_process: dict[str, list] = {}
     for row in rows:
         by_process.setdefault(row.process_name, []).append(row)
 

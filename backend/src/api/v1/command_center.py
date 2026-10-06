@@ -60,9 +60,12 @@ async def command_center(
     # Model health: the latest scan of each server, and the risks behind it.
     health, risks = [], {}
     if ids:
+        # Only each server's latest scan: scans accumulate daily, and reading
+        # every one of them to keep the first grew slower every day.
         scans = (await db.execute(
             select(TM1HealthScan).where(TM1HealthScan.connection_id.in_(ids))
-            .order_by(TM1HealthScan.scanned_at.desc())
+            .distinct(TM1HealthScan.connection_id)
+            .order_by(TM1HealthScan.connection_id, TM1HealthScan.scanned_at.desc())
         )).scalars()
         seen = set()
         for scan in scans:
