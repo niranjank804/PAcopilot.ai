@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { CommandCenter } from "@/components/command-center";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -133,7 +134,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <PageHeader
         title={`${greeting(new Date())}${user ? `, ${user.first_name}` : ""}`}
-        description="Planning Analytics environment overview — the last 30 days."
+        description="TM1 Engineering Command Center — what needs attention on the servers you can use."
         actions={
           <Link href="/chat" className={buttonVariants({ size: "lg" })}>
             <MessageSquare className="size-4" aria-hidden />
@@ -210,6 +211,8 @@ export default function DashboardPage() {
           errorText="Usage unavailable"
         />
       </div>
+
+      <CommandCenter />
 
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">

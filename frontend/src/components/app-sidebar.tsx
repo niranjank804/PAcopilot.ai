@@ -69,11 +69,11 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       {
-        label: "Overview",
+        label: "Command Center",
         href: "/dashboard",
         icon: LayoutDashboard,
         tour: "nav-dashboard",
-        help: "AI runs, tool success rate, tokens and connection health for the last 30 days, plus your recent assistant sessions.",
+        help: "Everything that needs attention on the TM1 servers you can use: model health and its biggest risks, open incidents and alerts, failed and unusually slow processes, changes waiting for approval, recent deployments and model changes, and AI usage and cost.",
       },
     ],
   },

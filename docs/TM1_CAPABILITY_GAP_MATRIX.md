@@ -399,6 +399,18 @@ look (`src/services/incident_service.py`).
   investigation in chat, read-only and not saved.
 - Tests: `tests/integration/test_incidents.py` (6), Incident page tests.
 
+### Command Center (2026-10-06)
+
+The brief's executive dashboard (§28). The Overview page is now the TM1
+Engineering Command Center (`GET /command-center`, `src/api/v1/command_center.py`):
+model health per server with the biggest risks behind the scores, active
+incidents, open alerts, failed processes and performance regressions,
+changes waiting for approval, recent deployments and model changes, and AI
+usage and cost. One read of what PA-Copilot has recorded — no TM1 calls,
+so it is instant and never waits on a slow server — limited to the
+servers the viewer may use. Tests: `tests/integration/test_command_center.py`,
+`frontend/src/components/__tests__/command-center.test.tsx`.
+
 ### Live verification
 
 **2026-10-05: the live suite passed against TM1 11.0.1 (Planning Sample),
