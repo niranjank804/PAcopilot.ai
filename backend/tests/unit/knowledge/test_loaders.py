@@ -38,7 +38,8 @@ def test_pdf_loader_joins_page_text():
     fake_reader = type("Reader", (), {"pages": [fake_page_1, fake_page_2]})()
 
     with patch(
-        "src.knowledge.loaders.pdf_loader.PdfReader",
+        # Imported inside load(), so patched where it is defined.
+        "pypdf.PdfReader",
         return_value=fake_reader,
     ):
         text = PDFLoader().load(b"fake pdf bytes")

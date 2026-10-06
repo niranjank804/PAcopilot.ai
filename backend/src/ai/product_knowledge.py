@@ -35,7 +35,7 @@ from src.ai.capabilities import CAPABILITIES, CapabilityStatus
 _NAVIGATION = """\
 PA-Copilot is an AI platform for IBM Planning Analytics / TM1. The left-\
 hand navigation contains: Dashboard, TM1 Connections, AI Chat, Knowledge \
-Base, Coding Standards, Metadata Explorer, Visualize, Deployments, \
+Base, Engineering Memory, Team, Metadata Explorer, Visualize, Deployments, \
 Reports, Report Workers, Executions, Monitoring, Users, Settings."""
 
 _BOUNDARY = """\

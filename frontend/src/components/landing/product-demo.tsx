@@ -73,9 +73,9 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     steps: [
       {
         kind: "user",
-        text: "Add that feeder, following our coding standards.",
+        text: "Add that feeder, following our standards in the Knowledge Base.",
       },
-      { kind: "tool", tool: "get_coding_standards", target: "Knowledge Base" },
+      { kind: "tool", tool: "search_knowledge_base", target: "Rule standards" },
       { kind: "tool", tool: "get_cube_rules", target: "Sales" },
       { kind: "tool", tool: "propose_rule_update", target: "Sales" },
       {

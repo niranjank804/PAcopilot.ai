@@ -163,17 +163,6 @@ CAPABILITIES: tuple[Capability, ...] = (
         implementation="backend/src/tm1/deployment/change_service.py",
         permission="tm1.deploy",
     ),
-    Capability(
-        key="coding_standards",
-        name="Coding standards",
-        status=CapabilityStatus.AVAILABLE,
-        summary=(
-            "Organizational TM1 conventions, applied when generating or "
-            "reviewing code."
-        ),
-        implementation="backend/src/database/models/tm1_coding_convention.py",
-        permission="tm1.read",
-    ),
     # --- TM1 engineering capabilities (2026-09-24 benchmark work) ---
     #
     # Implemented, permission-gated, on specialist agents' allowlists and

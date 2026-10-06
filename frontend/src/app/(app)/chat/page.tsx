@@ -117,7 +117,7 @@ const TASKS: { label: string; agent: string; prompt: string; help: string }[] = 
     label: "Generate TI",
     agent: "ti",
     prompt: "Generate a TurboIntegrator process that ",
-    help: "The TI agent drafts a process in your team's style (from Coding Standards), compile-checks it against the server, and files it as a draft. Nothing is created in TM1 until a person deploys it.",
+    help: "The TI agent drafts a process following your Knowledge Base, compile-checks it against the server, and files it as a draft. Nothing is created in TM1 until a person deploys it.",
   },
   {
     label: "Explain TI",

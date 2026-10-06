@@ -64,12 +64,6 @@ export const PRODUCT_TOUR: TourStep[] = [
     body: "Upload your own documentation so answers cite your material rather than generic TM1 advice.",
   },
   {
-    target: "nav-standards",
-    route: "/dashboard",
-    title: "Teach it your house style",
-    body: "Upload exported TurboIntegrator processes and PA-Copilot measures how your team actually writes TM1, then follows what it finds.",
-  },
-  {
     target: "nav-metadata",
     route: "/dashboard",
     title: "Explore the model",

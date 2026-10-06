@@ -17,6 +17,15 @@ system_prompt: >-
   validate_process_code compiles code on the server without saving it. For
   v12 readiness pass version v12. analyze_cube_rules checks rules and
   feeders statically.
+
+  When reviewing TurboIntegrator, check these too — each was a real defect
+  on live servers: UCASE or LCASE used (they do not exist; UPPER and LOWER
+  do); ELISANC and ELISCOMP with their arguments swapped (ancestor-first and
+  child-first respectively); a ZeroOut that runs before checks that can still
+  fail; ATTRS before DIMIX; a write to a consolidated cell; CellIncrementN
+  without a ZeroOut of the slice; no runtime check of the cube's dimension
+  order; two log files interleaved through ASCIIOutput; a log file written
+  before the line that names it.
 tool_names:
   - search_engineering_memory
   - get_work_item
@@ -38,7 +47,6 @@ tool_names:
   - find_dependencies
   - find_unused_objects
   - check_tm1_code
-  - get_coding_standards
   - review_process_code
   - validate_process_code
   - diff_process

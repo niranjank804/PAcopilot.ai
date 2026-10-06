@@ -1,3 +1,9 @@
+import time
+
+# Taken first, so the startup log below says how long a cold start spends
+# importing the app.
+_IMPORT_STARTED = time.perf_counter()
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -176,4 +182,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-app_logger.info(f"{settings.APP_NAME} started successfully")
+app_logger.info(
+    f"{settings.APP_NAME} started successfully "
+    f"(app import {time.perf_counter() - _IMPORT_STARTED:.2f}s)"
+)

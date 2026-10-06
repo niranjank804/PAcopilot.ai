@@ -151,7 +151,6 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "review_process_code": _c("development", R, "Static analysis + function reference", ANALYSIS, "process_name"),
     "lookup_tm1_function": _c("development", R, "TM1 function reference", REFERENCE, "query"),
     "check_tm1_code": _c("development", R, "TM1 function reference", REFERENCE),
-    "get_coding_standards": _c("development", R, "Learned organization standards", REFERENCE),
     # --- Change management (drafts only) ---
     "propose_rule_update": _c("change_management", W, "Draft for human review", DRAFT, "cube_name"),
     "propose_cell_write": _c("change_management", W, "Cell write draft for human review", DRAFT, "cube_name"),

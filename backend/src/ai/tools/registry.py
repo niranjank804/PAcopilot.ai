@@ -71,7 +71,6 @@ from src.ai.tools.tm1.rules import (
     SearchRulesTool,
     TraceCellCalculationTool,
 )
-from src.ai.tools.tm1.standards import GetCodingStandardsTool
 from src.ai.tools.tm1.structure import (
     GetDimensionAttributesTool,
     GetElementContextTool,
@@ -155,7 +154,6 @@ TOOLS: dict[str, Tool] = {
         SearchKnowledgeBaseTool(),
         LookupTM1FunctionTool(),
         CheckTM1CodeTool(),
-        GetCodingStandardsTool(),
     )
 }
 

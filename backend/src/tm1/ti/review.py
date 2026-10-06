@@ -328,7 +328,7 @@ def review(
                 object=target,
                 evidence=", ".join(p["name"] for p in record.parameters[:8]),
                 reason="Parameters in the same process use different prefixes.",
-                recommendation="Use one prefix for every parameter (compare get_coding_standards for the organization's convention).",
+                recommendation="Use one prefix for every parameter.",
                 confidence="medium",
             )
         )

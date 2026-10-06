@@ -12,6 +12,10 @@ import subprocess
 import sys
 
 STEPS = [
+    # Compile the app's modules now: the function's file system is read
+    # only, so Python cannot cache bytecode there and would otherwise
+    # compile every module again on each cold start.
+    [sys.executable, "-m", "compileall", "-q", "src"],
     [sys.executable, "-m", "alembic", "upgrade", "head"],
     [sys.executable, "scripts/seed_roles.py"],
     [sys.executable, "scripts/seed_permissions.py"],

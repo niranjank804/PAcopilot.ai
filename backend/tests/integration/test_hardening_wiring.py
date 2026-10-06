@@ -119,7 +119,7 @@ async def test_a_self_hosted_deployment_can_allow_private_addresses(
 
 @pytest.mark.asyncio
 async def test_expensive_routes_have_their_own_budget(client, db_session, monkeypatch):
-    """Corpus analysis, document parsing and metadata extraction cost
+    """Document parsing and metadata extraction cost
     seconds of CPU or money per call; they get a tighter window than the
     general API and do not spend the AI one."""
 
@@ -127,10 +127,10 @@ async def test_expensive_routes_have_their_own_budget(client, db_session, monkey
     rate_limit.reset()
     org, admin = await create_org_admin(db_session)
     headers = auth_headers(admin)
-    export = [("files", ("Load.pro", b"#Section=Prolog\n", "text/plain"))]
+    upload = {"file": ("notes.txt", b"Load Rates runs before Load Sales.", "text/plain")}
 
-    first = await client.post("/learning/report", files=export, headers=headers)
-    second = await client.post("/learning/report", files=export, headers=headers)
+    first = await client.post("/knowledge/documents", files=upload, headers=headers)
+    second = await client.post("/knowledge/documents", files=upload, headers=headers)
 
     assert first.status_code != 429
     assert second.status_code == 429

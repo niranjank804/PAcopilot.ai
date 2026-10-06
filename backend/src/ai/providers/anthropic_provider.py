@@ -111,9 +111,18 @@ def _reasoning_kwargs(model: str | None = None) -> dict:
 class AnthropicProvider(AIProvider):
 
     def __init__(self):
-        self._client = _anthropic().AsyncAnthropic(
-            api_key=settings.ANTHROPIC_API_KEY,
-        )
+        self._client_instance = None
+
+    @property
+    def _client(self):
+        # Built on first use, not at import: the provider is created when
+        # the app starts, and building the client loads the whole SDK
+        # (about 2 s of every cold start), which only chat requests need.
+        if self._client_instance is None:
+            self._client_instance = _anthropic().AsyncAnthropic(
+                api_key=settings.ANTHROPIC_API_KEY,
+            )
+        return self._client_instance
 
     def _system_payload(self, request: ChatRequest):
         """System prompt as blocks, with the stable half cached.

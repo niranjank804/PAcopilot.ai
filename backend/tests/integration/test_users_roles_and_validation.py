@@ -93,10 +93,9 @@ class TestValidationErrorMessages:
 
         _, admin = await create_org_admin(db_session)
 
-        # No multipart body at all — the exact request the broken
-        # Coding Standards page was sending.
+        # No multipart body at all: the upload's required file is missing.
         response = await client.post(
-            "/learning/corpus", headers=auth_headers(admin)
+            "/knowledge/documents", headers=auth_headers(admin)
         )
 
         assert response.status_code == 422
@@ -104,7 +103,7 @@ class TestValidationErrorMessages:
         error = response.json()["error"]
 
         assert error["code"] == "VALIDATION_ERROR"
-        assert "files" in error["message"]
+        assert "file" in error["message"]
         assert "required" in error["message"].lower()
         # No Python repr leaking through.
         assert "{'type'" not in error["message"]
@@ -117,7 +116,7 @@ class TestValidationErrorMessages:
         _, admin = await create_org_admin(db_session)
 
         response = await client.post(
-            "/learning/corpus", headers=auth_headers(admin)
+            "/knowledge/documents", headers=auth_headers(admin)
         )
         body = response.json()
 

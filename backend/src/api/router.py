@@ -12,7 +12,6 @@ from src.api.v1.memory import router as memory_router
 from src.api.v1.team import router as team_router
 from src.api.v1.monitors import router as monitors_router
 from src.api.v1.command_center import router as command_center_router
-from src.api.v1.learning import router as learning_router
 from src.api.v1.monitoring import router as monitoring_router
 from src.api.v1.permissions import router as permissions_router
 from src.api.v1.reports import router as reports_router
@@ -43,7 +42,6 @@ api_router.include_router(command_center_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(gateway_admin_router)
 api_router.include_router(tm1_router)
-api_router.include_router(learning_router)
 api_router.include_router(monitoring_router)
 api_router.include_router(billing_router)
 api_router.include_router(reports_router)
