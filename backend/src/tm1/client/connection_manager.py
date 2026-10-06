@@ -75,6 +75,11 @@ def build_tm1_kwargs(connection: TM1Connection, password: str) -> dict:
         "password": password,
         **_timeout_kwargs(),
     }
+    if connection.ssl:
+        # TM1py does not check a Basic-auth server's certificate unless
+        # asked. Checked when the connection says so (the default for new
+        # ones); off for a self-signed server, which its owner chose.
+        kwargs["verify"] = bool(getattr(connection, "verify_ssl", False))
     if getattr(connection, "gateway_id", None):
         # Inside a company network: TM1py's requests travel through the
         # PA-Copilot gateway there (src/tm1/gateway/relay.py).

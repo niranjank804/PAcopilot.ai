@@ -117,6 +117,16 @@ class TM1Connection(BaseModel, OrganizationScoped):
         index=True,
     )
 
+    # Check the server's TLS certificate (native connections with SSL).
+    # Off for rows from before it existed — many on-premises TM1 servers
+    # use self-signed certificates — and on by default for new ones.
+    verify_ssl: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="false",
+    )
+
     # Set by the platform owner (Super Admin) to stop all use of this
     # connection's credentials, whatever the organization's own settings.
     # Enforced where a TM1 session is opened (tm1/client/connection_manager).

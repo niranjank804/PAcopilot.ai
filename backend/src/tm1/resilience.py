@@ -81,6 +81,12 @@ def describe_failure(exc: BaseException) -> str:
     if isinstance(exc, GatewayError):
         return str(exc)
 
+    if isinstance(exc, requests.exceptions.SSLError) or "CERTIFICATE_VERIFY_FAILED" in str(exc):
+        return (
+            "The server's TLS certificate is not trusted (it may be self-signed "
+            "or issued by a private authority)."
+        )
+
     if isinstance(exc, TM1pyRestException):
         return f"TM1 returned HTTP {exc.status_code} ({exc.reason})."
 

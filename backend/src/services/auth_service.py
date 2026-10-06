@@ -403,6 +403,8 @@ class AuthService:
             raise AuthenticationException("Invalid or expired reset link")
 
         user.password_hash = password_service.hash_password(new_password)
+        # The reset link reached this mailbox: the address is confirmed.
+        user.email_verified_at = user.email_verified_at or datetime.now(timezone.utc)
 
         await user_repository.update(db, user)
         await password_reset_token_repository.mark_used(db, reset_token, now)
@@ -450,6 +452,8 @@ class AuthService:
                 last_name=claims.get("family_name") or "User",
                 is_active=True,
                 registration_status=_initial_registration_status(),
+                # Google has just confirmed this person owns the address.
+                email_verified_at=datetime.now(timezone.utc),
             )
 
             user = await user_repository.create(db, user)
@@ -463,6 +467,17 @@ class AuthService:
                 # first: the account is the outcome, the 403 is the
                 # message.
                 await db.commit()
+
+        elif user.email_verified_at is None:
+            # A password sign-up never proved it owns this address. Letting
+            # Google sign in to it would hand the real owner's sign-in to
+            # whoever registered their email first.
+            raise PermissionDeniedException(
+                "An account with this email was created with a password and "
+                "its email has not been confirmed. Sign in with the password, "
+                "or use 'Forgot password' to confirm the email; Google sign-in "
+                "then works too."
+            )
 
         _check_can_authenticate(user)
 

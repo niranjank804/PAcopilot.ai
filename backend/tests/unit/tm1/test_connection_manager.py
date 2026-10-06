@@ -116,6 +116,7 @@ def test_build_tm1_kwargs_native_mode():
     connection.ssl = True
     connection.username = "admin"
     connection.gateway_id = None
+    connection.verify_ssl = True
 
     kwargs = build_tm1_kwargs(connection, "secret")
 
@@ -123,6 +124,8 @@ def test_build_tm1_kwargs_native_mode():
         "address": "tm1.example.com",
         "port": 8010,
         "ssl": True,
+        # The certificate is checked when the connection says so.
+        "verify": True,
         "user": "admin",
         "password": "secret",
         # Every client carries TM1py's own request timeout; see

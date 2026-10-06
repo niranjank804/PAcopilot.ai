@@ -54,6 +54,7 @@ const connectionSchema = z
     address: z.string().min(1, "Address is required"),
     port: z.number().int().min(1).max(65535),
     ssl: z.boolean(),
+    verify_ssl: z.boolean().optional(),
     username: z.string().optional(),
     password: z.string().min(1, "Password is required"),
     tenant: z.string().optional(),
@@ -93,6 +94,7 @@ const editSchema = z
     address: z.string().min(1, "Address is required"),
     port: z.number().int().min(1).max(65535),
     ssl: z.boolean(),
+    verify_ssl: z.boolean().optional(),
     username: z.string().optional(),
     password: z.string().optional(),
     tenant: z.string().optional(),
@@ -157,7 +159,7 @@ export default function ConnectionsPage() {
     formState: { errors },
   } = useForm<ConnectionValues>({
     resolver: zodResolver(connectionSchema),
-    defaultValues: { authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev", visibility: "private" },
+    defaultValues: { authentication_type: "native", port: 8010, ssl: true, verify_ssl: true, gateway_id: DIRECT, environment: "dev", visibility: "private" },
   });
 
   const authType = watch("authentication_type");
@@ -195,7 +197,7 @@ export default function ConnectionsPage() {
     onSuccess: (created) => {
       toast.success(`Connection "${created.name}" created.`);
       setCreateOpen(false);
-      reset({ authentication_type: "native", port: 8010, ssl: true, gateway_id: DIRECT, environment: "dev", visibility: "private" });
+      reset({ authentication_type: "native", port: 8010, ssl: true, verify_ssl: true, gateway_id: DIRECT, environment: "dev", visibility: "private" });
       queryClient.invalidateQueries({ queryKey: ["tm1-connections"] });
       queryClient.invalidateQueries({ queryKey: ["monitoring-tm1-status"] });
     },
@@ -241,6 +243,7 @@ export default function ConnectionsPage() {
       address: connection.address,
       port: connection.port,
       ssl: connection.ssl,
+      verify_ssl: connection.verify_ssl ?? false,
       username: connection.username,
       password: "",
       tenant: connection.tenant ?? "",
@@ -376,7 +379,7 @@ export default function ConnectionsPage() {
                   ) : (
                     <>
                       {connection.address}:{connection.port}
-                      {connection.ssl ? " · SSL" : ""} · {connection.username}
+                      {connection.ssl ? (connection.verify_ssl ? " · SSL" : " · SSL (certificate not checked)") : ""} · {connection.username}
                       {connection.gateway_id ? ` · via ${gatewayName(connection.gateway_id)}` : ""}
                     </>
                   )}

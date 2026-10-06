@@ -197,6 +197,11 @@ async def test_google_login_issues_tokens_for_existing_active_user(
 ):
     org = await create_organization(db_session)
     user = await create_user(db_session, org.id)
+    # Its email is confirmed: Google sign-in only enters such an account.
+    from datetime import datetime, timezone
+
+    user.email_verified_at = datetime.now(timezone.utc)
+    await db_session.flush()
     fake_google_claims["email"] = user.email
     fake_google_claims["email_verified"] = True
 

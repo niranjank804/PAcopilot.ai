@@ -76,7 +76,7 @@ def _client_context(http_request: Request) -> tuple[str | None, str | None]:
 # Connection fields an edit records before and after. Never the password.
 _AUDITED_CONNECTION_FIELDS = (
     "name", "address", "port", "ssl", "username", "authentication_type", "tenant",
-    "database", "gateway_id", "environment", "visibility",
+    "database", "gateway_id", "environment", "visibility", "verify_ssl",
 )
 # Where the saved credentials would be sent.
 _ENDPOINT_FIELDS = ("address", "port", "ssl", "authentication_type", "tenant", "database", "gateway_id")
@@ -147,6 +147,7 @@ async def create_connection(
         tenant=request.tenant,
         database=request.database,
         gateway_id=request.gateway_id,
+        verify_ssl=request.verify_ssl,
         environment=request.environment,
         visibility=request.visibility,
     )
@@ -311,6 +312,10 @@ async def update_connection(
         key for key in _ENDPOINT_FIELDS
         if key in proposed and proposed[key] != getattr(existing, key, None)
     ]
+    # Turning certificate checking off makes the next connection easier to
+    # intercept: treated like pointing the credentials somewhere new.
+    if fields.get("verify_ssl") is False and existing.verify_ssl:
+        moved.append("certificate checking")
     if moved and not fields.get("password"):
         raise ValidationException(
             "Re-enter the password (or API key) when changing the server's "

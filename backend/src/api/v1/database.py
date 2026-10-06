@@ -16,7 +16,7 @@ anyone, and diagnostic detail only to an administrator.
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
-from src.api.dependencies.permissions import require_permission
+from src.api.v1.signups import require_super_admin
 from src.database.session import AsyncSessionLocal
 from src.schemas.auth import UserResponse
 
@@ -46,9 +46,10 @@ async def database_health():
 
 @router.get("/database/details", tags=["Database"])
 async def database_details(
-    # organization.read is the closest existing administrative permission:
-    # Super Admin and Organization Admin hold it, ordinary roles do not.
-    current_user: UserResponse = Depends(require_permission("organization.read")),
+    # The platform owner only: every sign-up administers a workspace of its
+    # own, so an organization permission would show the database version
+    # (which maps onto published vulnerabilities) to anyone who registers.
+    current_user: UserResponse = Depends(require_super_admin),
 ):
     """Diagnostics for an administrator.
 

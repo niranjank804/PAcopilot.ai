@@ -55,6 +55,7 @@ export interface ConnectionFormValues {
   address: string;
   port: number;
   ssl: boolean;
+  verify_ssl?: boolean;
   username?: string;
   password?: string;
   tenant?: string;
@@ -408,6 +409,15 @@ export function ConnectionFormFields<T extends FieldValues>({
             {...register("ssl" as Path<T>)}
           />
           <Label htmlFor="ssl">Use SSL</Label>
+          <input
+            id="verify_ssl"
+            type="checkbox"
+            className="ml-4 h-4 w-4 accent-primary"
+            {...register("verify_ssl" as Path<T>)}
+          />
+          <Label htmlFor="verify_ssl" title="Turn off only for a server with a self-signed certificate.">
+            Verify the server&apos;s certificate
+          </Label>
         </div>
       ) : null}
     </>

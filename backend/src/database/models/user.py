@@ -96,6 +96,15 @@ class User(BaseModel, OrganizationScoped):
     # For the platform owner's view of who is using the product: set on
     # each successful sign-in, and on each token refresh (about every half
     # hour of activity), so neither costs a write per request.
+    # When the person proved they own this email: a Google sign-in, or a
+    # completed password reset. A Google sign-in only enters an existing
+    # account whose email is confirmed — otherwise whoever registered
+    # someone else's address first would receive that person's sign-in.
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

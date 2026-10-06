@@ -26,6 +26,9 @@ class ConnectionCreate(BaseModel):
     environment: Literal["dev", "qa", "prod"] = "dev"
     # private: only you. organization: every member with TM1 access.
     visibility: Literal["private", "organization"] = "private"
+    # Check the server's TLS certificate. Turn off only for a server with
+    # a self-signed certificate.
+    verify_ssl: bool = True
 
 
 class ConnectionUpdate(BaseModel):
@@ -45,6 +48,7 @@ class ConnectionUpdate(BaseModel):
     gateway_id: uuid.UUID | None = None
     environment: Literal["dev", "qa", "prod"] | None = None
     visibility: Literal["private", "organization"] | None = None
+    verify_ssl: bool | None = None
 
 
 class ConnectionResponse(BaseModel):
@@ -67,6 +71,7 @@ class ConnectionResponse(BaseModel):
     # False when the caller may manage this connection (an admin seeing a
     # member's private one) but not use it: pickers leave it out.
     can_use: bool = True
+    verify_ssl: bool = False
     # Set when the platform owner suspended it: nothing can use it until
     # it is resumed, so the Connections page says so instead of failing.
     suspended_at: datetime | None = None

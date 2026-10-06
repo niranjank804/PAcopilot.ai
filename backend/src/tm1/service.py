@@ -107,6 +107,13 @@ def _explain(problem: str, connection: TM1Connection, detail: str = "") -> str:
             f"Could not reach {connection.address}:{connection.port} through "
             f"the gateway. {detail}"
         ).strip()
+    if "certificate is not trusted" in detail:
+        return (
+            f"{connection.address}:{connection.port} answered, but its TLS "
+            "certificate is not trusted. If the server uses a self-signed "
+            "certificate, edit the connection and turn off 'Verify the "
+            "server's certificate'."
+        )
     return (
         f"Could not reach {connection.address}:{connection.port}. Check the "
         "address, port and SSL setting, and that the server accepts "
@@ -183,6 +190,7 @@ class TM1IntegrationService:
         gateway_id: uuid.UUID | None = None,
         environment: str = "dev",
         visibility: str = "private",
+        verify_ssl: bool = True,
     ) -> TM1Connection:
 
         parsed = parse_address(address)
@@ -228,6 +236,7 @@ class TM1IntegrationService:
             # Owner: created_by, set from the session above, never from
             # the request body.
             visibility=visibility,
+            verify_ssl=verify_ssl,
         )
 
         return await tm1_connection_repository.create(db, connection)
@@ -339,6 +348,7 @@ class TM1IntegrationService:
         gateway_id: object = _UNSET,
         environment: str | None = None,
         visibility: str | None = None,
+        verify_ssl: bool | None = None,
     ) -> TM1Connection:
 
         connection = await self.get_connection(
@@ -407,6 +417,8 @@ class TM1IntegrationService:
             connection.environment = environment
         if visibility is not None:
             connection.visibility = visibility
+        if verify_ssl is not None:
+            connection.verify_ssl = verify_ssl
         if gateway_id is not _UNSET:
             if gateway_id is None:
                 # Off the gateway: the address must now be reachable directly.

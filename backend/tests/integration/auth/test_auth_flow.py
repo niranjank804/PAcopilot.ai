@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -407,6 +408,20 @@ async def test_google_login_issues_tokens_for_existing_account(
         "verify_google_id_token",
         lambda token: {"email": email, "email_verified": True},
     )
+
+    # A password sign-up never proved it owns the address, so Google
+    # sign-in must not enter it: whoever registered someone else's email
+    # first would otherwise receive that person's sign-in.
+    refused = await client.post("/auth/google", json={"id_token": "fake-token"})
+    assert refused.status_code == 403
+    assert "not been confirmed" in refused.json()["error"]["message"]
+
+    # Once the address is confirmed (a completed password reset does it),
+    # Google sign-in enters the same account.
+    db_session.info.pop("organization_id", None)
+    user = await user_repository.get_by_email(db_session, email)
+    user.email_verified_at = datetime.now(timezone.utc)
+    await user_repository.update(db_session, user)
 
     resp = await client.post("/auth/google", json={"id_token": "fake-token"})
 

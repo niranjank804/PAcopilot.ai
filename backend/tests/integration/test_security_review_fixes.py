@@ -137,3 +137,63 @@ async def test_a_public_name_for_a_private_address_is_refused(monkeypatch):
 
     with pytest.raises(TM1ConnectionError):
         await manager_module._refuse_private_destination(connection)
+
+
+@pytest.mark.asyncio
+async def test_a_password_reset_confirms_the_email(client, db_session, monkeypatch):
+    from src.services.auth_service import auth_service
+
+    _org, person = await create_org_admin(db_session)
+    person.email_verified_at = None
+    await db_session.flush()
+    import hashlib
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from src.database.models.password_reset_token import PasswordResetToken
+
+    raw = secrets.token_urlsafe(32)
+    db_session.add(PasswordResetToken(
+        user_id=person.id,
+        token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    ))
+    await db_session.flush()
+
+    await auth_service.reset_password(db_session, raw, "A-new-password-123!")
+    assert person.email_verified_at is not None
+
+
+@pytest.mark.asyncio
+async def test_database_details_are_for_the_platform_owner_only(client, db_session):
+    _org, admin = await create_org_admin(db_session)
+    resp = await client.get("/database/details", headers=auth_headers(admin))
+    assert resp.status_code == 403, resp.text
+
+
+def test_certificate_checking_follows_the_connection():
+    from src.tm1.client.connection_manager import build_tm1_kwargs
+
+    connection = TM1Connection(id=uuid.uuid4(), address="tm1.example.com", port=8010, ssl=True,
+                               username="a", encrypted_password="x", authentication_type="native",
+                               verify_ssl=True)
+    assert build_tm1_kwargs(connection, "pw")["verify"] is True
+    connection.verify_ssl = False
+    assert build_tm1_kwargs(connection, "pw")["verify"] is False
+    connection.ssl = False
+    assert "verify" not in build_tm1_kwargs(connection, "pw")
+
+
+@pytest.mark.asyncio
+async def test_turning_certificate_checking_off_needs_the_password(client, db_session, tm1_credentials_key):
+    _org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    dev = await _connection(client, headers, "dev")
+    await db_session.commit()
+
+    off = await client.patch(f"/tm1/connections/{dev}", json={"verify_ssl": False}, headers=headers)
+    assert off.status_code == 422, off.text
+    assert "certificate checking" in off.json()["error"]["message"]
+
+    retyped = await client.patch(f"/tm1/connections/{dev}", json={"verify_ssl": False, "password": "again"},
+                                 headers=headers)
+    assert retyped.status_code == 200 and retyped.json()["data"]["verify_ssl"] is False

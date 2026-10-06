@@ -24,6 +24,8 @@ export interface TM1Connection {
   // False for a member's private connection an admin can manage, not use.
   can_use?: boolean;
   /** Set when the platform administrator suspended it; nothing can use it. */
+  /** Whether the server's TLS certificate is checked (native + SSL). */
+  verify_ssl?: boolean;
   suspended_at?: string | null;
   suspended_reason?: string | null;
 }
