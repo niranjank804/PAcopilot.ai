@@ -1,0 +1,11 @@
+﻿{
+    "credential_storage_consent":  true,
+    "read":  true,
+    "write_requested":  true,
+    "command":  "python -m pytest tests/live -m \"live and not live_ai\"",
+    "paid_ai":  false,
+    "commit":  "33af360",
+    "script":  "backend/scripts/run_live_validation.ps1",
+    "uncommitted_paths":  1,
+    "transport":  "DIRECT"
+}

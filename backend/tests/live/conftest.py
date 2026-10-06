@@ -121,6 +121,7 @@ def pytest_runtest_logreport(report):
             reason = text.replace("Skipped: ", "")[:200]
         elif report.failed:
             outcome = "FAILED" if report.when == "call" else "ERROR"
+            reason = _error_category(report)
         else:
             outcome = "PASSED"
         _RUN.results.append({
@@ -133,6 +134,34 @@ def pytest_runtest_logreport(report):
             "properties": {k: v for k, v in report.user_properties if k in
                            ("layer", "transport", "observed", "compat_path", "audit")},
         })
+
+
+# The exception's class only, never its message: messages can carry server
+# details. Each class maps to the classification the report uses.
+_CATEGORIES = {
+    "TM1AuthenticationError": "environment/authentication: TM1 rejected the credentials",
+    "TM1NotFoundError": "not found on the server",
+    "TM1OutcomeUnknownError": "no answer from TM1 (network, timeout or server error); for a write, outcome unknown",
+    "TM1ConnectionError": "TM1 refused or could not be reached",
+    "TM1pyRestException": "TM1 REST error",
+    "TM1pyNetworkException": "network",
+    "ConnectionError": "network",
+    "Timeout": "network/timeout",
+    "AssertionError": "assertion: product behaviour differed from the expectation",
+}
+
+
+def _error_category(report) -> str:
+    crash = getattr(getattr(report, "longrepr", None), "reprcrash", None)
+    message = str(getattr(crash, "message", "") or "")
+    if message.startswith("assert"):
+        # A bare assert reports its expression, not the exception class.
+        message = "AssertionError: " + message
+    name = message.split(":", 1)[0].strip().split(".")[-1].split(" ")[0]
+    for key, category in _CATEGORIES.items():
+        if name.endswith(key):
+            return f"{name}: {category}"
+    return f"{name or 'error'}: unclassified"
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -246,17 +275,25 @@ def _load_inventory() -> list | None:
 
 
 @pytest.fixture
-def write_target(direct_tm1, live_tm1_config, live_run):
+def write_target(request, live_tm1_config, live_run):
     """Writes are allowed only for this target, in this run, within scope,
     or the test is BLOCKED (skipped, reason recorded) before anything is
     written. Identity is read first with two bounded calls: the server's
     name and version — nothing about its business data."""
 
+    # Everything that can be checked without the server is checked first, so
+    # an unauthorized run never contacts the target at all.
     if os.environ.get("TM1_LIVE_WRITE") != "1":
         pytest.skip("BLOCKED: TM1_LIVE_WRITE=1 not set — write validation not authorized")
+    inventory = _load_inventory()
+    ok, detail = authorize_write(dict(os.environ), os.environ.get("TM1_LIVE_WRITE_SERVER", ""),
+                                 live_tm1_config, inventory)
+    if not ok:
+        pytest.skip(f"BLOCKED: {detail}")
+    direct_tm1 = request.getfixturevalue("direct_tm1")
     reported = direct_tm1.server.get_server_name()
     version = direct_tm1.server.get_product_version()
-    ok, detail = authorize_write(dict(os.environ), reported, live_tm1_config, _load_inventory())
+    ok, detail = authorize_write(dict(os.environ), reported, live_tm1_config, inventory)
     if not ok:
         pytest.skip(f"BLOCKED: {detail}")
 
@@ -329,7 +366,7 @@ class OwnedFixtures:
 
 
 @pytest.fixture
-def owned(direct_tm1, live_run, write_target):
+def owned(write_target, direct_tm1, live_run):
     fixtures = OwnedFixtures(direct_tm1, live_run)
     try:
         yield fixtures
