@@ -114,7 +114,7 @@ Write-Host ""
 Write-Host "Running... (a minute or two)" -ForegroundColor Cyan
 try {
     # Console only: test output is not saved, so values it prints never reach the evidence.
-    & .\.venv\Scripts\python.exe -m pytest tests/live -m "$markers" -q -p no:cacheprovider -rs 2>&1 |
+    & .\.venv\Scripts\python.exe -m pytest tests/live -m "$markers" -q -p no:cacheprovider -rs --tb=no 2>&1 |
         ForEach-Object { $_.ToString().Replace($password, "********") }
 } finally {
     foreach ($name in "TM1_PASSWORD", "TM1_USER", "TM1_ADDRESS", "TM1_PORT", "TM1_SSL", "TM1_LIVE_WRITE",
@@ -127,6 +127,15 @@ try {
     $secure.Dispose()
 }
 
+$resultsFile = Join-Path $evidence "results.json"
+if (Test-Path $resultsFile) {
+    $results = Get-Content -Raw $resultsFile | ConvertFrom-Json
+    Write-Host ""
+    Write-Host "Summary" -ForegroundColor Cyan
+    $results | Group-Object outcome | ForEach-Object { Write-Host ("  {0,-8} {1}" -f $_.Name, $_.Count) }
+    $reasons = $results | Where-Object { $_.reason } | Group-Object reason
+    foreach ($r in $reasons) { Write-Host ("  {0} x {1}" -f $r.Count, $r.Name) -ForegroundColor Yellow }
+}
 Write-Host ""
 Write-Host "Evidence: $evidence (run.json, manifest.json, results.json)" -ForegroundColor Green
 Write-Host "Tell Claude 'done' to read it." -ForegroundColor Green
