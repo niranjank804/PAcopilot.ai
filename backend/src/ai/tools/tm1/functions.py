@@ -18,8 +18,14 @@ class LookupTM1FunctionTool(Tool):
         "server versions support it. Use this before writing a function you are "
         "not certain about — a Rules-only function used in TI will not compile, "
         "and a v11-only function fails at runtime on a v12 (Planning Analytics "
-        "SaaS) server. Accepts an exact function name or a keyword to search for."
+        "SaaS) server. Accepts an exact function name or a keyword to search for "
+        "— or, to check several functions at once, a list of exact names in "
+        "`names`: look up everything you plan to use in ONE call, not one call "
+        "per function."
     )
+    # Several names per call: a TI answer that looked functions up one at a
+    # time made 28 tool calls (live accuracy run, 2026-10-05).
+    MAX_NAMES = 40
     required_permission = "tm1.read"
     input_schema = {
         "type": "object",
@@ -31,8 +37,12 @@ class LookupTM1FunctionTool(Tool):
                     "keyword to search names and descriptions (e.g. 'attribute')."
                 ),
             },
+            "names": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Several exact function names to confirm in one call.",
+            },
         },
-        "required": ["query"],
     }
 
     async def execute(
@@ -51,6 +61,23 @@ class LookupTM1FunctionTool(Tool):
                 "You do not have permission to read TM1 data."
             )
 
+        names = kwargs.get("names")
+        if isinstance(names, list) and names:
+            found, not_found = {}, []
+            for name in [str(n).strip() for n in names if str(n).strip()][: self.MAX_NAMES]:
+                match = lookup(name)
+                if match is None:
+                    not_found.append(name)
+                else:
+                    found[name] = match.as_dict()
+            result = {"found": found, "not_found": not_found}
+            if not_found:
+                result["note"] = (
+                    "Not in the reference: treat these as unconfirmed, not as proof "
+                    "they do not exist; search by keyword for a near name."
+                )
+            return json.dumps(result)
+
         raw_query = kwargs.get("query")
 
         if raw_query is None or not str(raw_query).strip():
@@ -58,7 +85,7 @@ class LookupTM1FunctionTool(Tool):
                 {
                     "error": (
                         "No query supplied. Pass a function name or a keyword "
-                        "to search for."
+                        "to search for, or a list of names."
                     )
                 }
             )

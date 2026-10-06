@@ -230,3 +230,13 @@ async def test_stream_chat_surfaces_tool_calls_and_stop_reason():
     assert message_stop.tool_calls == [
         ToolCall(id="call_1", name="list_cubes", input={"connection_id": "abc"}),
     ]
+
+
+def test_haiku_gets_no_thinking_or_effort_settings():
+    """The API refuses both on Haiku, rejecting the whole request; AUTO
+    routing sends documentation questions and plain chat there."""
+
+    from src.ai.providers.anthropic_provider import _reasoning_kwargs
+
+    assert _reasoning_kwargs("claude-haiku-4-5") == {}
+    assert "output_config" in _reasoning_kwargs("claude-sonnet-5")

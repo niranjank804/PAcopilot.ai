@@ -69,7 +69,16 @@ _MAX_MESSAGE_BREAKPOINTS = 3
 _LOOKBACK_BLOCKS = 15
 
 
-def _reasoning_kwargs() -> dict:
+# Models that take neither adaptive thinking nor the effort parameter: the
+# API rejects the whole request ("adaptive thinking is not supported on this
+# model", "This model does not support the effort parameter"). AUTO routing
+# sends documentation questions and plain chat to the fast tier, Haiku, so
+# with Haiku allowed those chats failed outright. Found by the live accuracy
+# run, 2026-10-06; both answers confirmed against the API.
+_NO_REASONING_SETTINGS = ("claude-haiku-",)
+
+
+def _reasoning_kwargs(model: str | None = None) -> dict:
     """Thinking and effort settings for a request.
 
     Omitting `thinking` does NOT give adaptive thinking — it gives no
@@ -81,6 +90,9 @@ def _reasoning_kwargs() -> dict:
     `effort` is the cost dial that comes with it. It is nested inside
     output_config, not a top-level argument.
     """
+
+    if model and model.startswith(_NO_REASONING_SETTINGS):
+        return {}
 
     if not settings.AI_THINKING_ENABLED:
         # Still send effort: it governs overall token spend, not just
@@ -269,7 +281,7 @@ class AnthropicProvider(AIProvider):
                 system=self._system_payload(request),
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
-                **_reasoning_kwargs(),
+                **_reasoning_kwargs(request.model),
             )
         except _anthropic().RateLimitError as exc:
             raise AIProviderRateLimitError(str(exc)) from exc
@@ -308,7 +320,7 @@ class AnthropicProvider(AIProvider):
                 system=self._system_payload(request),
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
-                **_reasoning_kwargs(),
+                **_reasoning_kwargs(request.model),
             ) as stream:
                 async for text in stream.text_stream:
                     yield StreamEvent(type="text_delta", text=text)

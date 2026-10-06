@@ -52,6 +52,9 @@ PA-Copilot's tools — with deterministic checks, no model grading.
 | 2 | 10 / 11 (91%) | 8.3 s | 73 s | $0.53 |
 | 3 (after the fixes below) | 10 / 11 (91%) | 8.6 s | 174 s | $0.61 |
 | 4 (after the fixes below) | 10 / 11 (91%) | 8.5 s | see note | $1.07 |
+| 5 (18 questions, 6 agents) | 17 / 18 (94%) | 8.3 s | 281 s | $1.26 |
+| 6 (18 questions, 6 agents) | 17 / 18 (94%) | 9.2 s | 192 s | $1.14 |
+| 7 (18 questions, all fixes) | 17 / 18 (94%) | 7.4 s | 405 s | $1.61 |
 
 Reports: [`evidence/accuracy/run1`](evidence/accuracy/run1/report.md),
 [`run2`](evidence/accuracy/run2/report.md). Correct both times: the cube
@@ -91,6 +94,35 @@ chats in production until the fix is deployed.
 - Run 4's missing-cube answer ("There's no 'Sales_Forecast_2031'") was
   correct; the check's pattern missed it and was fixed. Re-scored with no
   new model call, as the report says.
+
+**Runs 5–7** widened the set to 18 questions across six agents (Developer,
+Analyst, Architect, Administrator, Documentation, Troubleshooter, TI):
+process parameters, the file a process loads, a text cell, which cubes'
+rules read another cube, which cubes use a dimension, a leaf count, and
+whether any chores exist. No agent reads TM1 security, by design, so there is
+no security question. Three more product defects came out:
+
+- **Haiku requests failed outright.** AUTO routing sends documentation
+  questions and plain chat to the fast tier, Haiku 4.5, and every request
+  carried adaptive thinking and the effort setting, which Haiku refuses
+  (both confirmed against the API). Fixed: those settings go only to models
+  that take them. The Documentation agent now answers on Haiku in 4–7 s for
+  about $0.02.
+- **Text written before a tool call was lost.** Only the last round's text
+  was returned and saved, so code the TI agent wrote and then checked with a
+  tool vanished from the answer — and, in chat, from the conversation when
+  reopened, though it had streamed to the screen. Fixed in both paths: the
+  answer is every round's text, as streamed.
+- **Function lookups one at a time.** `lookup_tm1_function` now takes a
+  list; the TI agent is told to look everything up in one call and rely on
+  `check_tm1_code`. Lookups per TI answer fell from 28 to 1–5.
+
+The miss in runs 5–7 is the TI case again: the code uses the v11 logging
+functions this server's own processes use, and the case requires code that
+also runs on v12. Run 8 stopped on a network error reaching the model API
+and has no report. A check of my own held stray control characters and
+missed two correct "no chores" answers; fixed and re-scored with no new
+model call, as the reports say.
 
 Also seen: results vary run to run (the same code scored 9 and 8 of 11
 before the checks were corrected); the element-count question is slow
@@ -183,7 +215,7 @@ latency, cost, safety and deployment reliability.
 | Capability coverage | 103 / 114 rows exist, 10 partial, 1 blocked; plus cell write-back, which the 114 rows did not list |
 | Workflow completion | 11 / 12 golden workflows automated; explain calculation unit-tested only |
 | Safety | Every write is a draft; no tool calls TM1's mutating APIs (enforced by `test_tool_classification.py`); PROD two-person and AI read-only enforced |
-| Accuracy | 10 / 11 (91%) in two live runs on Planning Sample; truth from TM1, deterministic checks. One set of 11 questions on one sample model — a start, not a benchmark |
+| Accuracy | 17 / 18 (94%) in three live runs on Planning Sample across six agents; truth from TM1, deterministic checks. One sample model — a start, not a benchmark |
 | Latency | Median 8–13 s per answer with tool calls, slowest 66–73 s (live runs above) |
 | Cost | About $0.05 per answer on average, $0.50 per 11-question run (live runs above) |
 | Deployment reliability | Live on TM1 11.0.1: apply, verify, drift refusal and rollback for processes, rules and cells all passed. Not measured over time |

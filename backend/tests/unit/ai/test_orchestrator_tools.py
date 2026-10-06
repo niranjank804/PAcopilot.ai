@@ -624,7 +624,10 @@ async def test_stream_tool_loop_executes_tool_and_persists_final_answer(
         .all()
     )
     assert len(assistant_messages) == 1
-    assert assistant_messages[0].content == "final answer"
+    # What streamed to the screen, every round of it: text before a tool
+    # call is part of the answer (code written, then checked, vanished on
+    # reload when only the last round was saved).
+    assert assistant_messages[0].content == "checking...final answer"
 
 
 @pytest.mark.asyncio
@@ -883,3 +886,33 @@ def test_an_agent_still_gets_exactly_its_own_tools():
     assert _resolve_allowed_tools(persona, False) == persona.tool_names
     # A persona's allowlist is not widened by the caller's flag.
     assert _resolve_allowed_tools(persona, True) == persona.tool_names
+
+
+@pytest.mark.asyncio
+async def test_text_written_before_a_tool_call_stays_in_the_answer(
+    db_session, fake_tool, tool_use_once_provider, monkeypatch
+):
+    """A TI process written, then checked with a tool, used to vanish: only
+    the last round's text was returned and saved."""
+
+    original = ToolUseOnceProvider.chat
+
+    async def chat_with_text(self, request):
+        response = await original(self, request)
+        if response.tool_calls:
+            response.content = "Here is the process: ```CellPutN(1, 'C', 'e');```"
+        return response
+
+    monkeypatch.setattr(ToolUseOnceProvider, "chat", chat_with_text)
+    org = await create_organization(db_session)
+    user = await create_user(db_session, org.id)
+
+    result = await ai_orchestrator.chat(
+        db_session, organization_id=org.id, user_id=user.id, message="hi", enable_tools=True,
+    )
+
+    assert result.content == "Here is the process: ```CellPutN(1, 'C', 'e');```\n\nfinal answer"
+    saved = (await db_session.execute(
+        select(AIMessage).where(AIMessage.conversation_id == result.conversation_id, AIMessage.role == "assistant")
+    )).scalars().one()
+    assert saved.content == result.content

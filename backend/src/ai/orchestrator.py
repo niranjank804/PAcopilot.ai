@@ -802,6 +802,11 @@ class AIOrchestrator:
         total_cache_creation = 0
         total_cache_read = 0
         response: ChatResponse | None = None
+        # What the model wrote in every round, not only the last: code it
+        # writes before checking it with a tool is part of the answer. Only
+        # the last round was kept, so a TI process written and then checked
+        # vanished from the reply (found by the live accuracy run).
+        earlier_text: list[str] = []
 
         for _ in range(max_rounds):
             request = ChatRequest(
@@ -825,6 +830,9 @@ class AIOrchestrator:
                     response.stop_reason,
                 )
                 break
+
+            if (response.content or "").strip():
+                earlier_text.append(response.content.strip())
 
             history.append(
                 ChatMessage(
@@ -882,6 +890,9 @@ class AIOrchestrator:
             total_output_tokens += response.usage.output_tokens
             total_cache_creation += response.usage.cache_creation_input_tokens
             total_cache_read += response.usage.cache_read_input_tokens
+
+        if earlier_text:
+            response.content = "\n\n".join([*earlier_text, response.content or ""]).strip()
 
         return response, Usage(
             input_tokens=total_input_tokens,
@@ -1493,7 +1504,10 @@ class AIOrchestrator:
                     total_cache_read += round_usage.cache_read_input_tokens
                     last_round_usage = round_usage
 
-                final_content_parts = round_content_parts
+                # Every round's text, as it streamed to the screen: replacing
+                # it each round saved only the last, so code written before a
+                # tool call vanished when the conversation was reopened.
+                final_content_parts = final_content_parts + round_content_parts
 
                 if (
                     not enable_tools

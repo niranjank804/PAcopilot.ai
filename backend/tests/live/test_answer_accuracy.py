@@ -18,6 +18,7 @@ the score is the result.
 """
 
 import json
+import ntpath
 import os
 import re
 import time
@@ -157,6 +158,68 @@ def _cases(tm1) -> list[dict]:
             "check": lambda a: any(k in _norm(a) for k in ("ascii", "text file", "csv", "flat file", "file")),
         })
 
+    # --- The other agents (added 2026-10-06) -----------------------------
+    # No agent reads TM1 security (by design: tests/unit/ai/test_agents.py),
+    # so there is no security question here.
+    chores = tm1.chores.get_all_names()
+    cases.append({
+        "id": "chores", "agent": "administrator",
+        "question": "Which chores are set up on this server, and what do they run?",
+        "truth": chores or "none",
+        "check": (lambda a, c=chores: all(x.lower() in _norm(a) for x in c)) if chores else
+        (lambda a: bool(re.search(r"\bno chores\b|\b(there are|has) no\b.*chore|\bnone\b|\b0 chores\b|not any chores", _norm(a)))),
+    })
+
+    if "plan_load_budget_ascii" in processes:
+        process = tm1.processes.get("plan_load_budget_ascii")
+        parameters = [p["Name"] for p in process.parameters]
+        if parameters:
+            cases.append({
+                "id": "process_parameters", "agent": "documentation",
+                "question": "What parameters does the process plan_load_budget_ascii take?",
+                "truth": parameters, "check": lambda a, p=parameters: all(x.lower() in _norm(a) for x in p),
+            })
+        source_file = ntpath.basename(process.datasource_data_source_name_for_server or "")
+        if source_file:
+            cases.append({
+                "id": "datasource_file", "agent": "troubleshooter",
+                "question": "Which file does the process plan_load_budget_ascii load data from?",
+                "truth": source_file, "check": lambda a, f=source_file: f.lower() in _norm(a),
+            })
+
+    if "plan_Control" in cubes:
+        currency = tm1.cells.get_value("plan_Control", "Corporate Currency,Setting")
+        if currency:
+            cases.append({
+                "id": "string_cell", "agent": "analyst",
+                "question": "What is the corporate currency set in the plan_Control cube?",
+                "truth": currency, "check": lambda a, v=str(currency): v.lower() in _norm(a),
+            })
+        readers = [c for c in cubes if tm1.cubes.get(c).has_rules
+                   and "plan_control" in (tm1.cubes.get(c).rules.text or "").lower()]
+        if readers:
+            cases.append({
+                "id": "rules_reading_cube", "agent": "architect",
+                "question": "Which cubes have rules that read values from the plan_Control cube?",
+                "truth": readers, "check": lambda a, r=readers: all(x.lower() in _norm(a) for x in r),
+            })
+
+    if "plan_exchange_rates" in tm1.dimensions.get_all_names():
+        users = [c for c in cubes if "plan_exchange_rates" in tm1.cubes.get(c).dimensions]
+        cases.append({
+            "id": "cubes_using_dimension", "agent": "architect",
+            "question": "Which cubes use the dimension plan_exchange_rates?",
+            "truth": users, "check": lambda a, u=users: all(x.lower() in _norm(a) for x in u),
+        })
+
+    if "plan_chart_of_accounts" in tm1.dimensions.get_all_names():
+        leaves = tm1.elements.get_number_of_leaf_elements("plan_chart_of_accounts", "plan_chart_of_accounts")
+        cases.append({
+            "id": "leaf_count", "agent": "developer",
+            "question": "How many leaf (lowest-level) elements does plan_chart_of_accounts have?",
+            "truth": leaves, "check": lambda a, n=leaves: _has_number(a, n),
+        })
+
     cases.append({
         "id": "missing_cube", "agent": "developer",
         "question": "What dimensions does the cube Sales_Forecast_2031 have?",
@@ -208,7 +271,7 @@ async def test_answer_accuracy(db_session, live_connection):
             "id": case["id"], "agent": case["agent"], "question": case["question"],
             "truth": case["truth"], "passed": bool(case["check"](result.content)),
             "latency_s": round(latency, 1), "cost_usd": round(cost, 4), "model": result.model,
-            "tools": tools, "answer": result.content[:1500],
+            "tools": tools, "answer": result.content[:8000],
         })
 
     # The existing TI generation case: functions used must exist in TM1.
@@ -219,7 +282,7 @@ async def test_answer_accuracy(db_session, live_connection):
             "id": f"ti:{case.name}", "agent": case.agent, "question": case.prompt.strip(),
             "truth": "deterministic checks in evals/cases/ti", "passed": all(o.passed for o in outcomes),
             "latency_s": round(latency, 1), "cost_usd": round(cost, 4), "model": result.model,
-            "tools": tools, "answer": result.content[:1500],
+            "tools": tools, "answer": result.content[:8000],
             "failures": [f"{level}: {name}" for o in outcomes for level, names in o.failures_by_severity.items() for name in names][:10],
         })
 
