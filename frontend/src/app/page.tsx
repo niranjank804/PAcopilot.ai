@@ -1,20 +1,25 @@
 import {
   AudioLines,
+  BellRing,
   FileText,
   Fingerprint,
   GitBranch,
+  HeartPulse,
   Image as ImageIcon,
   KeyRound,
+  Layers,
+  LayoutDashboard,
   LineChart,
   Lock,
-  MessageSquare,
-  ScrollText,
+  Network,
   Shield,
   ShieldCheck,
   Sigma,
+  Siren,
   Sparkles,
   Terminal,
   UserCheck,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -27,58 +32,76 @@ import { cn } from "@/lib/utils";
 
 const FEATURES = [
   {
+    icon: LayoutDashboard,
+    title: "Command Center",
+    description:
+      "One screen for what needs attention: model health, open incidents and alerts, failed and slow processes, changes awaiting approval, and AI cost.",
+  },
+  {
     icon: Terminal,
     title: "TI Script Assistant",
     description:
-      "Generate, refactor, and debug TurboIntegrator processes with AI that understands your cube model.",
-  },
-  {
-    icon: Fingerprint,
-    title: "House-Style Code Generation",
-    description:
-      "Generated TI processes, rules, and feeders follow your org's own coding standards from the Knowledge Base — not generic TM1 templates.",
+      "Generate, refactor, review and debug TurboIntegrator processes with specialist agents that read your live model.",
   },
   {
     icon: Sigma,
     title: "Rules & Feeders Intelligence",
     description:
-      "Explain and validate rule and feeder logic in plain language before it ever touches production.",
+      "Explain, trace and validate rule and feeder logic in plain language before it ever touches production.",
   },
   {
     icon: LineChart,
     title: "Visualize",
     description:
-      "Ask a question in plain English, get an MDX query and a live, styled chart back — no manual query writing.",
-  },
-  {
-    icon: ScrollText,
-    title: "Explain Error",
-    description:
-      "Paste a TM1 error and get a clear explanation of what went wrong and how to fix it.",
-  },
-  {
-    icon: MessageSquare,
-    title: "Multimodal Chat",
-    description:
-      "Attach PDFs, screenshots, and Word docs directly in chat — the AI reads and reasons over them natively.",
-  },
-  {
-    icon: AudioLines,
-    title: "Voice Input",
-    description:
-      "Speak your question instead of typing it — dictation built directly into the chat composer.",
+      "Ask a question in plain English and get the MDX and a live chart back — then pivot it and export to CSV, Excel or an image.",
   },
   {
     icon: ShieldCheck,
-    title: "Human-Gated Writes",
+    title: "Governed write-back",
     description:
-      "The AI drafts rule and process changes; a permitted human reviews and executes them from the same thread.",
+      "The AI drafts rule, process and cell-value changes; a person with the right DEV, QA or PROD rights executes them, with a second approver on PROD and rollback to the saved state.",
+  },
+  {
+    icon: Siren,
+    title: "Incident investigation",
+    description:
+      "Report wrong numbers or a failed load and get ranked suspects — recent changes, failed runs, model differences — with the evidence and a suggested next step.",
+  },
+  {
+    icon: BellRing,
+    title: "Alerts & monitoring",
+    description:
+      "Rules that watch for failed or slow processes, dimension growth, security and model changes, and raise alerts in the app and by email. They only read TM1.",
+  },
+  {
+    icon: HeartPulse,
+    title: "Model Health",
+    description:
+      "A health score for the model with the evidence behind every point, plus performance regressions and the slowest loads.",
+  },
+  {
+    icon: Network,
+    title: "Dependencies & impact",
+    description:
+      "Walk the dependency graph across cubes, dimensions, processes and rules, and see what a change or deletion would affect before you make it.",
+  },
+  {
+    icon: UsersRound,
+    title: "Team & Engineering Memory",
+    description:
+      "Work items with their whole story, shared conversations, and the team knowledge TM1 cannot hold — run orders, conventions, cautions.",
   },
   {
     icon: FileText,
-    title: "Knowledge Base",
+    title: "Knowledge Base & Explain Error",
     description:
-      "Ground answers in your own uploaded documentation, retrieved automatically as context.",
+      "Ground answers in your own documentation, and paste a TM1 error to get the cause and the fix checked against your model.",
+  },
+  {
+    icon: AudioLines,
+    title: "Files and voice in chat",
+    description:
+      "Attach PDFs, screenshots, Word docs or .pro files, or just talk — dictation and hands-free conversation with answers read aloud.",
   },
 ];
 
@@ -96,13 +119,14 @@ const WORKFLOW = [
   {
     step: "03",
     title: "Human Reviews",
-    description: "A permitted reviewer sees the exact diff and confirms it inline.",
+    description:
+      "A reviewer with rights for that environment sees the exact diff and its impact; on PROD a second person approves.",
   },
   {
     step: "04",
     title: "Verified & Audited",
     description:
-      "Changes are snapshotted before write, verified after, and auto-restored on failure.",
+      "Changes are snapshotted before the write, verified after, restored if verification fails, and can be promoted from DEV to QA to PROD.",
   },
 ];
 
@@ -126,7 +150,19 @@ const SECURITY = [
       "AI agents can only draft changes. Executing or rolling back a change always requires an explicit human action.",
   },
   {
+    icon: Layers,
+    title: "DEV, QA and PROD rights",
+    description:
+      "Each connection is marked DEV, QA or PROD. Deploying needs the right for that environment, PROD needs a second approver, and the AI is read-only on PROD.",
+  },
+  {
     icon: KeyRound,
+    title: "Encrypted credentials, private networks",
+    description:
+      "TM1 credentials are encrypted at rest and never shown again. A gateway reaches servers inside your network by connecting out — no inbound firewall port.",
+  },
+  {
+    icon: Fingerprint,
     title: "Google Sign-In",
     description:
       "Sign in with your Google account — a PA-Copilot account is created automatically on first sign-in, no separate password to manage.",
@@ -196,9 +232,9 @@ export default function LandingPage() {
             <span className="text-primary">IBM Planning Analytics</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground text-balance">
-            Write and debug TI scripts, explain rules and errors, chart data from a
-            question, and safely draft TM1 changes — with a human always in control
-            of what actually gets written.
+            Write and debug TI, explain rules and errors, chart data from a
+            question, investigate incidents and watch your servers — and draft TM1
+            changes with a human always in control of what actually gets written.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link
@@ -233,8 +269,8 @@ export default function LandingPage() {
                 See it work
               </h2>
               <p className="mt-3 text-muted-foreground">
-                From a wrong total to a reviewed fix, and from a question to a
-                chart — the way it runs inside{" "}
+                From a wrong total to a reviewed fix, from a question to a chart,
+                and from an incident to its likely cause — the way it runs inside{" "}
                 <span className="whitespace-nowrap">PA-Copilot</span>.
               </p>
             </div>
@@ -253,7 +289,7 @@ export default function LandingPage() {
                 bolted on.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {FEATURES.map((feature) => (
                 <Card key={feature.title}>
                   <CardHeader>

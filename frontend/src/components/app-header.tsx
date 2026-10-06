@@ -1,6 +1,6 @@
 "use client";
 
-import { HelpCircle, LogOut, Menu, PlayCircle } from "lucide-react";
+import { HelpCircle, LogOut, Menu, MonitorPlay, PlayCircle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { FeatureTourButton } from "@/components/feature-tour-button";
+import { ProductDemo } from "@/components/landing/product-demo";
+import { Button } from "@/components/ui/button";
 import { useRestartTour } from "@/components/onboarding";
 import { useAuth } from "@/lib/auth-context";
 
@@ -38,6 +40,29 @@ function currentSection(pathname: string): string | null {
   ).sort((a, b) => b.href.length - a.href.length)[0];
 
   return match?.label ?? null;
+}
+
+/**
+ * The landing page's scripted replays, also available once signed in, so
+ * a new user can watch a workflow before trying it on their own server.
+ */
+function DemoButton() {
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="sm" data-tour="demo-button" aria-label="Watch the demo">
+            <MonitorPlay className="mr-1.5 h-4 w-4" />
+            <span className="hidden sm:inline">Demo</span>
+          </Button>
+        }
+      />
+      <DialogContent className="max-h-[90vh] w-[min(56rem,calc(100vw-2rem))] max-w-none overflow-y-auto sm:max-w-none">
+        <DialogTitle>See PA-Copilot at work</DialogTitle>
+        <ProductDemo />
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /**
@@ -106,6 +131,7 @@ export function AppHeader() {
             route. Renders nothing elsewhere, so it needs no per-page
             wiring. */}
         <FeatureTourButton />
+        <DemoButton />
         <AlertsBell />
         {/* Help. Also the last stop on the product tour, which is how
             someone learns the tour can be replayed from here. */}
