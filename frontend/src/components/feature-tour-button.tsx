@@ -42,7 +42,7 @@ export function FeatureTourButton() {
         Take a tour
       </Button>
 
-      {tour.isRunning && tour.step ? (
+      {tour.isRunning && tour.step && tour.ready ? (
         <ProductTour
           step={tour.step}
           spotlight={tour.spotlight}

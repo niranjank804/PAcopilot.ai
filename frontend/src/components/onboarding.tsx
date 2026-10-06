@@ -78,7 +78,10 @@ export function Onboarding() {
     user.onboarding_completed_at ?? user.onboarding_dismissed_at,
   );
 
-  if (tour.isRunning && step) {
+  if (tour.isRunning) {
+    // While a step's element is still loading, draw nothing rather than a
+    // card pointing at an empty screen.
+    if (!step || !tour.ready) return null;
     return (
       <ProductTour
         step={step}

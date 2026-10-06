@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * The product tour's data and state, separate from how it is drawn.
@@ -142,6 +142,12 @@ export const PRODUCT_TOUR: TourStep[] = [
     body: "Each page has its own Take a tour button here, which walks through every option on that page.",
   },
   {
+    target: "demo-button",
+    route: "/dashboard",
+    title: "Watch the demo",
+    body: "Short replays of real workflows on a sample model — diagnosing a rule, drafting a fix, charting a question, correcting a value, investigating an incident and more — so you can see one before trying it on your own server.",
+  },
+  {
     target: "help-menu",
     route: "/dashboard",
     title: "Restart this any time",
@@ -183,65 +189,129 @@ export function measure(target: string): Spotlight | null {
   };
 }
 
+/** How long a step waits for its element after a navigation before it
+ * is skipped: long enough for a page to load its data, short enough that
+ * a missing element does not look like a hang. */
+const WAIT_FOR_TARGET_MS = 2500;
+const POLL_MS = 150;
+
 export function useTour(steps: TourStep[] = PRODUCT_TOUR) {
+  // The steps this run will show: fixed when it starts, so the count in
+  // "Step 3 of 7" matches what the user will actually see.
+  const [active, setActive] = useState<TourStep[]>(steps);
   const [index, setIndex] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<Spotlight | null>(null);
+  const direction = useRef<1 | -1>(1);
 
   const isRunning = index !== null;
-  const step = isRunning ? (steps[index] ?? null) : null;
+  const step = isRunning ? (active[index] ?? null) : null;
 
-  const start = useCallback(() => setIndex(0), []);
+  const start = useCallback(() => {
+    // Steps on this screen must be here now; one that is absent (an
+    // option this role or state does not show) is left out rather than
+    // shown pointing at nothing. Steps on another screen are kept and
+    // checked once the tour has navigated there.
+    const here = window.location.pathname;
+    const shown = steps.filter(
+      (candidate) =>
+        (candidate.route && candidate.route !== here) || measure(candidate.target),
+    );
+    direction.current = 1;
+    setActive(shown);
+    setSpotlight(null);
+    setIndex(shown.length ? 0 : null);
+  }, [steps]);
+
   const stop = useCallback(() => {
     setIndex(null);
     setSpotlight(null);
   }, []);
 
-  const next = useCallback(
-    () =>
-      setIndex((current) => {
-        if (current === null) return null;
-        return current + 1 >= steps.length ? null : current + 1;
-      }),
-    [steps.length],
-  );
+  const next = useCallback(() => {
+    direction.current = 1;
+    setIndex((current) => {
+      if (current === null) return null;
+      return current + 1 >= active.length ? null : current + 1;
+    });
+  }, [active.length]);
 
-  const back = useCallback(
-    () =>
-      setIndex((current) =>
-        current === null ? null : Math.max(0, current - 1),
-      ),
-    [],
-  );
+  const back = useCallback(() => {
+    direction.current = -1;
+    setIndex((current) => (current === null ? null : Math.max(0, current - 1)));
+  }, []);
 
   // Re-measure on scroll and resize: the popover is positioned from the
   // element's real box, so a tour that measured once would drift away
   // from its target the moment anything moved.
   useEffect(() => {
-    if (!step) return;
+    if (!step || index === null) return;
 
     let frame = 0;
+    let waited = 0;
+    let poll: ReturnType<typeof setInterval> | undefined;
 
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => setSpotlight(measure(step.target)));
     };
 
-    const element = document.querySelector(`[data-tour="${step.target}"]`);
-
-    element?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // An element that is not there yet may still be loading after a
+    // navigation; one that never appears is skipped in the direction the
+    // user was going, never shown pointing at an empty screen.
+    const found = measure(step.target);
     update();
+    if (!found) {
+      poll = setInterval(() => {
+        const box = measure(step.target);
+        waited += POLL_MS;
+        if (box) {
+          clearInterval(poll);
+          document
+            .querySelector(`[data-tour="${step.target}"]`)
+            ?.scrollIntoView({ block: "center", behavior: "smooth" });
+          setSpotlight(box);
+        } else if (waited >= WAIT_FOR_TARGET_MS) {
+          clearInterval(poll);
+          const target = index + direction.current;
+          if (target < 0) {
+            direction.current = 1;
+            setIndex(index + 1 < active.length ? index + 1 : null);
+          } else {
+            setIndex(target < active.length ? target : null);
+          }
+        }
+      }, POLL_MS);
+    } else {
+      document
+        .querySelector(`[data-tour="${step.target}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
 
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
 
     return () => {
       cancelAnimationFrame(frame);
+      if (poll) clearInterval(poll);
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };
-  }, [step]);
+  }, [step, index, active.length]);
 
-  return { isRunning, index, step, steps, spotlight, start, stop, next, back };
+  return {
+    isRunning,
+    index,
+    step,
+    steps: active,
+    // Nothing is drawn until the target is found, so the card never
+    // floats over a screen with nothing highlighted.
+    ready: spotlight !== null,
+    spotlight,
+    start,
+    stop,
+    next,
+    back,
+  };
 }
 
 /**

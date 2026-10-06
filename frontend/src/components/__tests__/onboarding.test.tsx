@@ -46,6 +46,19 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { Onboarding } from "../onboarding";
+import { PRODUCT_TOUR } from "@/lib/tour";
+
+/** The tour skips a step whose element is not on screen, so each test
+ * page carries every element the product tour points at. */
+function giveStepsSomethingToPointAt() {
+  for (const step of PRODUCT_TOUR) {
+    const element = document.createElement("div");
+    element.setAttribute("data-tour", step.target);
+    element.getBoundingClientRect = () =>
+      ({ top: 50, left: 10, width: 120, height: 30 }) as DOMRect;
+    document.body.appendChild(element);
+  }
+}
 
 function renderOnboarding() {
   const client = new QueryClient({
@@ -65,6 +78,7 @@ beforeEach(() => {
   mocks.user.onboarding_completed_at = null;
   mocks.user.onboarding_dismissed_at = null;
   document.body.innerHTML = "";
+  giveStepsSomethingToPointAt();
 });
 
 describe("who sees it", () => {

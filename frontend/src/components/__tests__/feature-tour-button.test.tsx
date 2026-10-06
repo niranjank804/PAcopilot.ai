@@ -143,6 +143,24 @@ describe("running a feature tour", () => {
     ).toBeInTheDocument();
   });
 
+  it("leaves out options this page is not showing", async () => {
+    // Pointing at an absent element would float the card over nothing.
+    const user = userEvent.setup();
+    giveStepsSomethingToPointAt("/chat");
+    const [first, second] = FEATURE_TOURS["/chat"];
+    document.querySelector(`[data-tour="${first.target}"]`)?.remove();
+
+    render(<FeatureTourButton />);
+    await user.click(
+      screen.getByRole("button", { name: /take a tour of this page/i }),
+    );
+
+    expect(await screen.findByRole("dialog", { name: second.title })).toBeInTheDocument();
+    expect(
+      screen.getByText(`Step 1 of ${FEATURE_TOURS["/chat"].length - 1}`),
+    ).toBeInTheDocument();
+  });
+
   it("writes no onboarding state when finished", async () => {
     // A feature tour is help. Using it must not mark someone as having
     // completed the product introduction.
