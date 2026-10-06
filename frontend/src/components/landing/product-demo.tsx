@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BellRing,
   BookOpen,
   CheckCircle2,
   Copy,
@@ -11,7 +12,9 @@ import {
   Network,
   RotateCcw,
   ScrollText,
+  Siren,
   Stethoscope,
+  Table2,
   Wrench,
 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
@@ -21,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * A scripted replay of three real workflows, on a sample model.
+ * Scripted replays of real workflows, on a sample model.
  *
  * Deliberately not a video and not live data. Every tool name shown is one
  * the backend agents actually call (a test checks this against
@@ -113,7 +116,57 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       },
       {
         kind: "assistant",
-        text: "Americas leads on 2026 actual revenue, with EMEA about a quarter lower and APAC under half.",
+        text: "Americas leads on 2026 actual revenue, with EMEA about a quarter lower and APAC under half. Switch the chart type, sort or number format beside it, or export the view to CSV, Excel or an image.",
+      },
+    ],
+  },
+  {
+    key: "cells",
+    label: "Correct a value",
+    icon: Table2,
+    window: "Chat · analyst agent",
+    steps: [
+      { kind: "user", text: "Set the EMEA FX rate for March 2026 to 1.085 in the Rates cube." },
+      { kind: "tool", tool: "get_cube", target: "Rates" },
+      { kind: "tool", tool: "get_cell_values", target: "Rates" },
+      { kind: "tool", tool: "propose_cell_write", target: "Rates" },
+      {
+        kind: "draft",
+        object: "Rates · 1 cell",
+        diff: ["  EMEA · Mar 2026 · FX Rate   1.072", "+ EMEA · Mar 2026 · FX Rate   1.085"],
+      },
+      {
+        kind: "assistant",
+        text: "The current value sits next to the new one in the draft. When someone with deploy rights applies it, the old value is saved first so the write can be rolled back, and the cell is read again to confirm it took.",
+      },
+    ],
+  },
+  {
+    key: "incident",
+    label: "Investigate an incident",
+    icon: Siren,
+    window: "Team · incident",
+    steps: [
+      { kind: "user", text: "Forecast numbers for EMEA dropped overnight. What happened?" },
+      { kind: "tool", tool: "investigate_incident", target: "Forecast" },
+      { kind: "tool", tool: "get_process_execution_history", target: "Load Forecast" },
+      {
+        kind: "assistant",
+        text: "Top suspect: the rule change to Forecast applied at 22:40 yesterday, the only change to that cube in the window. Second: Load Forecast failed at 02:00, so last night's data is missing. Suggested: review the rule change and roll it back from Deployments if it is the cause, then re-run the load. Nothing has been changed yet.",
+      },
+    ],
+  },
+  {
+    key: "alert",
+    label: "Set an alert",
+    icon: BellRing,
+    window: "Chat · administrator agent",
+    steps: [
+      { kind: "user", text: "Tell me if Load Sales starts taking twice as long as usual." },
+      { kind: "tool", tool: "propose_monitor", target: "Load Sales" },
+      {
+        kind: "assistant",
+        text: "I proposed a performance rule: alert when Load Sales runs at more than twice its 30-day average. It does nothing until you turn it on under Alerts; then it checks every 15 minutes, only reads TM1, and raises alerts in the bell — and by email for anyone subscribed to the rule.",
       },
     ],
   },
@@ -372,7 +425,7 @@ export function ProductDemo() {
       </div>
 
       <p className="mt-3 text-center text-xs text-muted-foreground">
-        Eight scripted replays on a sample Sales model — not live data or a
+        Scripted replays on a sample Sales model — not live data or a
         customer environment. The agents and tool calls are the ones the
         product really uses; every draft shown waits for a person to
         deploy it.
