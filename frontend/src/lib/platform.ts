@@ -139,8 +139,12 @@ export function device(userAgent: string | null): string {
   return system ? `${browser} · ${system}` : browser;
 }
 
+/** A CSV cell. Audit text comes from users (names, reasons, typed sign-in
+ * names), so a value Excel would read as a formula is prefixed with an
+ * apostrophe and shown as text instead of run. */
 function csvField(value: unknown): string {
-  const text = value === null || value === undefined ? "" : String(value);
+  let text = value === null || value === undefined ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
