@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
 
-import { ChartBuilder } from "../chart-builder";
+import { ChartBuilder, download } from "../chart-builder";
 import type { VisualizeTable } from "@/lib/visualize";
 
 const TABLE: VisualizeTable = {
@@ -79,5 +79,32 @@ describe("ChartBuilder", () => {
     await choose("Visual", "Heatmap");
 
     expect(screen.getByText(/needs two dimensions/)).toBeInTheDocument();
+  });
+});
+
+describe("download", () => {
+  it("saves a CSV under its .csv name, as UTF-8 with a byte-order mark", async () => {
+    const created: Blob[] = [];
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      created.push(blob as Blob);
+      return "blob:test";
+    });
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    let saved: { name: string; attached: boolean } | null = null;
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved = { name: this.download, attached: document.body.contains(this) };
+    });
+
+    download("Workforce.csv", "Period,Value\nQ4 2026,4\n", "text/csv");
+
+    expect(saved).toEqual({ name: "Workforce.csv", attached: true });
+    expect(created[0].type).toBe("text/csv;charset=utf-8");
+    const bytes = new Uint8Array(await created[0].arrayBuffer());
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    // Kept alive while the browser takes the file.
+    expect(revoke).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 });

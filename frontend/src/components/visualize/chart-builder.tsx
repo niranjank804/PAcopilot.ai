@@ -188,13 +188,25 @@ const ALL = "__all__";
 
 const AXIS_INK = "#898781";
 
-function download(filename: string, content: BlobPart, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+/** Saves `content` as `filename`. The link is attached to the page and the
+ * blob URL kept briefly: revoking it during the click can make a browser
+ * lose the name and save under a generated one (often as .txt). CSVs get a
+ * UTF-8 byte-order mark so Excel opens them as a sheet, with non-ASCII
+ * member names intact. */
+export function download(filename: string, content: BlobPart, type: string) {
+  const isCsv = type === "text/csv";
+  const blob = new Blob(isCsv ? ["﻿", content] : [content], {
+    type: isCsv ? "text/csv;charset=utf-8" : type,
+  });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function safeName(text: string): string {
