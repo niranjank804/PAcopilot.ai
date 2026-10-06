@@ -110,7 +110,7 @@ describe("useKeepAwake", () => {
     vi.unstubAllGlobals();
   });
 
-  it("pings the backend every ten minutes while the tab is visible", async () => {
+  it("pings the backend every four minutes while the tab is visible", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null));
     vi.stubGlobal("fetch", fetchMock);
     const { useKeepAwake } = await import("../backend-warmup");
@@ -120,11 +120,11 @@ describe("useKeepAwake", () => {
     // Nothing on mount: the page's own requests just woke the server.
     expect(fetchMock).not.toHaveBeenCalled();
 
-    act(() => vi.advanceTimersByTime(10 * 60_000));
+    act(() => vi.advanceTimersByTime(4 * 60_000));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/health$/);
 
-    act(() => vi.advanceTimersByTime(10 * 60_000));
+    act(() => vi.advanceTimersByTime(4 * 60_000));
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -138,7 +138,7 @@ describe("useKeepAwake", () => {
     const { useKeepAwake } = await import("../backend-warmup");
 
     renderHook(() => useKeepAwake());
-    act(() => vi.advanceTimersByTime(10 * 60_000));
+    act(() => vi.advanceTimersByTime(4 * 60_000));
 
     expect(fetchMock).not.toHaveBeenCalled();
 

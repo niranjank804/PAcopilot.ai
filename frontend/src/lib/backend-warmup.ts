@@ -9,8 +9,9 @@ let warmupStarted = false;
 /**
  * Start waking the backend the moment someone lands on a public page.
  *
- * The backend runs on Render's free plan, which stops the process after
- * 15 idle minutes and takes a minute or more to bring it back. Without
+ * The backend is a serverless function: after a few idle minutes Vercel
+ * lets it go, and the next request waits for the app to start again —
+ * about four seconds in production (measured 2026-10-06). Without
  * this, that wait starts only when the user presses "Sign in" — after
  * they have already spent several seconds typing a password. Starting it
  * on arrival hands those seconds back.
@@ -62,16 +63,17 @@ export function useElapsedSeconds(active: boolean): number {
   return active ? elapsed : 0;
 }
 
-/** Between pings, comfortably inside the free instance's 15-minute idle
- * limit. */
-const KEEP_AWAKE_INTERVAL_MS = 10 * 60_000;
+/** Between pings: short enough that an open session does not go cold
+ * between clicks (Vercel lets an idle function go within minutes), and
+ * one /health request — no database — costs next to nothing. */
+export const KEEP_AWAKE_INTERVAL_MS = 4 * 60_000;
 
 /**
  * Keep the backend awake for as long as the app is open.
  *
- * Reading an answer or a report for twenty minutes counts as idle to the
- * hosting, and the next click then waits a minute for a cold start. A
- * request every ten minutes from an open, visible tab prevents that for
+ * Reading an answer or a report for a few minutes counts as idle to the
+ * hosting, and the next click then waits for a cold start. A
+ * request every four minutes from an open, visible tab prevents that for
  * the length of a working session. It does nothing for the first visit
  * of the day — only an external monitor or a paid instance can.
  */
