@@ -107,18 +107,18 @@ export default function TeamPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setReporting(true)}>
+          <Button variant="outline" onClick={() => setReporting(true)} data-tour="team-report-incident">
             <Siren className="mr-2 h-4 w-4" />
             Report incident
           </Button>
-          <Button onClick={() => setCreating(true)}>
+          <Button onClick={() => setCreating(true)} data-tour="team-new-work-item">
             <Plus className="mr-2 h-4 w-4" />
             New work item
           </Button>
         </div>
       </div>
 
-      <Card>
+      <Card data-tour="team-work-items">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="text-base">Work items</CardTitle>
@@ -127,7 +127,7 @@ export default function TeamPage() {
               the change through approval and deployment.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-tour="team-filters">
             <div className="flex gap-1" role="group" aria-label="Filter by status">
               {FILTERS.map((f) => (
                 <Button
@@ -187,7 +187,7 @@ export default function TeamPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card data-tour="team-awaiting">
           <CardHeader>
             <CardTitle className="text-base">Waiting for approval</CardTitle>
             <CardDescription>Drafted changes that passed validation, on servers you can use.</CardDescription>
@@ -216,7 +216,7 @@ export default function TeamPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="team-shared">
           <CardHeader>
             <CardTitle className="text-base">Shared conversations</CardTitle>
             <CardDescription>
@@ -244,7 +244,7 @@ export default function TeamPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="team-recent">
           <CardHeader>
             <CardTitle className="text-base">Recent changes</CardTitle>
             <CardDescription>The last 14 days, on servers you can use.</CardDescription>
@@ -271,7 +271,7 @@ export default function TeamPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="team-health">
           <CardHeader>
             <CardTitle className="text-base">Model health</CardTitle>
             <CardDescription>The latest scan of each server you can use.</CardDescription>

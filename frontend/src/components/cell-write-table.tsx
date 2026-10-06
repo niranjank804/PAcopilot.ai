@@ -30,7 +30,7 @@ export function CellWriteTable({
   reason?: string | null;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-tour="governance-cell-writes">
       {reason ? <p className="text-sm">Reason: {reason}</p> : null}
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">

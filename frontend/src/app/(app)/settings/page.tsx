@@ -115,7 +115,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card data-tour="settings-profile">
         <CardHeader>
           <CardTitle>Profile</CardTitle>
           <CardDescription>
@@ -155,6 +155,7 @@ export default function SettingsPage() {
             </dl>
           ) : null}
           <form
+            data-tour="settings-profile-form"
             className="flex flex-wrap items-end gap-2 border-t pt-4"
             onSubmit={(event) => {
               event.preventDefault();
@@ -203,7 +204,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="settings-theme">
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <CardDescription>Choose how the console looks.</CardDescription>
@@ -236,7 +237,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="settings-organization">
         <CardHeader>
           <CardTitle>Organization</CardTitle>
           <CardDescription>
@@ -271,6 +272,7 @@ export default function SettingsPage() {
               </dl>
 
               <form
+                data-tour="settings-org-form"
                 className="flex flex-wrap items-end gap-2 border-t pt-4"
                 onSubmit={(event) => {
                   event.preventDefault();

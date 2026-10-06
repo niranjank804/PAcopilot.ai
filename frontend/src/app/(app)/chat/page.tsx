@@ -1188,7 +1188,7 @@ export default function ChatPage() {
   // never both at once, so the tour handle inside it stays unique.
   const conversationList = (
     <>
-        <Button size="sm" onClick={newConversation} disabled={isStreaming}>
+        <Button size="sm" onClick={newConversation} disabled={isStreaming} data-tour="chat-new">
           <MessageSquarePlus className="mr-2 h-4 w-4" />
           New conversation
         </Button>
@@ -1202,7 +1202,7 @@ export default function ChatPage() {
             className="pl-7"
           />
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto">
+        <div className="flex-1 space-y-4 overflow-y-auto" data-tour="chat-conversations">
           {conversationsQuery.isError ? (
             <p className="text-sm text-destructive">
               Failed to load conversations: {errorMessage(conversationsQuery.error)}
@@ -1377,6 +1377,7 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
+              data-tour="chat-layout"
               aria-label={expanded ? "Restore chat size" : "Maximize chat"}
               aria-pressed={expanded}
               className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1425,7 +1426,7 @@ export default function ChatPage() {
           {servers.length > 1 ? (
             <Select value={server?.id ?? null} onValueChange={(value) => value && setServer(value)}>
               <Tip content="The TM1 server the agent reads and answers about." side="bottom">
-                <SelectTrigger className="w-44" aria-label="TM1 server">
+                <SelectTrigger className="w-44" aria-label="TM1 server" data-tour="chat-server">
                   <SelectValue>
                     {(value: string) =>
                       (() => {
@@ -1471,6 +1472,7 @@ export default function ChatPage() {
           <div
             role="group"
             aria-label="Model"
+            data-tour="chat-model"
             className="flex rounded-lg border border-border bg-card p-0.5"
           >
             {MODELS.map((choice) => (
@@ -1534,6 +1536,7 @@ export default function ChatPage() {
         <Card className="flex flex-1 flex-col overflow-hidden">
           <CardContent
             ref={scrollRef}
+            data-tour="chat-messages"
             className="flex-1 space-y-4 overflow-y-auto py-4"
           >
             {messages.length === 0 ? (
@@ -1541,7 +1544,7 @@ export default function ChatPage() {
                 <p className="text-center text-[0.9375rem] text-muted-foreground">
                   What do you want to accomplish?
                 </p>
-                <div className="mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-2">
+                <div className="mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-2" data-tour="chat-tasks">
                   {TASKS.map((task) => (
                     <Tip key={task.label} content={task.help} side="bottom">
                       <button
@@ -1792,6 +1795,7 @@ export default function ChatPage() {
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isStreaming}
+                data-tour="chat-attach"
                 aria-label="Attach files"
               >
                 <Paperclip className="h-4 w-4" />
@@ -1852,6 +1856,7 @@ export default function ChatPage() {
                   type="button"
                   variant={handsFree ? "default" : "outline"}
                   onClick={toggleHandsFree}
+                  data-tour="chat-hands-free"
                   aria-pressed={handsFree}
                   aria-label={
                     handsFree ? "Stop hands-free conversation" : "Start hands-free conversation"
@@ -1929,7 +1934,7 @@ export default function ChatPage() {
           showContext && !expanded && "xl:block",
         )}
       >
-        <div>
+        <div data-tour="chat-agent-panel">
           <h2 className="mb-2 text-sm font-semibold">Agent</h2>
           {selectedAgent ? (
             <Card>
@@ -1993,7 +1998,7 @@ export default function ChatPage() {
 
         <Separator />
 
-        <div>
+        <div data-tour="chat-timeline">
           <h2 className="mb-2 text-sm font-semibold">Tool Execution Timeline</h2>
           {!conversationId ? (
             <p className="text-xs text-muted-foreground">
@@ -2057,7 +2062,7 @@ export default function ChatPage() {
 
         <Separator />
 
-        <div>
+        <div data-tour="chat-referenced">
           <h2 className="mb-2 text-sm font-semibold">Referenced Objects</h2>
           {!referenced.length ? (
             <p className="text-xs text-muted-foreground">

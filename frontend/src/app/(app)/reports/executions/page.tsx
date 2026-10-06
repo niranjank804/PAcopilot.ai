@@ -119,7 +119,7 @@ export default function ExecutionsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card data-tour="executions-list">
         <CardHeader>
           <CardTitle>Executions</CardTitle>
           <CardDescription>
@@ -146,6 +146,7 @@ export default function ExecutionsPage() {
               <TableBody>
                 {executions.data.map((execution) => (
                   <TableRow
+                    data-tour="executions-row"
                     key={execution.id}
                     className="cursor-pointer"
                     onClick={() => setSelected(execution.id)}
@@ -153,13 +154,13 @@ export default function ExecutionsPage() {
                     <TableCell className="font-mono text-xs">
                       {execution.id.slice(0, 8)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-tour="executions-status">
                       <ExecutionStatusBadge status={execution.status} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {execution.trigger_type}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-muted-foreground" data-tour="executions-attempt">
                       {execution.attempt}/{execution.max_attempts}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -168,7 +169,7 @@ export default function ExecutionsPage() {
                     <TableCell className="text-muted-foreground">
                       {duration(execution.duration_ms)}
                     </TableCell>
-                    <TableCell className="max-w-xs truncate text-xs text-muted-foreground">
+                    <TableCell className="max-w-xs truncate text-xs text-muted-foreground" data-tour="executions-error">
                       {execution.error_message ?? "—"}
                     </TableCell>
                   </TableRow>

@@ -98,7 +98,7 @@ function ApproveRow({ user, roles }: { user: AppUser; roles: RoleInfo[] }) {
         <div className="text-xs text-muted-foreground">{user.email}</div>
       </TableCell>
       <TableCell className="font-mono text-xs">{user.username}</TableCell>
-      <TableCell>
+      <TableCell data-tour="users-assign-role">
         <Select value={roleId} onValueChange={(v) => setRoleId(v ?? NO_ROLE)}>
           <SelectTrigger className="w-36" aria-label="Role to assign">
             <SelectValue>
@@ -120,7 +120,7 @@ function ApproveRow({ user, roles }: { user: AppUser; roles: RoleInfo[] }) {
         </Select>
       </TableCell>
       <TableCell className="text-right">
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2" data-tour="users-approve">
           <Button
             size="sm"
             disabled={isPending}
@@ -211,7 +211,7 @@ function MemberRow({ user, isSelf }: { user: AppUser; isSelf: boolean }) {
         </Badge>
       </TableCell>
       <TableCell>{user.is_active ? "Yes" : "No"}</TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-right" data-tour="users-member-action">
         {isSelf ? null : user.is_active ? (
           <Button
             size="sm"
@@ -294,7 +294,7 @@ export default function UsersPage() {
 
       <SignupRequests />
 
-      <Card>
+      <Card data-tour="users-pending">
         <CardHeader>
           <CardTitle>Pending requests</CardTitle>
           <CardDescription>
@@ -335,7 +335,7 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="users-members">
         <CardHeader>
           <CardTitle>All members</CardTitle>
         </CardHeader>

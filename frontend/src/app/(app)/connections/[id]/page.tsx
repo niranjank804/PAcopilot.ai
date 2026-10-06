@@ -185,7 +185,7 @@ export default function ConnectionDetailPage() {
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3" data-tour="connection-detail-header">
                   <h1 className="page-title">
                     {connectionQuery.data?.name}
                   </h1>
@@ -203,7 +203,7 @@ export default function ConnectionDetailPage() {
                   {connectionQuery.data?.username}
                 </p>
               </div>
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1" data-tour="connection-detail-extract">
                 <Button
                   variant="outline"
                   size="sm"
@@ -230,7 +230,7 @@ export default function ConnectionDetailPage() {
       </div>
 
       <Tabs defaultValue="cubes">
-        <TabsList>
+        <TabsList data-tour="connection-detail-tabs">
           <TabsTrigger value="cubes">
             <Boxes className="mr-2 h-4 w-4" />
             Cubes {cubesQuery.data ? `(${cubesQuery.data.length})` : ""}
@@ -330,7 +330,7 @@ export default function ConnectionDetailPage() {
         </TabsContent>
       </Tabs>
 
-      <Card>
+      <Card data-tour="connection-detail-changes">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle>Recent Changes</CardTitle>
@@ -340,6 +340,7 @@ export default function ConnectionDetailPage() {
           </div>
           <Link
             href={`/deployments?connection=${connectionId}`}
+            data-tour="connection-detail-view-all"
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             View All

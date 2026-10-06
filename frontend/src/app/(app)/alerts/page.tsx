@@ -167,21 +167,21 @@ export default function AlertsPage() {
             security, model and deployment changes. They only read; nothing is ever changed.
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}>
+        <Button data-tour="alerts-new-rule" onClick={() => setCreating(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New rule
         </Button>
       </div>
 
       {setup.data && !setup.data.email_configured ? (
-        <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+        <p data-tour="alerts-email-notice" className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
           Email is not set up on this deployment, so alerts appear here and on the bell only. An
           administrator can add SMTP settings to send them by email too.
         </p>
       ) : null}
 
       {proposed.length ? (
-        <Card>
+        <Card data-tour="alerts-suggested">
           <CardHeader>
             <CardTitle className="text-base">Suggested by the assistant</CardTitle>
             <CardDescription>Not checked until you turn them on.</CardDescription>
@@ -218,7 +218,7 @@ export default function AlertsPage() {
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <CardTitle className="text-base">Alerts</CardTitle>
-          <div className="flex gap-1" role="group" aria-label="Alert status">
+          <div className="flex gap-1" role="group" aria-label="Alert status" data-tour="alerts-status-tabs">
             {ALERT_TABS.map((t) => (
               <Button
                 key={t.value}
@@ -232,7 +232,7 @@ export default function AlertsPage() {
             ))}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent data-tour="alerts-list">
           {alerts.isPending ? (
             <Skeleton className="h-16 w-full" />
           ) : alerts.isError ? (
@@ -257,7 +257,7 @@ export default function AlertsPage() {
                     {a.detail ? <p className="whitespace-pre-wrap text-xs">{a.detail}</p> : null}
                   </div>
                   {a.status !== "resolved" ? (
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 gap-2" data-tour="alerts-alert-actions">
                       {a.status === "open" ? (
                         <Button size="sm" variant="outline" onClick={() => alertAction.mutate({ id: a.id, action: "acknowledge" })} disabled={alertAction.isPending}>
                           <Check className="mr-1 h-3.5 w-3.5" />
@@ -277,7 +277,7 @@ export default function AlertsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="alerts-rules">
         <CardHeader>
           <CardTitle className="text-base">Rules</CardTitle>
           <CardDescription>Checked every 15 minutes. The first check of a rule sets its baseline.</CardDescription>
@@ -309,7 +309,7 @@ export default function AlertsPage() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 gap-1">
+                  <div className="flex shrink-0 gap-1" data-tour="alerts-rule-actions">
                     <Button size="sm" variant="ghost" aria-label="Check now" title="Check now" disabled={checkNow.isPending || r.status !== "active"} onClick={() => checkNow.mutate(r.id)}>
                       <RefreshCw className={cn("h-3.5 w-3.5", checkNow.isPending && checkNow.variables === r.id && "animate-spin")} />
                     </Button>

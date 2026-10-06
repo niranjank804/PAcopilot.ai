@@ -111,7 +111,7 @@ export default function HealthPage() {
         <div className="flex items-center gap-2">
           {connectionId ? (
             <Select value={connectionId} onValueChange={(value) => value && setChosen(value)}>
-              <SelectTrigger className="w-56" aria-label="Connection">
+              <SelectTrigger className="w-56" aria-label="Connection" data-tour="health-connection">
                 <SelectValue>
                   {(value: string) => connections.data?.find((c) => c.id === value)?.name ?? "Connection"}
                 </SelectValue>
@@ -125,7 +125,7 @@ export default function HealthPage() {
               </SelectContent>
             </Select>
           ) : null}
-          <Button onClick={() => scan.mutate()} disabled={!connectionId || scan.isPending}>
+          <Button onClick={() => scan.mutate()} disabled={!connectionId || scan.isPending} data-tour="health-scan">
             {scan.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {scan.isPending ? "Scanning…" : "Scan now"}
           </Button>
@@ -140,7 +140,7 @@ export default function HealthPage() {
         <p className="text-sm text-destructive">Could not load model health.</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card>
+          <Card data-tour="health-score">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <HeartPulse className="size-4" aria-hidden />
@@ -183,7 +183,7 @@ export default function HealthPage() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2" data-tour="health-deductions">
             <CardHeader>
               <CardTitle className="text-base">Where the points went</CardTitle>
               <CardDescription>
@@ -224,7 +224,7 @@ export default function HealthPage() {
           </Card>
 
           {perf ? (
-            <Card className="lg:col-span-3">
+            <Card className="lg:col-span-3" data-tour="health-performance">
               <CardHeader>
                 <CardTitle className="text-base">Performance</CardTitle>
                 <CardDescription>

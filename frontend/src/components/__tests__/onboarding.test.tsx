@@ -141,7 +141,7 @@ describe("the three choices", () => {
     await user.click(await screen.findByRole("button", { name: /start tour/i }));
 
     expect(
-      await screen.findByRole("dialog", { name: /your workspace/i }),
+      await screen.findByRole("dialog", { name: /command center/i }),
     ).toBeInTheDocument();
     expect(mocks.apiRequest).not.toHaveBeenCalled();
   });

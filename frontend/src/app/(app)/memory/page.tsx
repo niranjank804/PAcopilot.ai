@@ -178,7 +178,7 @@ export default function MemoryPage() {
             own suggestions wait here for a person.
           </p>
         </div>
-        <Button onClick={() => setAdding(true)}>
+        <Button onClick={() => setAdding(true)} data-tour="memory-add">
           <Plus className="mr-2 h-4 w-4" />
           Add memory
         </Button>
@@ -186,7 +186,7 @@ export default function MemoryPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Waiting for approval</CardTitle>
+          <CardTitle className="text-base" data-tour="memory-proposals">Waiting for approval</CardTitle>
           <CardDescription>Not used by the assistant until approved.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -199,7 +199,7 @@ export default function MemoryPage() {
               {proposals.data.map((m) => (
                 <li key={m.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                   <MemoryText memory={m} />
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 gap-2" data-tour="memory-review">
                     <Button size="sm" onClick={() => act.mutate({ id: m.id, action: "approve" })} disabled={act.isPending}>
                       <Check className="mr-1 h-3.5 w-3.5" />
                       Approve
@@ -219,7 +219,7 @@ export default function MemoryPage() {
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <div>
-            <CardTitle className="text-base">In use</CardTitle>
+            <CardTitle className="text-base" data-tour="memory-approved">In use</CardTitle>
             <CardDescription>The assistant follows these and cites them as organization knowledge.</CardDescription>
           </div>
           <Input
@@ -228,6 +228,7 @@ export default function MemoryPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             aria-label="Search memory"
+            data-tour="memory-search"
           />
         </CardHeader>
         <CardContent>
@@ -240,7 +241,7 @@ export default function MemoryPage() {
               {approved.data.map((m) => (
                 <li key={m.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                   <MemoryText memory={m} />
-                  <div className="flex shrink-0 gap-1">
+                  <div className="flex shrink-0 gap-1" data-tour="memory-actions">
                     <Button size="sm" variant="ghost" aria-label="Edit" onClick={() => { setEditing(m); setEditText(m.text); }}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>

@@ -389,7 +389,7 @@ function MetadataExplorer() {
           />
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto">
+        <div className="flex-1 space-y-4 overflow-y-auto" data-tour="metadata-objects">
           {!search && recent.length ? (
             <div>
               <p className="mb-1 px-1 text-xs font-medium text-muted-foreground">
@@ -502,14 +502,14 @@ function MetadataExplorer() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="relationships">Relationships</TabsTrigger>
-                <TabsTrigger value="graph">Graph</TabsTrigger>
-                <TabsTrigger value="impact">Impact</TabsTrigger>
-                <TabsTrigger value="changes">
+                <TabsTrigger value="overview" data-tour="metadata-tab-overview">Overview</TabsTrigger>
+                <TabsTrigger value="relationships" data-tour="metadata-tab-relationships">Relationships</TabsTrigger>
+                <TabsTrigger value="graph" data-tour="metadata-tab-graph">Graph</TabsTrigger>
+                <TabsTrigger value="impact" data-tour="metadata-tab-impact">Impact</TabsTrigger>
+                <TabsTrigger value="changes" data-tour="metadata-tab-changes">
                   Recent Changes {objectChanges.length ? `(${objectChanges.length})` : ""}
                 </TabsTrigger>
-                <TabsTrigger value="ai">AI Analysis</TabsTrigger>
+                <TabsTrigger value="ai" data-tour="metadata-tab-ai">AI Analysis</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">

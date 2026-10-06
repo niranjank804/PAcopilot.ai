@@ -31,11 +31,11 @@ export default function SharedConversationPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Link href="/team" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/team" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground" data-tour="shared-conversation-back">
         <ArrowLeft className="h-3.5 w-3.5" />
         Team
       </Link>
-      <div>
+      <div data-tour="shared-conversation-header">
         <h1 className="page-title">{summary?.title || "Shared conversation"}</h1>
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Eye className="h-3.5 w-3.5" aria-hidden />
@@ -52,7 +52,7 @@ export default function SharedConversationPage() {
             : "Could not load the conversation."}
         </p>
       ) : (
-        <ol className="space-y-3">
+        <ol className="space-y-3" data-tour="shared-conversation-messages">
           {messages.data
             .filter((m) => m.role === "user" || m.role === "assistant")
             .map((m) => (

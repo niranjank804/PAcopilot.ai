@@ -185,7 +185,7 @@ export default function WorkItemPage() {
           Team
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div data-tour="work-item-header">
             <h1 className="page-title">
               {item.reference} <span className="font-normal">{item.title}</span>
             </h1>
@@ -194,7 +194,7 @@ export default function WorkItemPage() {
               {detail.data.created_by_name ? ` by ${detail.data.created_by_name}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-tour="work-item-status">
             <WorkItemStatusBadge status={item.status} />
             <Select
               value={item.status}
@@ -225,7 +225,7 @@ export default function WorkItemPage() {
         {item.description ? <p className="max-w-3xl whitespace-pre-wrap text-sm">{item.description}</p> : null}
       </div>
 
-      <ol className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Progress">
+      <ol className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Progress" data-tour="work-item-progress">
         {progress.map((step) => (
           <li key={step.key} className={cn("flex items-center gap-1.5 text-sm", !step.done && "text-muted-foreground")}>
             {step.done ? (
@@ -240,16 +240,18 @@ export default function WorkItemPage() {
       </ol>
 
       {item.kind === "incident" && item.connection_id ? (
-        <IncidentInvestigation
-          investigations={detail.data.investigations}
-          connectionId={item.connection_id}
-          investigating={investigate.isPending}
-          onInvestigate={() => investigate.mutate()}
-        />
+        <div data-tour="work-item-investigation">
+          <IncidentInvestigation
+            investigations={detail.data.investigations}
+            connectionId={item.connection_id}
+            investigating={investigate.isPending}
+            onInvestigate={() => investigate.mutate()}
+          />
+        </div>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card>
+        <Card data-tour="work-item-findings">
           <CardHeader>
             <CardTitle className="text-base">What the team found</CardTitle>
             <CardDescription>Written by people; the timeline records who and when.</CardDescription>
@@ -276,13 +278,13 @@ export default function WorkItemPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="work-item-links">
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="text-base">Linked</CardTitle>
               <CardDescription>Shared conversations and TM1 changes.</CardDescription>
             </div>
-            <Button size="sm" variant="outline" onClick={() => setLinking(true)}>
+            <Button size="sm" variant="outline" onClick={() => setLinking(true)} data-tour="work-item-link">
               <Link2 className="mr-1 h-3.5 w-3.5" />
               Link
             </Button>
@@ -348,7 +350,7 @@ export default function WorkItemPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card data-tour="work-item-timeline">
         <CardHeader>
           <CardTitle className="text-base">Timeline</CardTitle>
           <CardDescription>From the records as they are now, oldest first.</CardDescription>

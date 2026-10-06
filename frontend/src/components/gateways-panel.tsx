@@ -97,7 +97,7 @@ export function GatewaysPanel() {
   const gateways = gatewaysQuery.data ?? [];
 
   return (
-    <Card data-testid="gateways-panel">
+    <Card data-testid="gateways-panel" data-tour="connections-gateways">
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -111,7 +111,7 @@ export function GatewaysPanel() {
             firewall port is opened.
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+        <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)} data-tour="connections-gateway-add">
           <Plus className="mr-2 h-4 w-4" />
           Add gateway
         </Button>
@@ -146,7 +146,7 @@ export function GatewaysPanel() {
                     .join(" · ")}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2" data-tour="connections-gateway-actions">
                 <Button
                   variant="outline"
                   size="sm"

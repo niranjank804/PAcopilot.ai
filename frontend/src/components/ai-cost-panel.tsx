@@ -66,7 +66,7 @@ export function AICostPanel() {
   });
 
   return (
-    <Card>
+    <Card data-tour="monitoring-ai-cost">
       <CardHeader>
         <CardTitle>AI Cost</CardTitle>
         <CardDescription>Last 30 days, from the usage ledger.</CardDescription>
@@ -78,7 +78,7 @@ export function AICostPanel() {
           <p className="text-sm text-destructive">Could not load AI cost.</p>
         ) : (
           <div className="space-y-5">
-            <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4" data-tour="monitoring-ai-cost-figures">
               <div>
                 <dt className="text-xs text-muted-foreground">Spend</dt>
                 <dd className="text-lg font-semibold tabular-nums">{usd(report.data.total_cost_usd)}</dd>
@@ -116,7 +116,7 @@ export function AICostPanel() {
                 </dd>
               </div>
             </dl>
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-3" data-tour="monitoring-ai-cost-breakdown">
               <GroupList title="By agent (cost · requests · per request)" groups={report.data.by_agent} />
               <GroupList title="By tier" groups={report.data.by_tier} />
               <GroupList title="By person" groups={report.data.by_user} />

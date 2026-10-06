@@ -8,6 +8,9 @@
  * it should never mark someone as having been onboarded.
  */
 
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
+
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,7 +33,37 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 import { FeatureTourButton } from "../feature-tour-button";
-import { FEATURE_TOURS } from "@/lib/tour";
+import { FEATURE_TOURS, PRODUCT_TOUR, featureTourFor } from "@/lib/tour";
+
+const SRC = resolve(__dirname, "../..");
+
+/** Every `data-tour="..."` handle written in the app's source, tests excluded. */
+function taggedHandles(dir = SRC, found = new Set<string>()): Set<string> {
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) {
+      if (entry !== "__tests__" && entry !== "node_modules") taggedHandles(path, found);
+    } else if (/\.tsx?$/.test(entry)) {
+      const text = readFileSync(path, "utf8");
+      for (const match of text.matchAll(/data-tour="([a-z0-9-]+)"/g)) found.add(match[1]);
+      for (const match of text.matchAll(/\btour(?:: |=)"([a-z0-9-]+)"/g)) found.add(match[1]);
+    }
+  }
+  return found;
+}
+
+/** The app's page routes, from the folders under app/(app). */
+function appRoutes(dir = join(SRC, "app", "(app)"), prefix = ""): string[] {
+  const routes: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    if (!statSync(path).isDirectory() || entry === "__tests__") continue;
+    const route = `${prefix}/${entry}`;
+    if (readdirSync(path).includes("page.tsx")) routes.push(route);
+    routes.push(...appRoutes(path, route));
+  }
+  return routes;
+}
 
 /** Feature tours point at page elements; without them every step is
  * skipped and the popover has nothing to anchor to. */
@@ -61,22 +94,22 @@ describe("where it appears", () => {
 
   it("renders nothing on a page that has none", () => {
     // Why it can live in the shared header without auditing routes.
-    mocks.pathname = "/settings";
+    mocks.pathname = "/no-such-page";
 
     const { container } = render(<FeatureTourButton />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("covers the feature areas the product leads with", () => {
-    // Chat, model exploration, governance and reports — the four the
-    // landing page and the global tour both point at.
-    expect(Object.keys(FEATURE_TOURS).sort()).toEqual([
-      "/chat",
-      "/deployments",
-      "/metadata",
-      "/reports",
-    ]);
+  it("has a tour for every page in the app", () => {
+    for (const route of appRoutes()) {
+      expect(featureTourFor(route), route).toBeDefined();
+    }
+  });
+
+  it("uses a detail page's shared tour for any id", () => {
+    expect(featureTourFor("/team/abc-123")).toBe(FEATURE_TOURS["/team/[id]"]);
+    expect(featureTourFor("/team/abc/extra")).toBeUndefined();
   });
 });
 
@@ -90,9 +123,9 @@ describe("running a feature tour", () => {
       screen.getByRole("button", { name: /take a tour of this page/i }),
     );
 
-    // The chat tour's first step, not "Your workspace".
+    // The chat tour's first step, not the global tour's "Command Center".
     expect(
-      await screen.findByRole("dialog", { name: /pick a specialist/i }),
+      await screen.findByRole("dialog", { name: FEATURE_TOURS["/chat"][0].title }),
     ).toBeInTheDocument();
   });
 
@@ -122,6 +155,9 @@ describe("running a feature tour", () => {
       screen.getByRole("button", { name: /take a tour of this page/i }),
     );
 
+    for (let step = 1; step < FEATURE_TOURS["/reports"].length; step++) {
+      await user.click(await screen.findByRole("button", { name: /next/i }));
+    }
     await user.click(await screen.findByRole("button", { name: /finish/i }));
 
     await waitFor(() =>
@@ -154,30 +190,19 @@ describe("the step data", () => {
     // A step pointing at an untagged element is skipped silently, so
     // this is the check that keeps a tour from quietly explaining
     // nothing.
-    const tagged = new Set([
-      "chat-agent",
-      "chat-input",
-      "chat-history",
-      "voice-input",
-      "metadata-connection",
-      "metadata-search",
-      "governance-connection",
-      "governance-changes",
-      "governance-review",
-      "reports-definitions",
-    ]);
+    const tagged = taggedHandles();
 
-    for (const steps of Object.values(FEATURE_TOURS)) {
-      for (const step of steps) {
-        expect(tagged).toContain(step.target);
-      }
+    expect(tagged.size).toBeGreaterThan(20);
+    for (const step of [...PRODUCT_TOUR, ...Object.values(FEATURE_TOURS).flat()]) {
+      expect(tagged, step.target).toContain(step.target);
     }
   });
 
   it("keeps each tour short enough to finish", () => {
-    // A tour longer than the task it explains gets skipped.
+    // Every option is explained, but related controls share a step: a
+    // tour longer than the task it explains gets skipped.
     for (const steps of Object.values(FEATURE_TOURS)) {
-      expect(steps.length).toBeLessThanOrEqual(5);
+      expect(steps.length).toBeLessThanOrEqual(16);
       expect(steps.length).toBeGreaterThan(0);
     }
   });

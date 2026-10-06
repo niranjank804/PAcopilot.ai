@@ -150,7 +150,7 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button data-tour="reports-new" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New report
         </Button>
@@ -191,11 +191,12 @@ export default function ReportsPage() {
                     <TableCell>
                       {report.output_formats.join(", ").toUpperCase()}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-tour="reports-status">
                       <Badge variant="outline">{report.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
+                        data-tour="reports-run-now"
                         size="sm"
                         variant="outline"
                         disabled={runNow.isPending}
@@ -223,7 +224,7 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground" data-tour="reports-history-link">
         Runs never start on their own — scheduling and STET approval arrive in
         a later phase. See{" "}
         <Link href="/reports/executions" className="underline">

@@ -112,7 +112,7 @@ export function ModelHistory({
     latest && ageInDays(latest.started_at) > STALE_AFTER_DAYS;
 
   return (
-    <Card>
+    <Card data-tour="metadata-model-map">
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
         <div className="space-y-1">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -130,7 +130,7 @@ export function ModelHistory({
             </p>
           ) : null}
         </div>
-        <Button size="sm" variant="outline" onClick={onExtract} disabled={extracting}>
+        <Button size="sm" variant="outline" onClick={onExtract} disabled={extracting} data-tour="metadata-extract">
           {extracting ? (
             <Loader2 className="size-4 animate-spin" aria-hidden />
           ) : (

@@ -61,7 +61,7 @@ export function SignupRequests() {
   if (signups.error instanceof ApiError && signups.error.status === 403) return null;
 
   return (
-    <Card>
+    <Card data-tour="users-signups">
       <CardHeader>
         <CardTitle>Sign-up requests (all workspaces)</CardTitle>
         <CardDescription>

@@ -234,6 +234,7 @@ function Picker({
   choices,
   onChange,
   width = "w-40",
+  tour,
 }: {
   id: string;
   label: string;
@@ -241,9 +242,11 @@ function Picker({
   choices: Choice[];
   onChange: (value: string) => void;
   width?: string;
+  /** `data-tour` target for the page's feature tour. */
+  tour?: string;
 }) {
   return (
-    <div className="min-w-0 space-y-1.5">
+    <div className="min-w-0 space-y-1.5" data-tour={tour}>
       <Label htmlFor={id} className="text-xs">
         {label}
       </Label>
@@ -884,6 +887,7 @@ export function ChartBuilder({
             <Picker
               id="viz-type"
               label="Visual"
+              tour="chart-visual"
               value={chartType}
               width="w-44"
               choices={CHART_TYPES.map((t) => ({
@@ -895,6 +899,7 @@ export function ChartBuilder({
             <Picker
               id="viz-axis"
               label="Axis"
+              tour="chart-axis"
               value={axis}
               choices={dimensionChoices}
               onChange={(v) => {
@@ -909,6 +914,7 @@ export function ChartBuilder({
               <Picker
                 id="viz-legend"
                 label="Legend"
+                tour="chart-legend"
                 value={series ?? NONE}
                 choices={[
                   { value: NONE, label: "None" },
@@ -926,6 +932,7 @@ export function ChartBuilder({
                 key={dimension}
                 id={`viz-slicer-${dimension}`}
                 label={`Slicer: ${dimension}`}
+                tour="chart-slicer"
                 value={filters[dimension] ?? ALL}
                 choices={[
                   { value: ALL, label: "All (summed)" },
@@ -947,6 +954,7 @@ export function ChartBuilder({
             <Picker
               id="viz-sort"
               label="Sort"
+              tour="chart-sort"
               value={sort}
               width="w-36"
               choices={SORTS}
@@ -966,6 +974,7 @@ export function ChartBuilder({
             <Picker
               id="viz-format"
               label="Numbers"
+              tour="chart-numbers"
               value={format}
               width="w-36"
               choices={FORMATS}
@@ -986,7 +995,10 @@ export function ChartBuilder({
             {/* Chart styling only means something on a drawn chart; the
             table-style views (KPI, matrix, heatmap) have none. */}
             {SVG_TYPES.includes(chartType) ? (
-              <div className="flex flex-wrap items-center gap-3 pb-2">
+              <div
+                className="flex flex-wrap items-center gap-3 pb-2"
+                data-tour="chart-toggles"
+              >
                 {chartType !== "treemap" ? (
                   <Toggle
                     id="viz-labels"
@@ -1041,7 +1053,7 @@ export function ChartBuilder({
         </ul>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" data-tour="chart-exports">
         <Button
           size="sm"
           variant="outline"
@@ -1099,7 +1111,7 @@ export function ChartBuilder({
       </div>
 
       {chartType !== "matrix" ? (
-        <details className="rounded-md border">
+        <details className="rounded-md border" data-tour="chart-table">
           <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
             Table view
           </summary>

@@ -217,6 +217,7 @@ export default function KnowledgePage() {
             onChange={handleFileChange}
           />
           <Button
+            data-tour="knowledge-upload"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadMutation.isPending}
           >
@@ -232,7 +233,7 @@ export default function KnowledgePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Documents</CardTitle>
+          <CardTitle data-tour="knowledge-documents">Documents</CardTitle>
           <CardDescription>PDF, DOCX, TXT, or Markdown.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -291,7 +292,7 @@ export default function KnowledgePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2" data-tour="knowledge-ask">
             <div className="flex-1 space-y-2">
               <Textarea
                 value={query}
@@ -304,7 +305,7 @@ export default function KnowledgePage() {
               />
             </div>
             <Select value={agent} onValueChange={(value) => setAgent(value ?? NO_AGENT)}>
-              <SelectTrigger className="w-44" aria-label="Agent">
+              <SelectTrigger className="w-44" aria-label="Agent" data-tour="knowledge-agent">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -354,7 +355,7 @@ export default function KnowledgePage() {
           ) : null}
 
           {answer ? (
-            <div className="space-y-3 rounded-md border p-4">
+            <div className="space-y-3 rounded-md border p-4" data-tour="knowledge-answer">
               {/* Said before the answer, not after it. A reader who has
                   already absorbed a confident paragraph will not
                   re-weigh it on the strength of a footnote. */}
@@ -404,7 +405,7 @@ export default function KnowledgePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Explain an error</CardTitle>
+          <CardTitle data-tour="knowledge-explain">Explain an error</CardTitle>
           <CardDescription>
             Paste a TM1 error message — the Troubleshooter agent checks the
             real objects it mentions and explains what happened and how to

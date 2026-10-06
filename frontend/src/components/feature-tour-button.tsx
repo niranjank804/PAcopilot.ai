@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { ProductTour } from "@/components/product-tour";
 import { Button } from "@/components/ui/button";
-import { FEATURE_TOURS, useTour } from "@/lib/tour";
+import { featureTourFor, useTour } from "@/lib/tour";
 
 /**
  * "Take a tour" for the page you are on.
@@ -24,7 +24,7 @@ import { FEATURE_TOURS, useTour } from "@/lib/tour";
  */
 export function FeatureTourButton() {
   const pathname = usePathname();
-  const steps = FEATURE_TOURS[pathname];
+  const steps = featureTourFor(pathname);
   const tour = useTour(steps ?? []);
 
   if (!steps?.length) return null;
@@ -35,6 +35,7 @@ export function FeatureTourButton() {
         variant="ghost"
         size="sm"
         onClick={tour.start}
+        data-tour="page-tour"
         aria-label="Take a tour of this page"
       >
         <HelpCircle className="mr-1.5 h-4 w-4" />

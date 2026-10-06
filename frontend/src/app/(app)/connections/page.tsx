@@ -307,7 +307,7 @@ export default function ConnectionsPage() {
             Your TM1 servers, and the ones shared with your organization.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)} data-tour="connections-new">
           <Plus className="mr-2 h-4 w-4" />
           New Connection
         </Button>
@@ -325,7 +325,7 @@ export default function ConnectionsPage() {
           <Skeleton className="h-24 w-full" />
         </div>
       ) : connectionsQuery.data?.length ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2" data-tour="connections-list">
           {connectionsQuery.data.map((connection) => (
             <Card key={connection.id}>
               <CardHeader className="pb-2">
@@ -336,7 +336,7 @@ export default function ConnectionsPage() {
                   >
                     <CardTitle className="text-lg">{connection.name}</CardTitle>
                   </Link>
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5" data-tour="connections-badges">
                     <Badge
                       variant="outline"
                       title={
@@ -374,7 +374,7 @@ export default function ConnectionsPage() {
                   )}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex gap-2">
+              <CardContent className="flex gap-2" data-tour="connections-actions">
                 {/* A member's private connection: an admin manages it (edit,
                     share, delete) but never uses it, so no Test or details. */}
                 {connection.can_use !== false ? (

@@ -121,7 +121,10 @@ export default function VisualizePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-2">
+          <div
+            className="flex flex-wrap items-end gap-2"
+            data-tour="visualize-question"
+          >
             <div className="min-w-0 flex-1 space-y-2">
               <Textarea
                 value={query}
@@ -155,7 +158,7 @@ export default function VisualizePage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" data-tour="visualize-examples">
             {EXAMPLES.map((example) => (
               <button
                 key={example}
@@ -168,6 +171,7 @@ export default function VisualizePage() {
             ))}
           </div>
           <Button
+            data-tour="visualize-run"
             onClick={() => visualizeMutation.mutate()}
             disabled={visualizeMutation.isPending || !query.trim() || !connectionId}
           >
@@ -197,7 +201,7 @@ export default function VisualizePage() {
             ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2" data-tour="visualize-mdx">
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setEditing((v) => !v)}>
                   <Code2 className="mr-2 h-3.5 w-3.5" />

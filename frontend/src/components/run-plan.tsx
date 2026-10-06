@@ -50,7 +50,7 @@ export function RunPlan({ change }: { change: TM1ChangeSummary }) {
   const result = change.execution_result as ExecutionResult | null | undefined;
 
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-3 text-sm" data-tour="governance-run-plan">
       <div>
         <p className="text-xs font-medium text-muted-foreground">Parameters</p>
         {parameters.length ? (

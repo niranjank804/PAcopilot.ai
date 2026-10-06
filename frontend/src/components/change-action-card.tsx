@@ -125,7 +125,7 @@ export function ChangeActionCard({
   const aiGenerated = Boolean(change.new_content?.ai_generated);
 
   return (
-    <div className="max-w-md space-y-2 rounded-md border p-3">
+    <div className="max-w-md space-y-2 rounded-md border p-3" data-tour="governance-actions">
       {showSummary ? (
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={STATUS_VARIANT[change.status]}>

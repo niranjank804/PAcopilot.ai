@@ -104,13 +104,13 @@ export default function WorkersPage() {
           </p>
         </div>
 
-        <Button onClick={() => setRegisterOpen(true)}>
+        <Button data-tour="workers-register" onClick={() => setRegisterOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Register worker
         </Button>
       </div>
 
-      <Card>
+      <Card data-tour="workers-list">
         <CardHeader>
           <CardTitle>Registered workers</CardTitle>
           <CardDescription>
@@ -143,7 +143,7 @@ export default function WorkersPage() {
                         {worker.hostname ?? "—"} · {worker.os ?? "—"}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-tour="workers-status">
                       <WorkerStatusBadge status={worker.status} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -152,7 +152,7 @@ export default function WorkersPage() {
                     <TableCell className="text-muted-foreground">
                       {worker.pafe_version ?? "not detected"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-tour="workers-capabilities">
                       <div className="flex flex-wrap gap-1">
                         {worker.capabilities.length ? (
                           worker.capabilities.map((capability) => (
@@ -176,6 +176,7 @@ export default function WorkersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
+                        data-tour="workers-toggle"
                         size="sm"
                         variant="outline"
                         onClick={() =>

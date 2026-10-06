@@ -52,6 +52,7 @@ function Section({
   href,
   count,
   urgent,
+  tour,
   children,
 }: {
   title: string;
@@ -60,10 +61,12 @@ function Section({
   href: string;
   count: number;
   urgent?: boolean;
+  /** `data-tour` target for the page's feature tour. */
+  tour?: string;
   children: ReactNode;
 }) {
   return (
-    <Card>
+    <Card data-tour={tour}>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -105,7 +108,7 @@ export function CommandCenter() {
 
   if (!d.servers) {
     return (
-      <Card>
+      <Card data-tour="dashboard-setup">
         <CardHeader>
           <CardTitle className="text-base">Command center</CardTitle>
           <CardDescription>
@@ -121,7 +124,7 @@ export function CommandCenter() {
     <section aria-label="Command center" className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Section title="Model health" description="Latest score per server, lowest first." icon={<HeartPulse className="size-4" />}
-          href="/health" count={d.health.filter((h) => h.score < 75).length}>
+          href="/health" count={d.health.filter((h) => h.score < 75).length} tour="dashboard-health">
           {!d.health.length ? <Empty>No health scans yet.</Empty> : (
             <ul className="space-y-1.5">
               {d.health.map((h) => (
@@ -152,7 +155,7 @@ export function CommandCenter() {
         </Section>
 
         <Section title="Active incidents" description="Open and in progress." icon={<Siren className="size-4" />}
-          href="/team" count={d.incidents.length} urgent>
+          href="/team" count={d.incidents.length} urgent tour="dashboard-incidents">
           {!d.incidents.length ? <Empty>No open incidents.</Empty> : (
             <ul className="space-y-1.5">
               {d.incidents.map((i) => (
@@ -168,7 +171,7 @@ export function CommandCenter() {
         </Section>
 
         <Section title="Open alerts" description="Raised by monitoring rules." icon={<BellRing className="size-4" />}
-          href="/alerts" count={d.alerts.open} urgent={d.alerts.critical > 0}>
+          href="/alerts" count={d.alerts.open} urgent={d.alerts.critical > 0} tour="dashboard-alerts">
           {!d.alerts.open ? <Empty>No open alerts.</Empty> : (
             <ul className="space-y-1.5">
               {d.alerts.latest.map((a) => (
@@ -182,7 +185,7 @@ export function CommandCenter() {
         </Section>
 
         <Section title="Failed processes" description="Last 7 days, from TM1's message log." icon={<TriangleAlert className="size-4" />}
-          href="/health" count={d.failed_processes.length} urgent>
+          href="/health" count={d.failed_processes.length} urgent tour="dashboard-failures">
           {!d.failed_processes.length ? <Empty>No failures recorded.</Empty> : (
             <ul className="space-y-1.5">
               {d.failed_processes.map((f) => (
@@ -196,7 +199,7 @@ export function CommandCenter() {
         </Section>
 
         <Section title="Performance regressions" description="Runs far slower than usual." icon={<Timer className="size-4" />}
-          href="/health" count={d.regressions.length}>
+          href="/health" count={d.regressions.length} tour="dashboard-regressions">
           {!d.regressions.length ? <Empty>No regressions.</Empty> : (
             <ul className="space-y-1.5 text-xs">
               {d.regressions.map((r) => (
@@ -207,7 +210,7 @@ export function CommandCenter() {
         </Section>
 
         <Section title="Waiting for approval" description="Valid drafts nobody has applied yet." icon={<Rocket className="size-4" />}
-          href="/deployments" count={d.pending_approvals.length}>
+          href="/deployments" count={d.pending_approvals.length} tour="dashboard-approvals">
           {!d.pending_approvals.length ? <Empty>Nothing waiting.</Empty> : (
             <ul className="space-y-1.5">
               {d.pending_approvals.map((c) => (
@@ -224,7 +227,7 @@ export function CommandCenter() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2" data-tour="dashboard-deployments">
           <CardHeader>
             <CardTitle className="text-base">Recent deployments and model changes</CardTitle>
             <CardDescription>The last 14 days on the servers you can use.</CardDescription>
@@ -258,7 +261,7 @@ export function CommandCenter() {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card data-tour="dashboard-ai-usage">
           <CardHeader>
             <CardTitle className="text-base">
               <Link href="/monitoring" className="hover:underline">AI usage and cost</Link>

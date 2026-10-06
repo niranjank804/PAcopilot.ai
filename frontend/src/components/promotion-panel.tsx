@@ -132,7 +132,7 @@ export function PromotionPanel({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2" data-tour="governance-promotion">
       {promotable ? (
         targets.length ? (
           <>

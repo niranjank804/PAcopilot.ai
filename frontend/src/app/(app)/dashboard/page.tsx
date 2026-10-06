@@ -136,7 +136,11 @@ export default function DashboardPage() {
         title={`${greeting(new Date())}${user ? `, ${user.first_name}` : ""}`}
         description="TM1 Engineering Command Center — what needs attention on the servers you can use."
         actions={
-          <Link href="/chat" className={buttonVariants({ size: "lg" })}>
+          <Link
+            href="/chat"
+            className={buttonVariants({ size: "lg" })}
+            data-tour="dashboard-ask"
+          >
             <MessageSquare className="size-4" aria-hidden />
             Ask PA Copilot
           </Link>
@@ -146,7 +150,10 @@ export default function DashboardPage() {
       {/* Four measurements, each read straight from the monitoring API.
           Nothing here is derived from a target the product does not
           have: there is no quota endpoint, so there is no "% of plan". */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        data-tour="dashboard-kpis"
+      >
         <KpiCard
           label="AI runs"
           help="Every assistant request answered in the last 30 days, across all users in your organization. Read from the same usage log that bills tokens."
@@ -215,7 +222,7 @@ export default function DashboardPage() {
       <CommandCenter />
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3" data-tour="dashboard-recent">
           <CardHeader className="border-b pb-4">
             <CardTitle className="text-card-title">Recent AI activity</CardTitle>
             <CardDescription>
@@ -269,7 +276,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2" data-tour="dashboard-connections">
           <CardHeader className="border-b pb-4">
             <CardTitle className="text-card-title">TM1 connections</CardTitle>
             <CardDescription>

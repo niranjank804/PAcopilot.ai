@@ -65,7 +65,7 @@ function DiffBlock({ label, before, after }: { label: string; before: string; af
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" data-tour="governance-diff">
       <p className="text-xs font-medium text-muted-foreground capitalize">{label}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
@@ -324,6 +324,7 @@ export default function DeploymentsPage() {
             size="sm"
             disabled={!activeConnectionId}
             onClick={() => setCreateOpen(true)}
+            data-tour="governance-new-change"
           >
             <Plus className="mr-2 h-4 w-4" />
             New Change
@@ -442,7 +443,7 @@ export default function DeploymentsPage() {
                 ) : null}
 
                 {selectedDetail.change.validation_errors?.length ? (
-                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm" data-tour="governance-validation">
                     <p className="font-medium text-destructive">
                       Validation errors — cannot be executed
                     </p>
@@ -456,7 +457,7 @@ export default function DeploymentsPage() {
                   </div>
                 ) : null}
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2" data-tour="governance-lifecycle">
                   <div>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">Lifecycle</p>
                     <ChangeLifecycle steps={selectedDetail.lifecycle ?? []} />
@@ -472,7 +473,7 @@ export default function DeploymentsPage() {
                 <ChangeDiff detail={selectedDetail} />
 
                 {/* A run's impact is its plan, shown above by RunPlan. */}
-                <div hidden={selectedDetail.change.change_type === "run_process"}>
+                <div hidden={selectedDetail.change.change_type === "run_process"} data-tour="governance-impact">
                   <p className="mb-1 text-xs font-medium text-muted-foreground">
                     Impact — what this change affects
                   </p>
@@ -482,7 +483,7 @@ export default function DeploymentsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={discussInChat}>
+                  <Button variant="outline" size="sm" onClick={discussInChat} data-tour="governance-discuss">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Discuss in AI Chat
                   </Button>

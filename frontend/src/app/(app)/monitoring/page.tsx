@@ -63,7 +63,7 @@ export default function MonitoringPage() {
 
       <AICostPanel />
 
-      <Card>
+      <Card data-tour="monitoring-usage">
         <CardHeader>
           <CardTitle>AI Usage by Model</CardTitle>
           <CardDescription>
@@ -110,7 +110,7 @@ export default function MonitoringPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="monitoring-tools">
         <CardHeader>
           <CardTitle>Tool Executions</CardTitle>
           <CardDescription>
@@ -177,7 +177,7 @@ export default function MonitoringPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="monitoring-breakers">
         <CardHeader>
           <CardTitle>TM1 Circuit Breakers</CardTitle>
           <CardDescription>
