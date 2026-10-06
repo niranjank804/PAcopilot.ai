@@ -253,3 +253,20 @@
     @apply text-[0.9375rem] leading-6 text-muted-foreground;
   }
 }
+
+/* Printing a work item document (Print / PDF): only the document. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: none;
+  }
+}

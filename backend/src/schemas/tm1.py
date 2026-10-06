@@ -244,6 +244,7 @@ class ChangeCreate(BaseModel):
         "delete_process",
         "run_process",
         "write_cells",
+        "create_view",
     ]
     target_name: str = Field(min_length=1, max_length=255)
     new_content: dict | None = None

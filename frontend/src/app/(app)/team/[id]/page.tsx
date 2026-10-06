@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Link2, MessageSquare, Rocket, Unlink } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Link2, MessageSquare, Rocket, Sparkles, Unlink } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { WorkItemDocuments } from "@/components/work-item-documents";
 import { WorkItemStatusBadge } from "@/components/work-item-status-badge";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import {
@@ -39,6 +40,7 @@ import {
   type TeamActivity,
   type WorkItemDetail,
   type WorkItemStatus,
+  workThisPbiPrompt,
 } from "@/lib/team";
 import { cn } from "@/lib/utils";
 
@@ -195,6 +197,15 @@ export default function WorkItemPage() {
             </p>
           </div>
           <div className="flex items-center gap-2" data-tour="work-item-status">
+            {item.kind !== "incident" ? (
+              <Link
+                href={`/chat?agent=ti&prompt=${encodeURIComponent(workThisPbiPrompt(item.reference))}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                data-tour="work-item-work-this"
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden /> Work this PBI
+              </Link>
+            ) : null}
             <WorkItemStatusBadge status={item.status} />
             <Select
               value={item.status}
@@ -249,6 +260,8 @@ export default function WorkItemPage() {
           />
         </div>
       ) : null}
+
+      <WorkItemDocuments workItemId={item.id} reference={item.reference} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card data-tour="work-item-findings">

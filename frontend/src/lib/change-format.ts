@@ -47,6 +47,7 @@ export const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   delete_process: "Delete process",
   run_process: "Run process",
   write_cells: "Write cell values",
+  create_view: "Create view",
 };
 
 // Maps the short keys used in TM1Change.new_content to the PascalCase field

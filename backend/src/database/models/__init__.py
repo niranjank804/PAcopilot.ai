@@ -35,7 +35,7 @@ from .tm1_object import TM1Object
 from .tm1_relationship import TM1Relationship
 from .user import User
 from .user_role import UserRole
-from .work_item import IncidentInvestigation, WorkItem, WorkItemLink
+from .work_item import IncidentInvestigation, WorkItem, WorkItemDocument, WorkItemLink
 from .monitor import MonitorAlert, MonitorRule
 
 __all__ = [

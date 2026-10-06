@@ -32,11 +32,15 @@ class TM1Change(BaseModel, OrganizationScoped):
         # Partial: one open draft per (connection, author, target).
         # Executed, rejected and superseded rows are excluded, so a
         # target can be re-proposed once the previous draft is resolved.
+        # A view's target is its cube, so the view name is part of the key:
+        # a PBI's evidence views ("- 1 Result", "- 2 Source") on one cube
+        # can all be open at once. Empty for every other change type.
         Index(
             "uq_tm1_changes_open_draft",
             "connection_id",
             "created_by",
             "target_name",
+            text("coalesce(new_content ->> 'view_name', '')"),
             unique=True,
             postgresql_where=text("status = 'draft'"),
         ),

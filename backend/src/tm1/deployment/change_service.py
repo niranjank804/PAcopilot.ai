@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -17,11 +18,24 @@ from src.database.models.tm1_change import TM1Change
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment import ti_analysis
-from src.tm1.exceptions import TM1NotFoundError, TM1OutcomeUnknownError
+from src.tm1.exceptions import (
+    TM1AuthenticationError,
+    TM1NotFoundError,
+    TM1OutcomeUnknownError,
+)
 from src.tm1.impact.analyzer import analyze_impact, needs_acknowledgement
 from src.tm1.metadata import dependency_analyzer, extractor
+from src.tm1.resilience import call_with_resilience
 from src.tm1.service import tm1_integration_service
-from src.tm1.services import cell_service, cube_service, log_service, process_service
+from src.tm1.services import (
+    cell_service,
+    cube_service,
+    log_service,
+    process_service,
+    structure_service,
+    view_service,
+)
+from src.tm1.services.mdx_table import execute_mdx_table
 from src.tm1.ti.parser import parse_process_code
 from src.tm1.ti.review import review
 
@@ -34,11 +48,23 @@ VALID_CHANGE_TYPES = (
     "delete_process",
     "run_process",
     "write_cells",
+    "create_view",
 )
 
 # Cells one write_cells change may set. A change is something a person
 # reads before approving; beyond this it is a data load, which is a process.
 MAX_CELL_WRITES = 200
+
+# A create_view draft runs its MDX to prove it works. Values are read only
+# when the view is this small; a bigger one is proven by TM1 counting it.
+VIEW_CHECK_CELLS = 500
+# Seconds the check may take: a view that cannot be counted in this long
+# is not one anyone will open.
+VIEW_CHECK_TIMEOUT = 30
+MAX_VIEW_NAME = 100
+# TM1 stores a public view as a .vue file named after it, so the
+# characters a file name cannot hold are refused, as TM1 itself does.
+_VIEW_NAME_FORBIDDEN = set('\\/:*?"<>|')
 
 # Characters of a failed run's error log kept on the change. Enough for
 # the lines that matter; the full file stays on the server.
@@ -409,6 +435,107 @@ async def _read_values(client, connection_id, cube: str, coordinates: list[list[
     return [cell["value"] for cell in result["cells"]]
 
 
+def _view_content(new_content: dict | None) -> tuple[str, str]:
+    """(view name, MDX) of a create_view change. Raises ValidationException
+    for a request with the wrong shape; what is wrong with the values is
+    left to the draft's checks."""
+
+    content = new_content if isinstance(new_content, dict) else {}
+    view_name, mdx = content.get("view_name"), content.get("mdx")
+    if not isinstance(view_name, str) or not isinstance(mdx, str):
+        raise ValidationException("create_view requires new_content.view_name and new_content.mdx.")
+    return view_name, mdx
+
+
+def _view_name_problems(view_name: str) -> list[str]:
+    if not view_name.strip():
+        return ["The view needs a name."]
+    problems = []
+    if len(view_name) > MAX_VIEW_NAME:
+        problems.append(f"A view name can be at most {MAX_VIEW_NAME} characters.")
+    forbidden = sorted({c for c in view_name if c in _VIEW_NAME_FORBIDDEN or ord(c) < 32})
+    if forbidden:
+        shown = " ".join(repr(c) for c in forbidden)
+        problems.append(f"TM1 does not allow these characters in a view name: {shown}.")
+    if view_name.startswith("}"):
+        problems.append("Names starting with '}' are reserved for TM1's control objects.")
+    if view_name != view_name.strip():
+        problems.append("The view name starts or ends with a space.")
+    return problems
+
+
+# A bracketed name (skipped whole, so a member called [Transfer From X]
+# is not read as a FROM clause) or the FROM keyword.
+_MDX_TOKEN = re.compile(r"\[(?:[^\]]|\]\])*\]|\bFROM\b", re.IGNORECASE)
+# What follows FROM: "[Cube]" (with "]]" for a "]" in the name) or "Cube".
+_MDX_FROM_TARGET = re.compile(r"\s*(?:\[((?:[^\]]|\]\])+)\]|([^\s\[\]()]+))")
+
+
+def _tm1_name(name: str) -> str:
+    # TM1 names ignore case and spaces.
+    return name.replace(" ", "").lower()
+
+
+def _mdx_cubes(mdx: str) -> list[str]:
+    """Every cube the MDX selects FROM. A sub-select has a FROM per level."""
+
+    cubes = []
+    for token in _MDX_TOKEN.finditer(mdx):
+        if token.group().startswith("["):
+            continue
+        target = _MDX_FROM_TARGET.match(mdx, token.end())
+        if target:
+            bracketed, bare = target.groups()
+            cubes.append(bracketed.replace("]]", "]") if bracketed else bare)
+    return cubes
+
+
+def _mdx_cube_problem(mdx: str, cube_name: str) -> str | None:
+    cubes = _mdx_cubes(mdx)
+    if not cubes:
+        return f"The MDX has no FROM [{cube_name}] clause."
+    others = sorted({c for c in cubes if _tm1_name(c) != _tm1_name(cube_name)})
+    if others:
+        return (
+            f"The MDX reads from {', '.join(others)}, not from '{cube_name}'. A view "
+            "belongs to one cube and must select from it."
+        )
+    return None
+
+
+def _mdx_text(mdx: str | None) -> str:
+    """MDX as compared after a save: whitespace does not change a query."""
+
+    return " ".join((mdx or "").split())
+
+
+async def _mdx_run_check(client, connection_id, mdx: str) -> tuple[str | None, str]:
+    """(problem, what happened) from running a view's MDX, read-only.
+
+    TM1 counts the cells first, which proves the query parses and runs
+    against the cube; a small result is also read. Unreachable server or
+    lost credentials are not the MDX's fault, so those still raise."""
+
+    try:
+        total = int(await call_with_resilience(
+            connection_id,
+            client.cubes.cells.execute_mdx_cellcount,
+            mdx,
+            timeout=VIEW_CHECK_TIMEOUT,
+            max_retries=0,
+        ))
+        if total > VIEW_CHECK_CELLS:
+            return None, f"TM1 ran it: {total:,} cells (too many to read in a check)"
+        table = await execute_mdx_table(
+            client, connection_id, mdx, timeout=VIEW_CHECK_TIMEOUT, max_retries=0
+        )
+    except (TM1OutcomeUnknownError, TM1AuthenticationError):
+        raise
+    except Exception as exc:  # noqa: BLE001 - recorded on the draft
+        return f"TM1 could not run the MDX: {getattr(exc, 'message', None) or exc}", "failed"
+    return None, f"TM1 ran it: {total:,} cells, {len(table['rows'])} with a value"
+
+
 def _check(name: str, status: str, detail: str, items: list | None = None) -> dict:
     entry = {"name": name, "status": status, "detail": detail}
     if items:
@@ -497,6 +624,17 @@ class ChangeService:
             change_type=change_type,
             target_name=target_name,
         )
+
+        if change_type == "create_view":
+            # The target is the cube; the view name is part of the open-draft
+            # key (uq_tm1_changes_open_draft). A draft of the same view is
+            # replaced as usual; drafts of other views on this cube are
+            # their own pending work and are left alone.
+            view_name = str((new_content or {}).get("view_name") or "")
+            open_drafts = [
+                draft for draft in open_drafts
+                if str((draft.new_content or {}).get("view_name") or "") == view_name
+            ]
 
         for draft in open_drafts:
             if (
@@ -705,6 +843,47 @@ class ChangeService:
             ]
             object_type = "cube"
 
+        elif change_type == "create_view":
+            view_name, mdx = _view_content(new_content)
+            # The cube must exist (raises TM1NotFoundError otherwise).
+            await cube_service.get_cube(client, connection.id, target_name)
+
+            view_problems = _view_name_problems(view_name)
+            if not view_problems and await view_service.view_exists(
+                client, connection.id, target_name, view_name
+            ):
+                # Never overwrite or modify a view someone already has.
+                view_problems.append(
+                    f"A public view named '{view_name}' already exists on '{target_name}'. "
+                    "Choose another name; an existing view is never replaced."
+                )
+
+            if not mdx.strip():
+                mdx_problem, mdx_detail = "The view needs MDX.", "no MDX given"
+            else:
+                mdx_problem = _mdx_cube_problem(mdx, target_name)
+                mdx_detail = "not run: it must select from this cube"
+                if mdx_problem is None:
+                    mdx_problem, mdx_detail = await _mdx_run_check(client, connection.id, mdx)
+
+            validation_errors = view_problems + ([mdx_problem] if mdx_problem else [])
+            checks = [
+                _check(
+                    "View",
+                    "fail" if view_problems else "pass",
+                    f"{len(view_problems)} problem(s)" if view_problems
+                    else f"a new public view '{view_name}' on '{target_name}'; no view of that name exists",
+                    view_problems,
+                ),
+                _check(
+                    "MDX runs",
+                    "fail" if mdx_problem else "pass",
+                    mdx_detail,
+                    [mdx_problem] if mdx_problem else None,
+                ),
+            ]
+            object_type = None
+
         else:  # delete_process
             exists = await process_service.process_exists(
                 client, connection.id, target_name
@@ -714,16 +893,26 @@ class ChangeService:
             object_type = "process"
 
         # A run's impact is its plan: parameter values and what it writes.
-        # Everything else uses the dependency graph.
-        impact = (
-            run_impact
-            if change_type == "run_process"
-            else await self._impact(
+        # A new view has no dependents. Everything else uses the dependency
+        # graph.
+        if change_type == "run_process":
+            impact = run_impact
+        elif change_type == "create_view":
+            impact = []
+        else:
+            impact = await self._impact(
                 db, connection.id, organization_id, object_type, target_name, change_type
             )
-        )
 
-        if change_type != "run_process":
+        if change_type == "create_view":
+            checks.append(_check("Impact", "info", "A new public view; nothing depends on it yet"))
+            checks.append(_check(
+                "Snapshot and rollback",
+                "info",
+                "Nothing existing is changed. Roll back deletes the view, and only "
+                "if it is unchanged since it was created",
+            ))
+        elif change_type != "run_process":
             checks.append(_impact_check(impact))
             checks.append(_check(
                 "Snapshot and rollback",
@@ -799,6 +988,18 @@ class ChangeService:
                         {"coordinates": c, "value": v} for c, v in zip(coordinates, values)
                     ]
                 }
+            elif change.change_type == "create_view":
+                view_name, _ = _view_content(change.new_content)
+                # None until it is created: the view is new.
+                current = (
+                    {"view": await structure_service.get_view(
+                        client, connection.id, change.target_name, view_name
+                    )}
+                    if await view_service.view_exists(
+                        client, connection.id, change.target_name, view_name
+                    )
+                    else None
+                )
             else:
                 current = {
                     "process": await process_service.get_process_body(
@@ -1169,6 +1370,50 @@ class ChangeService:
                 "applied": [_normal(v) for v in after],
             }
 
+        elif change.change_type == "create_view":
+            view_name, mdx = _view_content(change.new_content)
+            cube = change.target_name
+            # Checked when drafted, and again now: a view of this name made
+            # in between would be overwritten, and its rollback would then
+            # delete someone else's view.
+            if await view_service.view_exists(client, connection.id, cube, view_name):
+                raise ConflictException(
+                    f"A public view named '{view_name}' was created on '{cube}' after "
+                    "this draft was made. Nothing was changed; draft the view under "
+                    "another name."
+                )
+
+            change.previous_content = {"existed": False}
+            change.execution_result = {"view": view_name, "cube": cube, "private": False}
+
+            await view_service.create_mdx_view(client, connection.id, cube, view_name, mdx)
+
+            async def remove_view():
+                await view_service.delete_view(client, connection.id, cube, view_name)
+
+            try:
+                saved = await structure_service.get_view(client, connection.id, cube, view_name)
+            except Exception as exc:  # noqa: BLE001
+                await _restore_then_raise(remove_view, exc)
+
+            if saved.get("type") != "mdx" or _mdx_text(saved.get("mdx")) != _mdx_text(mdx):
+                await remove_view()
+                change.status = "failed"
+                change.validation_errors = [
+                    "The view TM1 saved does not hold the MDX that was approved."
+                ]
+                change.error_message = (
+                    "The view read back did not match the approved MDX; the view was deleted."
+                )
+                return await tm1_change_repository.update(db, change)
+
+            change.previous_content = {
+                "existed": False,
+                # What this change left there, so a rollback deletes the
+                # view only while it is still exactly this.
+                "applied": _mdx_text(saved.get("mdx")),
+            }
+
         else:  # delete_process
             base = await process_service.get_process_body(
                 client, connection.id, change.target_name
@@ -1318,6 +1563,28 @@ class ChangeService:
                     "was changed."
                 )
 
+        elif change.change_type == "create_view":
+            # Delete only the view this change created, exactly as it left
+            # it: a view edited or recreated since is someone else's work.
+            view_name, _ = _view_content(change.new_content)
+            label = f"{change.target_name}: {view_name}"
+            if not await view_service.view_exists(
+                client, connection.id, change.target_name, view_name
+            ):
+                raise ConflictException(
+                    f"The view '{label}' has been deleted since this change was "
+                    "applied; nothing was changed."
+                )
+            saved = await structure_service.get_view(
+                client, connection.id, change.target_name, view_name
+            )
+            if (
+                "applied" not in previous
+                or saved.get("type") != "mdx"
+                or _mdx_text(saved.get("mdx")) != previous["applied"]
+            ):
+                raise _changed_since(label)
+
         elif change.change_type == "delete_process":
             if await process_service.process_exists(client, connection.id, change.target_name):
                 raise ConflictException(
@@ -1352,6 +1619,12 @@ class ChangeService:
             await cell_service.write_cells(
                 client, connection.id, change.target_name, dimensions,
                 [(c["coordinates"], c["value"] if c["value"] is not None else 0) for c in saved],
+            )
+
+        elif change.change_type == "create_view":
+            await view_service.delete_view(
+                client, connection.id, change.target_name,
+                _view_content(change.new_content)[0],
             )
 
         elif change.change_type == "create_process":

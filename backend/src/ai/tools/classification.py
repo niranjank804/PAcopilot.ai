@@ -115,6 +115,11 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "propose_monitor": _c("governance", W, "Monitoring rule proposal for the user to turn on", DRAFT, "kind"),
     "investigate_incident": _c("diagnostics", R, "Changes, runs, model differences, rules and alerts near the reported object", ANALYSIS, "cube_name"),
     "get_work_item": _c("knowledge", R, "Team work item and its linked records", REFERENCE, "reference"),
+    # These three write PA-Copilot records only, never TM1, so they are not
+    # TM1 writes in this table's sense (which only propose_* tools may be).
+    "save_work_item": _c("knowledge", R, "Work item record (PA-Copilot only, not TM1)", DRAFT, "reference"),
+    "save_work_item_document": _c("knowledge", R, "Work item document (PA-Copilot only, not TM1)", DRAFT, "title"),
+    "link_change_to_work_item": _c("knowledge", R, "Work item link (PA-Copilot only, not TM1)", DRAFT, "reference"),
     "propose_engineering_memory": _c("knowledge", W, "Memory proposal for human approval", DRAFT, "object_name"),
     "get_model_health": _c("governance", R, "Scored health scans (rule parser + TI review at scan time)", ANALYSIS),
     "get_performance_report": _c("diagnostics", R, "Process run history from TM1's message log", LIVE),
@@ -154,6 +159,7 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     # --- Change management (drafts only) ---
     "propose_rule_update": _c("change_management", W, "Draft for human review", DRAFT, "cube_name"),
     "propose_cell_write": _c("change_management", W, "Cell write draft for human review", DRAFT, "cube_name"),
+    "propose_view": _c("change_management", W, "View draft for human review", DRAFT, "cube_name"),
     "propose_process_update": _c("change_management", W, "Draft for human review", DRAFT, "process_name"),
     "propose_process_copy": _c("change_management", W, "Draft for human review", DRAFT, "source_process", "new_process_name"),
     # --- Execution (drafts only) ---

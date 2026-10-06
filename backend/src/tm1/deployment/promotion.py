@@ -50,6 +50,12 @@ async def promote(
 ) -> TM1Change:
     """Draft `source` on the next environment's connection."""
 
+    if source.change_type == "create_view":
+        raise ValidationException(
+            "A new view is not promoted: views made for review or evidence belong "
+            "to the server they were made on. Propose it on the target connection "
+            "instead."
+        )
     if source.change_type not in PROMOTABLE:
         raise ValidationException(
             "A process run or a cell write is not promoted: it acts on one "
@@ -125,6 +131,12 @@ def _rollback_plan(change: TM1Change, connection_name: str) -> str:
         return (
             f"The process is saved before it is deleted; Roll back restores it on "
             f"{connection_name}, unless a process of that name exists again."
+        )
+    if change.change_type == "create_view":
+        view_name = (change.new_content or {}).get("view_name")
+        return (
+            f"Roll back deletes the new view '{view_name}' on '{change.target_name}' "
+            f"from {connection_name}, and refuses if the view has been changed since."
         )
     if change.change_type == "write_cells":
         return (

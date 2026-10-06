@@ -93,6 +93,8 @@ export function PromotionPanel({
     change.status === "executed" &&
     !change.rolled_back_at &&
     change.change_type !== "run_process" &&
+    // A new view stays on the server it was made for (see promotion.py).
+    change.change_type !== "create_view" &&
     Boolean(next);
 
   const promote = useMutation({

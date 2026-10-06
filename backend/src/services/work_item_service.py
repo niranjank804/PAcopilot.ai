@@ -98,7 +98,7 @@ class WorkItemService:
             organization_id=organization_id,
             reference=reference,
             title=self._text(title, "title", 255, required=True),
-            description=self._text(description, "description", 10_000),
+            description=self._text(description, "description", 50_000),
             status="open",
             created_by=user_id,
         )
@@ -141,7 +141,7 @@ class WorkItemService:
         return list((await db.execute(statement)).scalars())
 
     async def update(self, db: AsyncSession, item: WorkItem, user_id: uuid.UUID, changes: dict) -> WorkItem:
-        limits = {"title": 255, "description": 10_000, "root_cause": 10_000, "resolution": 10_000}
+        limits = {"title": 255, "description": 50_000, "root_cause": 10_000, "resolution": 10_000}
         old, new = {}, {}
         for field, value in changes.items():
             if field not in EDITABLE:
@@ -346,6 +346,20 @@ class WorkItemService:
                               detail=step["detail"] or where, actor=actor, link_id=link.id)
             linked.append(entry)
 
+        # Documents the work has produced (a PBI's clarification, tests and
+        # delivery), shown on the timeline and as progress.
+        from src.database.models.work_item import WorkItemDocument
+
+        documents = list((await db.execute(
+            select(WorkItemDocument).where(WorkItemDocument.work_item_id == item.id)
+        )).scalars())
+        for document in documents:
+            actors.add(document.updated_by)
+            event(document.updated_at, "document",
+                  f"{'Drafted' if document.drafted_by_assistant else 'Written'}: {document.title}",
+                  detail=f"version {document.version}", actor=document.updated_by)
+        kinds = {d.kind for d in documents}
+
         executed = [c for c in visible_changes if c.status in ("executed", "rolled_back")]
         progress = [
             {"key": "investigation", "label": "Investigation", "done": conversations > 0},
@@ -356,6 +370,13 @@ class WorkItemService:
             {"key": "verification", "label": "Verified", "done": any(
                 c.status == "executed" for c in visible_changes) and item.status in ("resolved", "closed")},
         ]
+        if kinds:
+            progress[1:1] = [{"key": "clarified", "label": "Requirements clarified",
+                              "done": bool(kinds & {"requirements", "clarification_email"})}]
+            progress += [
+                {"key": "tested", "label": "Tested", "done": "test_results" in kinds},
+                {"key": "delivered", "label": "Delivery documented", "done": "delivery" in kinds},
+            ]
 
         names = await user_names(db, actors | {e.get("owner_id") for e in linked})
         for e in events:

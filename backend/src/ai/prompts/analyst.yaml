@@ -46,10 +46,14 @@ system_prompt: >-
 tool_names:
   - search_engineering_memory
   - get_work_item
+  - save_work_item
+  - save_work_item_document
+  - link_change_to_work_item
   - investigate_incident
   - get_monitor_alerts
   - propose_monitor
   - propose_cell_write
+  - propose_view
   - propose_engineering_memory
   - analyze_change_impact
   - list_cubes

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -94,3 +94,32 @@ class WorkItemLink(BaseModel, OrganizationScoped):
     linked_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+
+
+class WorkItemDocument(BaseModel, OrganizationScoped):
+    """A document written for a work item: the clarification email, design
+    notes, test plan, test results, delivery document, completion email.
+
+    Markdown, written by a person or drafted by the assistant, kept with the
+    work item and downloadable as Markdown or Word. One row per title;
+    saving it again replaces the text and raises the version.
+    """
+
+    __tablename__ = "work_item_documents"
+    __table_args__ = (UniqueConstraint("work_item_id", "title", name="uq_work_item_documents_title"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    work_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("work_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Who last saved it, and whether that was the assistant on their behalf.
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    drafted_by_assistant: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -724,7 +724,17 @@ export const FEATURE_TOURS: Record<string, TourStep[]> = {
     {
       target: "work-item-progress",
       title: "Progress",
-      body: "The checklist of steps this work item has completed so far, worked out from its linked records.",
+      body: "The checklist of steps this work item has completed so far, worked out from its linked records and documents.",
+    },
+    {
+      target: "work-item-work-this",
+      title: "Work this PBI",
+      body: "Opens the TI agent with a step-by-step brief: list what the PBI leaves open and draft the clarification email, follow your house template from the Knowledge Base, draft and compile the code, plan the tests, and write the delivery documents. Every change to TM1 stays a draft for you to approve; nothing is sent.",
+    },
+    {
+      target: "work-item-documents",
+      title: "Documents",
+      body: "What the work has produced — clarification email, design, test plan and results, delivery document. Open one to read it, edit it, download it as Word or Markdown, or print it to PDF. Saving a title again keeps the version count.",
     },
     {
       target: "work-item-investigation",

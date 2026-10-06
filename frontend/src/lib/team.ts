@@ -147,3 +147,27 @@ export function changeHref(connectionId: string, changeId: string): string {
 export function when(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
+
+/** What "Work this PBI" asks the TI agent to do, in order. Every step that
+ * changes TM1 stays a draft for a person to approve. */
+export function workThisPbiPrompt(reference: string): string {
+  return [
+    `Work ${reference} with me, step by step.`,
+    "1) Read it with get_work_item. List what it does not say (objects, coordinates, periods, versions, signs, " +
+      "scope, edge cases) with a recommended default for each, and save a clarification email draft on the work " +
+      "item (save_work_item_document, kind clarification_email). It is a draft; nothing is sent.",
+    "2) Search the Knowledge Base and Engineering Memory for our TI house template and reference processes, and " +
+      "say which you will follow. If there is none, say so and use the closest existing processes on the server " +
+      "as the pattern.",
+    "3) Read the current state of every object the change touches and save it as evidence.",
+    "4) Draft the code to that pattern, compile it on the server without saving, then propose it as a change and " +
+      "link the change to the work item.",
+    "5) Save a test plan. Propose any test data as cell writes on empty leaf cells only, and a test run, for me " +
+      "to approve.",
+    `6) After I deploy and run it, read the results back from the cube, save the test results and evidence, ` +
+      `propose public views named '${reference} - 1 ...', '${reference} - 2 ...' for the result, source and ` +
+      "drivers, and save the delivery document and completion email.",
+    "Stop and ask me whenever a decision is mine, and never say something was run or verified unless you read " +
+      "it back.",
+  ].join("\n");
+}

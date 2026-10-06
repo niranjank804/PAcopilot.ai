@@ -597,3 +597,77 @@ class ProposeCellWriteTool(Tool):
                 "ai_generated": True,
             },
         )
+
+
+class ProposeViewTool(Tool):
+
+    name = "propose_view"
+    description = (
+        "Propose a new PUBLIC MDX view on a cube as a DRAFT change for human "
+        "review — for example the evidence view for a work item, named like "
+        "'PBI1234 - 1 Result'. The MDX must select FROM that cube; the draft "
+        "runs it read-only to prove it works. A view that already exists is "
+        "never overwritten or changed: pick a new name. You cannot create "
+        "views — a person with deploy rights applies the draft, and Roll "
+        "back deletes the view (only while it is unchanged)."
+    )
+    required_permission = "tm1.write"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": {
+                "type": "string",
+                "description": "The ID of the TM1 connection.",
+            },
+            "cube_name": {
+                "type": "string",
+                "description": "The cube the view belongs to.",
+            },
+            "view_name": {
+                "type": "string",
+                "description": "Name of the new public view, at most 100 characters.",
+            },
+            "mdx": {
+                "type": "string",
+                "description": "The view's MDX: SELECT ... ON 0, ... ON 1 FROM [cube] WHERE ...",
+            },
+            "rationale": {
+                "type": "string",
+                "description": "What the view is for, for the approver.",
+            },
+        },
+        "required": ["connection_id", "cube_name", "view_name", "mdx", "rationale"],
+    }
+
+    async def execute(
+        self,
+        db: AsyncSession,
+        *,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID,
+        **kwargs,
+    ) -> str:
+
+        if not await auth_repository.user_has_permission(
+            db, user_id, self.required_permission
+        ):
+            raise PermissionDeniedException(
+                "You do not have permission to draft TM1 changes."
+            )
+
+        # MDX is not marked AI GENERATED: the view stores it as-is, and the
+        # draft records where it came from.
+        return await _create_draft(
+            db,
+            organization_id=organization_id,
+            user_id=user_id,
+            connection_id=kwargs["connection_id"],
+            change_type="create_view",
+            target_name=str(kwargs["cube_name"]),
+            new_content={
+                "view_name": str(kwargs.get("view_name") or ""),
+                "mdx": str(kwargs.get("mdx") or ""),
+                "rationale": str(kwargs.get("rationale") or "")[:2000],
+                "ai_generated": True,
+            },
+        )

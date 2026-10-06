@@ -396,6 +396,7 @@ const TOOL_PROMPTS: Record<string, string> = {
   propose_process_copy:
     "Create a copy of the [process name] process named [new process name].",
   propose_cell_write: "In the [cube name] cube, set [element, element, ...] to [value] because ",
+  propose_view: "Draft a public view named [view name] on the [cube name] cube showing ",
 };
 
 function toolPrompt(tool: string): string {
@@ -445,6 +446,7 @@ const NAME_ARG_KEYS = [
 const DRAFT_TOOL_NAMES = new Set([
   "propose_rule_update",
   "propose_cell_write",
+  "propose_view",
   "propose_process_update",
   "propose_process_copy",
   "propose_process_run",

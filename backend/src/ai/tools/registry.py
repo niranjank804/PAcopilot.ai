@@ -16,10 +16,16 @@ from src.ai.tools.tm1.changes import (
     ProposeProcessRunTool,
     ProposeProcessUpdateTool,
     ProposeCellWriteTool,
+    ProposeViewTool,
     ProposeRuleUpdateTool,
 )
 from src.ai.tools.memory import ProposeEngineeringMemoryTool, SearchEngineeringMemoryTool
-from src.ai.tools.work_items import GetWorkItemTool
+from src.ai.tools.work_items import (
+    GetWorkItemTool,
+    LinkWorkItemChangeTool,
+    SaveWorkItemDocumentTool,
+    SaveWorkItemTool,
+)
 from src.ai.tools.incidents import InvestigateIncidentTool
 from src.ai.tools.monitors import GetMonitorAlertsTool, ProposeMonitorTool
 from src.ai.tools.tm1.intelligence import GetModelHealthTool, GetPerformanceReportTool
@@ -129,6 +135,9 @@ TOOLS: dict[str, Tool] = {
         SearchEngineeringMemoryTool(),
         ProposeEngineeringMemoryTool(),
         GetWorkItemTool(),
+        SaveWorkItemTool(),
+        SaveWorkItemDocumentTool(),
+        LinkWorkItemChangeTool(),
         InvestigateIncidentTool(),
         GetMonitorAlertsTool(),
         ProposeMonitorTool(),
@@ -148,6 +157,7 @@ TOOLS: dict[str, Tool] = {
         AnalyzeChangeImpactTool(),
         ProposeRuleUpdateTool(),
         ProposeCellWriteTool(),
+        ProposeViewTool(),
         ProposeProcessUpdateTool(),
         ProposeProcessCopyTool(),
         ProposeProcessRunTool(),

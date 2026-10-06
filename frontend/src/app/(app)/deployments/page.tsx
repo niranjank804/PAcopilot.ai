@@ -45,6 +45,7 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { RunPlan } from "@/components/run-plan";
+import { ViewChange } from "@/components/view-change";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
 import { CHANGE_TYPE_LABEL, PROCESS_FIELD_MAP, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
@@ -112,6 +113,24 @@ function ChangeDiff({ detail }: { detail: TM1ChangeDetail }) {
         current={(preview.current as { cells?: { coordinates: string[]; value: number | string | null }[] } | null)?.cells}
         proposed={proposed.cells ?? []}
         reason={proposed.reason}
+      />
+    );
+  }
+
+  if (change.change_type === "create_view") {
+    const proposed = (change.new_content ?? {}) as {
+      view_name?: string;
+      mdx?: string;
+      rationale?: string;
+    };
+    const current = preview.current as { view?: { mdx?: string | null } } | null;
+    return (
+      <ViewChange
+        cube={change.target_name}
+        viewName={proposed.view_name ?? ""}
+        mdx={proposed.mdx ?? ""}
+        rationale={proposed.rationale}
+        currentMdx={current?.view ? (current.view.mdx ?? "") : null}
       />
     );
   }

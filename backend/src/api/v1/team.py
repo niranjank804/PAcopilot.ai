@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,9 @@ from src.schemas.ai import SharedConversationSummary
 from src.schemas.auth import UserResponse
 from src.schemas.response import ApiResponse
 from src.services.incident_service import incident_service
+from src.services.markdown_docx import markdown_to_docx
+from src.services.work_item_document_service import KINDS as DOCUMENT_KINDS
+from src.services.work_item_document_service import work_item_document_service
 from src.services.work_item_service import user_names, work_item_service
 from src.tm1.service import tm1_integration_service
 
@@ -38,12 +41,12 @@ Status = Literal["open", "in_progress", "resolved", "closed"]
 class WorkItemCreate(BaseModel):
     reference: str = Field(min_length=1, max_length=50)
     title: str = Field(min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=10_000)
+    description: str | None = Field(default=None, max_length=50_000)
 
 
 class WorkItemUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=10_000)
+    description: str | None = Field(default=None, max_length=50_000)
     status: Status | None = None
     root_cause: str | None = Field(default=None, max_length=10_000)
     resolution: str | None = Field(default=None, max_length=10_000)
@@ -406,4 +409,111 @@ async def team_activity(
             changes=changes,
             health=health,
         ),
+    )
+
+
+# ------------------------------------------------------------ documents
+
+
+class DocumentSave(BaseModel):
+    kind: Literal[DOCUMENT_KINDS] = "notes"  # type: ignore[valid-type]
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=200_000)
+
+
+class DocumentSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    kind: str
+    title: str
+    version: int
+    drafted_by_assistant: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentResponse(DocumentSummary):
+    content: str
+
+
+@router.get("/work-items/{work_item_id}/documents", response_model=ApiResponse[list[DocumentSummary]])
+async def list_documents(
+    work_item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("ai.chat")),
+):
+    item = await work_item_service.get(db, work_item_id, current_user.organization_id)
+    documents = await work_item_document_service.list(db, item)
+    return ApiResponse(success=True, data=[DocumentSummary.model_validate(d) for d in documents])
+
+
+@router.post("/work-items/{work_item_id}/documents", response_model=ApiResponse[DocumentResponse], status_code=201)
+async def save_document(
+    work_item_id: uuid.UUID,
+    body: DocumentSave,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("ai.chat")),
+):
+    """Create a document, or replace the one with this title (its version rises)."""
+
+    item = await work_item_service.get(db, work_item_id, current_user.organization_id)
+    document = await work_item_document_service.save(
+        db, item, current_user.id, kind=body.kind, title=body.title, content=body.content,
+    )
+    return ApiResponse(success=True, data=DocumentResponse.model_validate(document))
+
+
+@router.get("/work-items/{work_item_id}/documents/{document_id}", response_model=ApiResponse[DocumentResponse])
+async def get_document(
+    work_item_id: uuid.UUID,
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("ai.chat")),
+):
+    item = await work_item_service.get(db, work_item_id, current_user.organization_id)
+    document = await work_item_document_service.get(db, item, document_id)
+    return ApiResponse(success=True, data=DocumentResponse.model_validate(document))
+
+
+@router.delete("/work-items/{work_item_id}/documents/{document_id}", response_model=ApiResponse[dict])
+async def delete_document(
+    work_item_id: uuid.UUID,
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("ai.chat")),
+):
+    item = await work_item_service.get(db, work_item_id, current_user.organization_id)
+    await work_item_document_service.delete(db, item, document_id, current_user.id)
+    return ApiResponse(success=True, data={"deleted": True})
+
+
+def _file_name(reference: str, title: str, extension: str) -> str:
+    stem = "".join(ch if ch.isalnum() or ch in " -_." else "_" for ch in f"{reference} - {title}").strip()
+    return f"{stem[:120] or 'document'}.{extension}"
+
+
+@router.get("/work-items/{work_item_id}/documents/{document_id}/download")
+async def download_document(
+    work_item_id: uuid.UUID,
+    document_id: uuid.UUID,
+    format: Literal["md", "docx"] = "docx",
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(require_permission("ai.chat")),
+):
+    """The document as Markdown or as a styled Word file. Test results are
+    landscape, so their wide tables fit."""
+
+    item = await work_item_service.get(db, work_item_id, current_user.organization_id)
+    document = await work_item_document_service.get(db, item, document_id)
+    name = _file_name(item.reference, document.title, format)
+    if format == "md":
+        body, media = document.content.encode("utf-8"), "text/markdown; charset=utf-8"
+    else:
+        body = markdown_to_docx(document.title, document.content, landscape=document.kind == "test_results")
+        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return Response(
+        content=body,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
