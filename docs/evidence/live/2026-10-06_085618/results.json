@@ -1,0 +1,194 @@
+[
+  {
+    "test": "test_answer_accuracy",
+    "file": "test_answer_accuracy.py",
+    "outcome": "SKIPPED",
+    "seconds": 0.0,
+    "reason": "ACCURACY_EVAL=1 and LIVE_AI=1 not both set \u2014 the accuracy run costs provider money",
+    "properties": {}
+  },
+  {
+    "test": "test_test_connection_succeeds_with_real_credentials",
+    "file": "test_connection.py",
+    "outcome": "FAILED",
+    "seconds": 2.05,
+    "reason": "AssertionError: assertion: product behaviour differed from the expectation",
+    "properties": {}
+  },
+  {
+    "test": "test_test_connection_fails_with_wrong_password",
+    "file": "test_connection.py",
+    "outcome": "PASSED",
+    "seconds": 2.13,
+    "reason": null,
+    "properties": {}
+  },
+  {
+    "test": "test_extract_metadata_completes_within_generous_ceiling",
+    "file": "test_dependencies.py",
+    "outcome": "FAILED",
+    "seconds": 2.05,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_dependency_traversal_is_internally_consistent",
+    "file": "test_dependencies.py",
+    "outcome": "FAILED",
+    "seconds": 2.09,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_process_definition_lifecycle",
+    "file": "test_governed_writes.py",
+    "outcome": "BLOCKED",
+    "seconds": 0.0,
+    "reason": "BLOCKED: no operator inventory of approved DEV/test servers",
+    "properties": {}
+  },
+  {
+    "test": "test_process_execution_and_a_safe_failure",
+    "file": "test_governed_writes.py",
+    "outcome": "BLOCKED",
+    "seconds": 0.0,
+    "reason": "BLOCKED: no operator inventory of approved DEV/test servers",
+    "properties": {}
+  },
+  {
+    "test": "test_compile_without_save",
+    "file": "test_governed_writes.py",
+    "outcome": "BLOCKED",
+    "seconds": 0.0,
+    "reason": "BLOCKED: no operator inventory of approved DEV/test servers",
+    "properties": {}
+  },
+  {
+    "test": "test_cell_writes_refusals_drift_and_rollback",
+    "file": "test_governed_writes.py",
+    "outcome": "BLOCKED",
+    "seconds": 0.0,
+    "reason": "BLOCKED: no operator inventory of approved DEV/test servers",
+    "properties": {}
+  },
+  {
+    "test": "test_rules_apply_check_refuse_and_roll_back",
+    "file": "test_governed_writes.py",
+    "outcome": "BLOCKED",
+    "seconds": 0.0,
+    "reason": "BLOCKED: no operator inventory of approved DEV/test servers",
+    "properties": {}
+  },
+  {
+    "test": "test_list_cubes_returns_real_cube_names",
+    "file": "test_metadata.py",
+    "outcome": "FAILED",
+    "seconds": 2.08,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_get_cube_returns_real_shape",
+    "file": "test_metadata.py",
+    "outcome": "FAILED",
+    "seconds": 2.06,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_list_dimensions_returns_real_dimension_names",
+    "file": "test_metadata.py",
+    "outcome": "FAILED",
+    "seconds": 2.07,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_get_dimension_returns_real_shape",
+    "file": "test_metadata.py",
+    "outcome": "FAILED",
+    "seconds": 2.08,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_every_cube_dimension_is_a_real_dimension",
+    "file": "test_metadata.py",
+    "outcome": "FAILED",
+    "seconds": 2.06,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_circuit_breaker_reads_closed_after_real_success",
+    "file": "test_monitoring.py",
+    "outcome": "FAILED",
+    "seconds": 2.06,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_usage_summary_endpoint_does_not_error_against_real_data",
+    "file": "test_monitoring.py",
+    "outcome": "PASSED",
+    "seconds": 0.01,
+    "reason": null,
+    "properties": {}
+  },
+  {
+    "test": "test_list_processes_returns_real_process_names",
+    "file": "test_processes.py",
+    "outcome": "FAILED",
+    "seconds": 2.07,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_get_process_returns_real_shape",
+    "file": "test_processes.py",
+    "outcome": "FAILED",
+    "seconds": 2.06,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_datasource_types_seen_across_real_processes",
+    "file": "test_processes.py",
+    "outcome": "FAILED",
+    "seconds": 2.07,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_get_cube_rules_does_not_error_on_real_cubes_with_rules",
+    "file": "test_rules.py",
+    "outcome": "FAILED",
+    "seconds": 2.03,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_reference_parser_against_a_known_real_rule_cube",
+    "file": "test_rules.py",
+    "outcome": "SKIPPED",
+    "seconds": 0.0,
+    "reason": "TM1_TEST_CUBE_WITH_RULES not set \u2014 skipping the reference-parser deep check (see docs/live_validation/CHECKLIST.md).",
+    "properties": {}
+  },
+  {
+    "test": "test_list_security_groups_returns_real_group_names",
+    "file": "test_security.py",
+    "outcome": "FAILED",
+    "seconds": 2.05,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  },
+  {
+    "test": "test_get_security_group_returns_real_shape",
+    "file": "test_security.py",
+    "outcome": "FAILED",
+    "seconds": 2.04,
+    "reason": "TM1AuthenticationError: environment/authentication: TM1 rejected the credentials",
+    "properties": {}
+  }
+]
