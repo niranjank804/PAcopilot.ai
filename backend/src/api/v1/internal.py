@@ -13,6 +13,7 @@ from fastapi import APIRouter, Request
 from src.core.config import settings
 from src.core.exceptions import AuthenticationException
 from src.reports.tasks import reap_stale_executions
+from src.services.request_log_service import purge_old_request_logs
 from src.schemas.response import ApiResponse
 from src.services.monitoring_rules_service import run_due_monitors
 from src.tm1.health.score import scan_due_connections
@@ -33,13 +34,15 @@ def _require_cron_secret(request: Request) -> None:
 
 @router.get("/reap-executions", response_model=ApiResponse[dict])
 async def reap_executions(request: Request):
-    """Reclaim report executions whose worker stopped heartbeating."""
+    """Reclaim report executions whose worker stopped heartbeating, and
+    drop request-log rows past their retention (the daily housekeeping)."""
 
     _require_cron_secret(request)
 
     reaped = await reap_stale_executions()
+    purged = await purge_old_request_logs()
 
-    return ApiResponse(success=True, data={"reaped": reaped})
+    return ApiResponse(success=True, data={"reaped": reaped, "request_logs_purged": purged})
 
 
 @router.get("/refresh-metadata", response_model=ApiResponse[dict])

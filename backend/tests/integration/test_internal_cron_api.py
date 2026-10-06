@@ -43,7 +43,7 @@ async def test_cron_reaps_with_the_right_secret(client, cron_secret):
     body = response.json()
     assert body["success"] is True
     # Nothing is stale in a fresh test database; the shape is the point.
-    assert body["data"] == {"reaped": 0}
+    assert body["data"] == {"reaped": 0, "request_logs_purged": 0}
 
 
 def test_scheduler_runs_in_process_by_default():

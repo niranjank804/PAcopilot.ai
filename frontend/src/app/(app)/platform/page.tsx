@@ -31,6 +31,7 @@ import {
   type PlatformConnection,
   type PlatformOverview,
   type PlatformUser,
+  type RequestRow,
   type SignIn,
   type UserActivity,
 } from "@/lib/platform";
@@ -78,6 +79,11 @@ export default function PlatformPage() {
   const signIns = useQuery({
     queryKey: ["platform-sign-ins"],
     queryFn: () => apiRequest<SignIn[]>("/admin/platform/sign-ins?limit=300"),
+    retry: false,
+  });
+  const requests = useQuery({
+    queryKey: ["platform-requests"],
+    queryFn: () => apiRequest<RequestRow[]>("/admin/platform/requests?limit=500"),
     retry: false,
   });
   const audit = useQuery({
@@ -137,6 +143,7 @@ export default function PlatformPage() {
     ["Active in 24 h", o?.active_users_24h],
     ["Sign-ins in 24 h", o?.sign_ins_24h, o ? `${o.failed_sign_ins_24h} failed` : undefined],
     ["TM1 connections", o?.connections, o ? `${o.suspended_connections} suspended` : undefined],
+    ["API requests in 24 h", o?.api_requests_24h, o ? `${o.failed_api_requests_24h} failed` : undefined],
     ["AI requests in 24 h", o?.ai_requests_24h, o ? `$${o.ai_cost_24h.toFixed(2)}` : undefined],
   ];
 
@@ -151,7 +158,7 @@ export default function PlatformPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-tour="platform-overview">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7" data-tour="platform-overview">
         {tiles.map(([label, value, sub]) => (
           <Card key={label}>
             <CardContent className="p-4">
@@ -179,6 +186,7 @@ export default function PlatformPage() {
           <TabsTrigger value="connections">TM1 connections</TabsTrigger>
           <TabsTrigger value="sign-ins">Sign-ins</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
+          <TabsTrigger value="requests">All requests</TabsTrigger>
         </TabsList>
 
         <TabsContent value="people">
@@ -494,6 +502,26 @@ export default function PlatformPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="requests">
+          <Card data-tour="platform-requests">
+            <CardHeader>
+              <CardDescription>
+                Every API request people made, newest first (last 500): what was asked, how it
+                ended and how long it took. Request contents are never stored. Kept for 90 days.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <RequestTable
+                rows={(requests.data ?? []).filter((r) =>
+                  !needle || [r.path, r.user?.email ?? "", r.organization ?? "", r.ip_address ?? "", String(r.status_code)]
+                    .some((v) => v.toLowerCase().includes(needle)),
+                )}
+                showWho
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={pending !== null} onOpenChange={(open) => { if (!open) { setPending(null); setReason(""); } }}>
@@ -576,6 +604,8 @@ function ActivityDialog({ person, onClose }: { person: PlatformUser | null; onCl
                 ))}
               </TableBody>
             </Table>
+            <h3 className="pt-2 text-sm font-semibold">Every request</h3>
+            <RequestTable rows={activity.data.requests} />
             <h3 className="pt-2 text-sm font-semibold">Sign-ins</h3>
             <Table>
               <TableBody>
@@ -596,5 +626,51 @@ function ActivityDialog({ person, onClose }: { person: PlatformUser | null; onCl
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RequestTable({ rows, showWho = false }: { rows: RequestRow[]; showWho?: boolean }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>When</TableHead>
+          {showWho ? <TableHead>Who</TableHead> : null}
+          <TableHead>Request</TableHead>
+          <TableHead>Server</TableHead>
+          <TableHead>Result</TableHead>
+          <TableHead className="text-right">Time</TableHead>
+          <TableHead>Address</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={showWho ? 7 : 6} className="text-muted-foreground">Nothing recorded yet.</TableCell>
+          </TableRow>
+        ) : rows.map((r) => (
+          <TableRow key={r.id}>
+            <TableCell>{when(r.at)}</TableCell>
+            {showWho ? (
+              <TableCell>
+                <div>{r.user?.name ?? "not signed in"}</div>
+                <div className="text-xs text-muted-foreground">{r.organization ?? ""}</div>
+              </TableCell>
+            ) : null}
+            <TableCell className="max-w-md truncate font-mono text-xs" title={r.path}>
+              <span className="font-semibold">{r.method}</span> {r.path}
+            </TableCell>
+            <TableCell className="text-xs">{r.connection?.name ?? "—"}</TableCell>
+            <TableCell>
+              <Badge variant={r.status_code >= 500 ? "destructive" : r.status_code >= 400 ? "warning" : "success"}>
+                {r.status_code}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-xs">{r.duration_ms} ms</TableCell>
+            <TableCell className="font-mono text-xs">{r.ip_address ?? "—"}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

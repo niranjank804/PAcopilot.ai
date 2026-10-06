@@ -535,6 +535,9 @@ class Settings(BaseSettings):
     # Shared secret Vercel sends as "Authorization: Bearer ..." on cron
     # invocations. Unset means the cron endpoints answer 401 to everyone.
     CRON_SECRET: str | None = None
+    # How long every API request a person made is kept (request_logs).
+    # Purged by the daily cron; the audit log is not affected.
+    REQUEST_LOG_RETENTION_DAYS: int = 90
 
     # ------------------------------------------------------------------
     # Tenancy

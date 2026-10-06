@@ -25,6 +25,7 @@ from src.database.models.ai_tool_execution import AIToolExecution
 from src.database.models.ai_usage import AIUsage
 from src.database.models.audit_log import AuditLog
 from src.database.models.organization import Organization
+from src.database.models.request_log import RequestLog
 from src.database.models.sign_in_event import SignInEvent
 from src.database.models.tm1_connection import TM1Connection
 from src.database.models.tm1_gateway import TM1Gateway
@@ -121,6 +122,9 @@ async def overview(
             "connections": await count(select(func.count(TM1Connection.id))),
             "suspended_connections": await count(select(func.count(TM1Connection.id)).where(
                 TM1Connection.suspended_at.is_not(None))),
+            "api_requests_24h": await count(select(func.count(RequestLog.id)).where(RequestLog.created_at >= day)),
+            "failed_api_requests_24h": await count(select(func.count(RequestLog.id)).where(
+                RequestLog.created_at >= day, RequestLog.status_code >= 400)),
             "ai_requests_24h": await count(select(func.count(AIUsage.id)).where(AIUsage.created_at >= day)),
             "ai_cost_24h": float(await count(select(func.coalesce(func.sum(AIUsage.estimated_cost_usd), 0))
                                              .where(AIUsage.created_at >= day)) or 0),
@@ -263,6 +267,10 @@ async def user_activity(
             select(AIToolExecution).where(AIToolExecution.user_id == user_id, AIToolExecution.created_at >= since)
             .order_by(AIToolExecution.created_at.desc()).limit(MAX_ROWS)
         )).scalars().all()
+        requests = (await db.execute(
+            select(RequestLog).where(RequestLog.user_id == user_id, RequestLog.created_at >= since)
+            .order_by(RequestLog.created_at.desc()).limit(MAX_ROWS)
+        )).scalars().all()
         sign_ins = (await db.execute(
             select(SignInEvent).where(
                 or_(SignInEvent.user_id == user_id, SignInEvent.identifier.in_((user.email, user.username))),
@@ -271,6 +279,7 @@ async def user_activity(
         )).scalars().all()
 
         connection_ids = {a.entity_id for a in audits if a.entity == "TM1Connection" and a.entity_id}
+        connection_ids |= {r.connection_id for r in requests if r.connection_id}
         for t in tools:
             try:
                 connection_ids.add(uuid.UUID(str((t.arguments or {}).get("connection_id"))))
@@ -316,8 +325,59 @@ async def user_activity(
         "user": {**_person(user), "is_active": user.is_active},
         "days": days,
         "events": events[:MAX_ROWS],
+        "requests": [
+            {**_request_row(r), "connection": connection_of(r.connection_id) if r.connection_id else None}
+            for r in requests
+        ],
         "sign_ins": [_sign_in_row(s) for s in sign_ins],
     })
+
+
+def _request_row(r: RequestLog, user: User | None = None, organization: str | None = None) -> dict:
+    return {
+        "id": str(r.id),
+        "at": r.created_at,
+        "method": r.method,
+        "path": r.path,
+        "route": r.route,
+        "status_code": r.status_code,
+        "duration_ms": r.duration_ms,
+        "ip_address": r.ip_address,
+        "user_agent": r.user_agent,
+        "user": _person(user),
+        "organization": organization,
+    }
+
+
+@router.get("/requests", response_model=ApiResponse[list[dict]])
+async def list_requests(
+    db: AsyncSession = Depends(get_db),
+    _: UserResponse = Depends(require_super_admin),
+    user_id: uuid.UUID | None = None,
+    method: str | None = Query(default=None, pattern="^(GET|POST|PUT|PATCH|DELETE)$"),
+    failed_only: bool = False,
+    path: str | None = Query(default=None, max_length=200),
+    limit: int = Query(default=300, ge=1, le=MAX_ROWS),
+):
+    """Every API request people made, newest first."""
+
+    with _every_organization(db):
+        stmt = (
+            select(RequestLog, User, Organization.name)
+            .outerjoin(User, User.id == RequestLog.user_id)
+            .outerjoin(Organization, Organization.id == User.organization_id)
+            .order_by(RequestLog.created_at.desc()).limit(limit)
+        )
+        if user_id:
+            stmt = stmt.where(RequestLog.user_id == user_id)
+        if method:
+            stmt = stmt.where(RequestLog.method == method)
+        if failed_only:
+            stmt = stmt.where(RequestLog.status_code >= 400)
+        if path:
+            stmt = stmt.where(RequestLog.path.contains(path, autoescape=True))
+        rows = (await db.execute(stmt)).all()
+    return ApiResponse(success=True, data=[_request_row(r, u, o) for r, u, o in rows])
 
 
 def _sign_in_row(s: SignInEvent, user: User | None = None, organization: str | None = None) -> dict:

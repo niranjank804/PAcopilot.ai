@@ -17,6 +17,7 @@ from src.core.config import settings
 from src.core.exceptions import AppException
 from src.core.logging import app_logger
 from src.middleware.request_context import RequestContextMiddleware
+from src.middleware.request_log import RequestLogMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
 from src.reports.tasks import register_tasks
 from src.tm1.client.connection_manager import tm1_connection_manager
@@ -83,6 +84,8 @@ app.add_middleware(
 # months without being registered here; nothing they promised was on the
 # wire.
 app.add_middleware(SecurityHeadersMiddleware, enable_hsts=settings.is_production)
+# Inside the request-id middleware, so each logged request carries its id.
+app.add_middleware(RequestLogMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 app.include_router(api_router)

@@ -346,8 +346,8 @@ export const FEATURE_TOURS: Record<string, TourStep[]> = {
     },
     {
       target: "platform-tabs",
-      title: "Four views",
-      body: "People, TM1 connections, Sign-ins and the Audit log. Each lists every workspace, newest or most recently active first.",
+      title: "Five views",
+      body: "People, TM1 connections, Sign-ins, the Audit log and All requests. Each lists every workspace, newest or most recently active first.",
     },
     {
       target: "platform-people",
@@ -373,6 +373,11 @@ export const FEATURE_TOURS: Record<string, TourStep[]> = {
       target: "platform-sign-ins",
       title: "Sign-ins",
       body: "Every attempt with its time, result, method, address and device, including failures for names that match no account — what a password-guessing run looks like.",
+    },
+    {
+      target: "platform-requests",
+      title: "All requests",
+      body: "Every API request people made — method, path, server, result, time taken and address — kept for 90 days. Request contents are never stored, so passwords and credentials never land here.",
     },
     {
       target: "platform-audit",

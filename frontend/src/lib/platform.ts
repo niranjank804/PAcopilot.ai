@@ -15,6 +15,8 @@ export interface PlatformOverview {
   failed_sign_ins_24h: number;
   connections: number;
   suspended_connections: number;
+  api_requests_24h: number;
+  failed_api_requests_24h: number;
   ai_requests_24h: number;
   ai_cost_24h: number;
 }
@@ -102,10 +104,26 @@ export interface ActivityEvent {
   status?: string;
 }
 
+export interface RequestRow {
+  id: string;
+  at: string;
+  method: string;
+  path: string;
+  route: string | null;
+  status_code: number;
+  duration_ms: number;
+  ip_address: string | null;
+  user_agent: string | null;
+  user: PlatformPerson | null;
+  organization: string | null;
+  connection?: { id: string; name: string } | null;
+}
+
 export interface UserActivity {
   user: PlatformPerson & { is_active: boolean };
   days: number;
   events: ActivityEvent[];
+  requests: RequestRow[];
   sign_ins: SignIn[];
 }
 

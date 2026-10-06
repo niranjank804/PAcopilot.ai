@@ -156,6 +156,20 @@ def _pinned_storage_backend(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _request_log_off(monkeypatch):
+    """The request log writes in its own session, outside each test's
+    rolled-back transaction, so it is off by default; tests of it capture
+    the rows instead (tests/integration/test_request_log.py)."""
+
+    from src.middleware import request_log
+
+    async def discard(entry: dict) -> None:
+        return None
+
+    monkeypatch.setattr(request_log, "write_request_log", discard)
+
+
+@pytest.fixture(autouse=True)
 def _clean_rate_limit_windows():
     """Every test starts with an empty limiter.
 
