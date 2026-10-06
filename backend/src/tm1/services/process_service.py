@@ -286,7 +286,7 @@ async def execute_process(
             success, status, error_log_file = client.processes.execute_with_return(
                 process_name=process_name, timeout=timeout, cancel_at_timeout=True, **parameters
             )
-            return success, status, error_log_file, None
+            return success, status, error_log_file, None, "ExecuteWithReturn"
         except Exception as exc:
             if not compat.is_unsupported_action(exc, "ExecuteWithReturn"):
                 raise
@@ -295,19 +295,19 @@ async def execute_process(
         # outcome and TM1's error text otherwise.
         try:
             client.processes.execute(process_name, timeout=timeout, cancel_at_timeout=True, **parameters)
-            return True, "CompletedSuccessfully", None, None
+            return True, "CompletedSuccessfully", None, None, "Execute"
         except Exception as exc:
             outcome = compat.run_outcome(exc)
             if outcome is None:
                 raise
-            return False, outcome[0], None, outcome[1]
+            return False, outcome[0], None, outcome[1], "Execute"
 
     # The resilience layer logs the callable's name on failure; the name
     # alone is enough (parameter values stay out of the log).
     run.__name__ = "execute_with_return"
 
     started = time.monotonic()
-    success, status, error_log_file, error_detail = await call_with_resilience(
+    success, status, error_log_file, error_detail, api = await call_with_resilience(
         connection_id, run, timeout=timeout, max_retries=0
     )
 
@@ -316,6 +316,8 @@ async def execute_process(
         "status": status or ("CompletedSuccessfully" if success else "Unknown"),
         "error_log_file": error_log_file or None,
         "duration_ms": int((time.monotonic() - started) * 1000),
+        # Which TM1 call ran it: the compatibility path, for the record.
+        "api": api,
     }
     if error_detail:
         result["error_detail"] = error_detail[:2000]

@@ -17,7 +17,7 @@ from src.database.models.tm1_change import TM1Change
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment import ti_analysis
-from src.tm1.exceptions import TM1ConnectionError, TM1NotFoundError
+from src.tm1.exceptions import TM1NotFoundError, TM1OutcomeUnknownError
 from src.tm1.impact.analyzer import analyze_impact, needs_acknowledgement
 from src.tm1.metadata import dependency_analyzer, extractor
 from src.tm1.service import tm1_integration_service
@@ -855,6 +855,13 @@ class ChangeService:
             return steps
 
         steps.append(step("approval", "Approved", "done", at=change.executed_at))
+        if status == "unknown":
+            # Sent, never confirmed: neither done nor failed.
+            steps.append(step("deployed", "Applied" if not is_run else "Run", "unknown",
+                              at=change.executed_at, detail=change.error_message))
+            steps.append(step("verified", "Verified", "pending",
+                              detail="check the object on the server"))
+            return steps
         if not is_run:
             steps.append(step("snapshot", "Snapshot", "done" if change.previous_content else "skipped",
                               at=change.executed_at))
@@ -941,6 +948,27 @@ class ChangeService:
 
         change.executed_by = executed_by
         change.executed_at = datetime.now(timezone.utc)
+
+        try:
+            return await self._apply(db, change, client, connection)
+        except TM1OutcomeUnknownError as exc:
+            if change.previous_content is None:
+                # The snapshot read failed: nothing was sent to TM1 yet.
+                raise
+            # The write was sent and TM1 did not confirm it. It may have
+            # been applied, partly or fully. Saying 'failed' could invite a
+            # second apply; saying nothing left a draft that looked unrun.
+            change.status = "unknown"
+            change.error_message = (
+                f"{exc.message} TM1 did not confirm the change, so it may or may "
+                "not have been applied. Check the object on the server; then make "
+                "a new draft from what is there now."
+            )
+            return await tm1_change_repository.update(db, change)
+
+    async def _apply(self, db, change: TM1Change, client, connection) -> TM1Change:
+        """Snapshot, write, verify — per change type. Every write is single-
+        attempt; previous_content is set before the first write is sent."""
 
         if change.change_type == "update_rules":
             previous = await cube_service.get_cube_rules(
@@ -1174,9 +1202,10 @@ class ChangeService:
                 parameters,
                 timeout=settings.TM1_PROCESS_RUN_TIMEOUT_SECONDS,
             )
-        except TM1ConnectionError as exc:
-            change.status = "failed"
-            change.execution_result = {"success": False, "status": "NoResponse"}
+        except TM1OutcomeUnknownError as exc:
+            # No answer: TM1 may have run it, partly or fully.
+            change.status = "unknown"
+            change.execution_result = {"success": None, "status": "NoResponse"}
             change.error_message = (
                 f"{exc.message} TM1 was asked to cancel the run. It may have "
                 "written some data before stopping: check the message log "

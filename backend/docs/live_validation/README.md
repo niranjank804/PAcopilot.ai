@@ -40,26 +40,58 @@ PYTHONPATH=. python tests/performance/benchmark_graph.py
 PYTHONPATH=. python tests/performance/benchmark_ai.py   # also needs ANTHROPIC_API_KEY
 ```
 
-Every live test and benchmark creates its own throwaway `Organization`/`User`/`TM1Connection` row (via the same `db_session` savepoint-rollback fixture — or, for the standalone benchmark scripts, an explicit cleanup at the end) — nothing is left behind in your database. Everything except `tests/live/test_write_paths.py` only reads from the TM1 server.
+Every live test and benchmark creates its own throwaway `Organization`/`User`/`TM1Connection` row (via the same `db_session` savepoint-rollback fixture — or, for the standalone benchmark scripts, an explicit cleanup at the end) — nothing is left behind in your database. Read, write and paid-AI validation are separate opt-ins; choosing one never
+enables another.
 
-## Write paths (opt-in, DEV only)
+## Write validation (opt-in, DEV/test only)
 
-`tests/live/test_write_paths.py` checks the change engine on the real server: a broken process refused by TM1's compiler before saving; create, update, run, delete and the rollbacks; a failing run recorded as failed; cell writes applied, read back, refused for consolidated, rule-calculated and mistyped cells, refused after a value changed since the draft, and rolled back; rules applied, checked by TM1 and rolled back.
+`tests/live/test_governed_writes.py` runs the governed workflow through
+PA-Copilot's own HTTP API, as two disposable users (an author who drafts and
+an approver who applies): process create / update / delete with rollbacks,
+a reviewed run and a safe failing run, compile-without-save (asserting no
+save is sent and the stored definition is unchanged), cell writes with every
+refusal rule, drift and rollback-over-newer refusal, and rules (invalid
+syntax refused with the last valid rules kept, apply, calculate, roll back).
+TM1 is touched directly only to create run-owned fixtures and to verify
+results independently.
 
-It writes only to objects it creates — a process, two dimensions and a cube named `zzPACopilotLive_<random>` — and deletes them afterwards, pass or fail. It runs only when both are set:
+Writes happen only when all of these hold — otherwise the tests are BLOCKED
+before anything is sent:
 
-| Variable | Value |
+| Condition | How |
 |---|---|
-| `TM1_LIVE_WRITE` | `1` |
-| `TM1_LIVE_WRITE_SERVER` | the server's name exactly as TM1 reports it; any other server makes these tests skip |
+| Opt-in | `TM1_LIVE_WRITE=1` |
+| The target is one you approved | listed in `%USERPROFILE%\.pa-copilot\live-targets.json` (or `LIVE_TARGETS_FILE`), which you maintain; a run never writes it |
+| You named it | `TM1_LIVE_WRITE_SERVER` equals the name the server reports |
+| You confirmed the scope | `LIVE_WRITE_SCOPE_CONFIRMED=1` |
 
-The easy way, on Windows, from `backend/`:
+Inventory format: `[{"address": "localhost", "port": 12354, "server_name": "Planning Sample", "purpose": "DEV sample"}]`.
+
+Fixtures are named `zzPACopilotLive_<run>_<kind>`, refused if the name
+already exists, and cleaned up with absence verified; see `manifest.json`.
+
+## Credentials
+
+The script reads the password masked and keeps it in its own process
+environment for the run. Tests that create a connection store it the way
+the product does — encrypted, here with a throwaway key, in the local test
+database, rolled back with each test — and only with your consent
+(`LIVE_CREDENTIAL_STORAGE_CONSENT=1`); otherwise they are BLOCKED.
+
+## Paid AI
+
+`tests/live/test_ai_tools.py` and `tests/live/test_answer_accuracy.py` call
+the model and cost money. They run only with `LIVE_AI=1` (and, for the
+accuracy run, `ACCURACY_EVAL=1`) — never because a key is present.
+
+## The easy way, on Windows, from the repository root
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run_live_validation.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\backend\scripts\run_live_validation.ps1
 ```
 
-It asks for the address, port, user and (hidden) password, asks whether to include the write paths, runs everything, and saves a report with results only to `docs/evidence/live/`. A local DEV server has a private address, so the script sets `TM1_ALLOW_PRIVATE_ADDRESSES=true` for that run only.
+Evidence (allowlisted fields only; raw output is not saved) goes to
+`docs/evidence/live/<run>/`: `run.json`, `manifest.json`, `results.json`.
 
 ## Known gap: CAM / IBMid auth cannot be tested yet
 

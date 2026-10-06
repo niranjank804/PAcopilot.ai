@@ -234,6 +234,11 @@ class IncidentService:
                             {"action": "rollback", "label": f"Roll back this change ({what})",
                              "change_id": str(c.id)},
                             {"change_id": str(c.id)})
+            elif c.status == "unknown" and (on_cube or on_writer):
+                suspect(88, "change_unknown", f"Outcome unknown: {what}", c.error_message, c.executed_at,
+                        {"action": "review", "label": "Check the object on the server; the change may have applied",
+                         "change_id": str(c.id)},
+                        {"change_id": str(c.id)})
             elif c.status == "failed" and (on_cube or on_writer):
                 suspect(70, "change_failed", f"Failed: {what}", c.error_message, c.executed_at,
                         {"action": "review", "label": "Open the failed change", "change_id": str(c.id)},

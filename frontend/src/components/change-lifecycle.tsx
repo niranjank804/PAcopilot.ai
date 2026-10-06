@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, CircleDot, Info, MinusCircle, TriangleAlert, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, CircleDot, CircleHelp, Info, MinusCircle, TriangleAlert, XCircle } from "lucide-react";
 
 import type { ChangeCheck, LifecycleStep } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ const STEP_ICON = {
   failed: XCircle,
   skipped: MinusCircle,
   pending: Circle,
+  unknown: CircleHelp,
 } as const;
 
 const STEP_TONE = {
@@ -17,6 +18,7 @@ const STEP_TONE = {
   failed: "text-destructive",
   skipped: "text-muted-foreground",
   pending: "text-muted-foreground/60",
+  unknown: "text-warning",
 } as const;
 
 const STEP_WORD = {
@@ -25,6 +27,7 @@ const STEP_WORD = {
   failed: "failed",
   skipped: "skipped",
   pending: "to do",
+  unknown: "not confirmed by TM1",
 } as const;
 
 /**

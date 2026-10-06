@@ -21,6 +21,7 @@ from src.tm1.exceptions import (
     TM1AuthenticationError,
     TM1ConnectionError,
     TM1NotFoundError,
+    TM1OutcomeUnknownError,
 )
 
 TRANSIENT_STATUS_THRESHOLD = 500
@@ -202,7 +203,7 @@ async def call_with_resilience(
                 f"TM1 call {getattr(func, '__name__', func)!s} on connection "
                 f"{connection_id} failed at the gateway: {exc}"
             )
-            raise TM1ConnectionError(describe_failure(exc)) from exc
+            raise TM1OutcomeUnknownError(describe_failure(exc)) from exc
         except (
             TM1pyNetworkException,
             TM1pyTimeout,
@@ -248,7 +249,7 @@ async def call_with_resilience(
         f"{last_exc!r}"
     )
 
-    raise TM1ConnectionError(
+    raise TM1OutcomeUnknownError(
         f"TM1 request failed after {resolved_max_retries + 1} attempts: "
         f"{describe_failure(last_exc)}"
     ) from last_exc

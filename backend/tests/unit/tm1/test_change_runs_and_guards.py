@@ -17,7 +17,7 @@ from src.core.config import settings
 from src.core.exceptions import ConflictException, ValidationException
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1.deployment.change_service import change_service, validate_run_parameters
-from src.tm1.exceptions import TM1ConnectionError
+from src.tm1.exceptions import TM1ConnectionError, TM1OutcomeUnknownError
 from src.tm1.service import tm1_integration_service
 from tests.fixtures.factories import create_organization, create_user
 
@@ -170,11 +170,12 @@ async def test_a_run_that_times_out_says_it_may_have_written_data(
 ):
     org, user, connection = await _setup(db_session)
     change = await _draft(db_session, org, user, connection, "run_process", "Load", {"parameters": {}})
-    client.processes.execute_with_return.side_effect = TM1ConnectionError("no answer")
+    client.processes.execute_with_return.side_effect = TM1OutcomeUnknownError("no answer")
 
     done = await change_service.execute_change(db_session, change, user.id)
 
-    assert done.status == "failed"
+    # Not "failed": TM1 may have run it. Unknown, and said plainly.
+    assert done.status == "unknown"
     assert "may have" in done.error_message
 
 
@@ -374,3 +375,61 @@ async def test_a_failed_run_shows_where_it_failed(db_session, tm1_credentials_ke
     states = {s["key"]: s["state"] for s in change_service.lifecycle(done)}
     assert states["deployed"] == "failed" and states["verified"] == "failed"
     assert "snapshot" not in states
+
+
+# --- Outcomes nobody can confirm ------------------------------------------
+#
+# A write that was sent and never confirmed may have been applied. It is
+# recorded as unknown - not failed, which could invite a second apply, and
+# not left as a draft that looks unrun.
+
+
+@pytest.mark.asyncio
+async def test_a_rules_write_that_times_out_is_unknown_and_not_retried(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    change = await _draft(db_session, org, user, connection, "update_rules", "Sales", {"rules": "['A'] = N: 2;"})
+    import requests
+    client.cubes.update_or_create_rules.side_effect = requests.exceptions.Timeout("read timed out")
+
+    done = await change_service.execute_change(db_session, change, user.id)
+
+    assert done.status == "unknown"
+    assert "may or may not have been applied" in done.error_message
+    assert client.cubes.update_or_create_rules.call_count == 1
+    with pytest.raises(ConflictException):
+        await change_service.execute_change(db_session, done, user.id)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_read_before_any_write_is_an_error_not_unknown(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    change = await _draft(db_session, org, user, connection, "update_rules", "Sales", {"rules": "['A'] = N: 2;"})
+    import requests
+    calls = {"n": 0}
+    original = client.cubes.get.side_effect
+
+    def drift_check_then_fail(name):
+        calls["n"] += 1
+        if calls["n"] >= 2:  # the drift check passes; the snapshot read fails
+            raise requests.exceptions.ConnectionError("connection reset")
+        return original(name)
+
+    client.cubes.get.side_effect = drift_check_then_fail
+
+    with pytest.raises(TM1OutcomeUnknownError):
+        await change_service.execute_change(db_session, change, user.id)
+    client.cubes.update_or_create_rules.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_refused_write_is_not_unknown(db_session, tm1_credentials_key, client):
+    org, user, connection = await _setup(db_session)
+    change = await _draft(db_session, org, user, connection, "update_rules", "Sales", {"rules": "['A'] = N: 2;"})
+    from TM1py.Exceptions import TM1pyRestException
+    client.cubes.update_or_create_rules.side_effect = TM1pyRestException(
+        '{"error":{"message":"Invalid rule syntax"}}', status_code=400, reason="Bad Request", headers={})
+
+    # TM1 answered and refused: definite, and the change is not marked unknown.
+    with pytest.raises(TM1ConnectionError) as refused:
+        await change_service.execute_change(db_session, change, user.id)
+    assert not isinstance(refused.value, TM1OutcomeUnknownError)

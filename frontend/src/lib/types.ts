@@ -62,7 +62,8 @@ export type ChangeStatus =
   | "failed"
   | "rolled_back"
   | "rejected"
-  | "superseded";
+  | "superseded"
+  | "unknown";
 
 export interface RelatedObject {
   object_type: string;
@@ -370,7 +371,7 @@ export interface TM1ChangeSummary {
 export interface LifecycleStep {
   key: string;
   label: string;
-  state: "done" | "current" | "failed" | "skipped" | "pending";
+  state: "done" | "current" | "failed" | "skipped" | "pending" | "unknown";
   at: string | null;
   detail: string | null;
 }

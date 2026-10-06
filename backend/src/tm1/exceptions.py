@@ -6,6 +6,13 @@ class TM1ConnectionError(AppException):
     code = "TM1_CONNECTION_ERROR"
 
 
+class TM1OutcomeUnknownError(TM1ConnectionError):
+    """The request may have reached TM1 and been applied: the connection
+    dropped, it timed out, or the server or gateway failed mid-request.
+    For a read that only means no answer; for a write it means nobody
+    knows whether it happened, and nothing may assume it did not."""
+
+
 class TM1AuthenticationError(AppException):
     status_code = 401
     code = "TM1_AUTHENTICATION_ERROR"

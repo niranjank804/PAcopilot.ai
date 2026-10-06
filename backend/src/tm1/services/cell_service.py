@@ -182,8 +182,7 @@ async def write_cells(
     """Write values to leaf cells, all in one request.
 
     Only ever reached from change_service for an approved `write_cells`
-    change, or its rollback writing the saved values back. Setting a value
-    is idempotent, so the usual retry is safe.
+    change, or its rollback writing the saved values back.
     """
 
     def write() -> None:
@@ -200,7 +199,9 @@ async def write_cells(
             )
 
     write.__name__ = "write_values"
-    await call_with_resilience(connection_id, write, **resilience_kwargs)
+    # Writes are single-attempt, like every other TM1 write: never blindly
+    # re-fire one whose outcome is unknown.
+    await call_with_resilience(connection_id, write, max_retries=0, **resilience_kwargs)
 
 
 async def read_attribute_values(

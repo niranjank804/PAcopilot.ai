@@ -10,6 +10,7 @@ export const STATUS_VARIANT: Record<
   rolled_back: "outline",
   rejected: "outline",
   superseded: "outline",
+  unknown: "destructive",
 };
 
 /** What each status is called in the interface.
@@ -32,6 +33,7 @@ export const STATUS_LABEL: Record<ChangeStatus, string> = {
   rolled_back: "rolled back",
   rejected: "discarded",
   superseded: "superseded",
+  unknown: "outcome unknown",
 };
 
 export function statusLabel(status: ChangeStatus | string): string {

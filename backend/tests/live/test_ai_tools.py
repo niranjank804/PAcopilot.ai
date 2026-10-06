@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from sqlalchemy import select
 
@@ -7,8 +9,15 @@ from src.database.models.ai_tool_execution import AIToolExecution
 from tests.fixtures.factories import grant_system_role
 
 
+pytestmark = pytest.mark.live_ai
+
+
 @pytest.fixture
 def require_anthropic_key():
+    # A paid model call: only on the explicit opt-in, never because a key
+    # happens to be present in the environment.
+    if os.environ.get("LIVE_AI") != "1":
+        pytest.skip("LIVE_AI=1 not set — paid AI calls not authorized for this run")
     if not settings.ANTHROPIC_API_KEY:
         pytest.skip(
             "ANTHROPIC_API_KEY not set — skipping real AI + TM1 tool-call test "

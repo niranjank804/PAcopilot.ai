@@ -253,8 +253,8 @@ async def _ask(db_session, org, user, connection, agent, question):
 
 @pytest.mark.asyncio
 async def test_answer_accuracy(db_session, live_connection):
-    if os.environ.get("ACCURACY_EVAL") != "1":
-        pytest.skip("ACCURACY_EVAL=1 not set — the accuracy run costs provider money")
+    if os.environ.get("ACCURACY_EVAL") != "1" or os.environ.get("LIVE_AI") != "1":
+        pytest.skip("ACCURACY_EVAL=1 and LIVE_AI=1 not both set — the accuracy run costs provider money")
     if not settings.ANTHROPIC_API_KEY:
         pytest.skip("ANTHROPIC_API_KEY not set")
 

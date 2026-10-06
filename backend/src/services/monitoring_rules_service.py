@@ -315,7 +315,15 @@ async def _check_deployment(check: _Check, rule: MonitorRule, since: datetime):
             alerts.append({"severity": "warning", "title": f"Rolled back: {what}", "detail": None,
                            "evidence": {"change_id": str(change.id)},
                            "dedup_key": f"change:{change.id}:rolled_back"})
-        if change.executed_at and change.executed_at > since:
+        if change.executed_at and change.executed_at > since and change.status == "unknown":
+            alerts.append({
+                "severity": "critical",
+                "title": f"Outcome unknown: {what}",
+                "detail": change.error_message,
+                "evidence": {"change_id": str(change.id), "status": change.status},
+                "dedup_key": f"change:{change.id}:unknown",
+            })
+        elif change.executed_at and change.executed_at > since:
             failed = change.status == "failed"
             alerts.append({
                 "severity": "critical" if failed else "info",
