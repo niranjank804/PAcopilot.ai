@@ -25,6 +25,7 @@ from .tm1_change import TM1Change
 from .tm1_coding_convention import TM1CodingConvention
 from .tm1_process import TM1Process, TM1ProcessPattern
 from .revoked_token import RevokedToken
+from .request_log import RequestLog
 from .sign_in_event import SignInEvent
 from .tm1_connection import TM1Connection
 from .tm1_extraction import TM1Extraction
@@ -38,6 +39,7 @@ from .work_item import IncidentInvestigation, WorkItem, WorkItemLink
 from .monitor import MonitorAlert, MonitorRule
 
 __all__ = [
+    "RequestLog",
     "SignInEvent",
     "Organization",
     "PasswordResetToken",

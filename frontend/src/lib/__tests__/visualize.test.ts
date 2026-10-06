@@ -143,3 +143,20 @@ describe("formatting and export", () => {
       .toContain('"x, ""y"""');
   });
 });
+
+describe("CSV export safety", () => {
+  it("turns an element name that looks like a formula into text, and leaves numbers alone", async () => {
+    const { tableToCsv } = await import("../visualize");
+    const csv = tableToCsv({
+      dimensions: ["Region"],
+      rows: [
+        { members: { Region: '=HYPERLINK("http://evil","x")' }, value: -5 },
+        { members: { Region: "@SUM(A1)" }, value: 3 },
+      ],
+      truncated: false,
+    });
+    const [, first, second] = csv.split("\r\n");
+    expect(first).toBe(`"'=HYPERLINK(""http://evil"",""x"")",-5`);
+    expect(second).toBe("'@SUM(A1),3");
+  });
+});

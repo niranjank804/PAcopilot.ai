@@ -7,7 +7,7 @@ upload re-checks that scope and its own permission.
 
 from fastapi import APIRouter, Depends
 
-from src.api.dependencies.auth import get_current_user
+from src.api.dependencies.auth import get_current_active_user
 from src.core.config import settings
 from src.core.exceptions import ServiceUnavailableException, ValidationException
 from src.reports.s3_storage import presign_upload, s3_is_configured, upload_object_key
@@ -40,7 +40,9 @@ def issue_upload_target(organization_id, payload: UploadRequest) -> UploadTarget
 @router.post("", response_model=ApiResponse[UploadTarget], status_code=201)
 async def create_upload(
     payload: UploadRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    # Active users only: a deactivated account must not keep a way to
+    # place files in storage.
+    current_user: UserResponse = Depends(get_current_active_user),
 ):
     return ApiResponse(
         success=True,

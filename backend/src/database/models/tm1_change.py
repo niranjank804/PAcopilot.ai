@@ -151,6 +151,11 @@ class TM1Change(BaseModel, OrganizationScoped):
 
     # The change this one was promoted from (DEV -> QA -> PROD), so the
     # chain of environments, approvals and verifications can be followed.
+    # The connection's environment when this was drafted. Execution uses
+    # the stricter of this and the environment at that moment
+    # (tm1/governance.effective_environment). Null on rows from before it.
+    environment: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
     promoted_from: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tm1_changes.id", ondelete="SET NULL"),

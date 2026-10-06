@@ -269,6 +269,7 @@ async def remove_role(
         user_id,
         role_id,
         current_user.organization_id,
+        caller_user_id=current_user.id,
     )
 
     await audit_service.log(

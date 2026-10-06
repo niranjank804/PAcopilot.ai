@@ -761,6 +761,7 @@ class ChangeService:
             status="draft",
             base_fingerprint=base_fingerprint,
             checks=checks or None,
+            environment=getattr(connection, "environment", None) or "dev",
         )
 
         created = await tm1_change_repository.create(db, change)

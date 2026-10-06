@@ -197,7 +197,9 @@ async def test_update_connection_name_and_address(
 
     update_resp = await client.patch(
         f"/tm1/connections/{connection_id}",
-        json={"name": "Prod (renamed)", "address": "tm1-new.example.com"},
+        # A new address needs the password again (saved credentials are
+        # never sent to a new server).
+        json={"name": "Prod (renamed)", "address": "tm1-new.example.com", "password": "again"},
         headers=headers,
     )
 

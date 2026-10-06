@@ -191,7 +191,7 @@ async def test_a_connection_can_move_off_its_gateway_to_a_public_address(
 
     public = await client.patch(
         f"/tm1/connections/{conn['id']}",
-        json={"gateway_id": None, "address": "tm1.example.com"},
+        json={"gateway_id": None, "address": "tm1.example.com", "password": "again"},
         headers=headers,
     )
     assert public.status_code == 200, public.text

@@ -55,4 +55,11 @@ describe("Markdown", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Summary" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
   });
+
+  it("follows only web links", () => {
+    render(<Markdown>{"[mail](mailto:a@b.c) and [file](file:///etc/passwd) and [web](https://example.com)"}</Markdown>);
+
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["https://example.com"]);
+    expect(screen.getByText("mail").tagName).toBe("SPAN");
+  });
 });

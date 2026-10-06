@@ -24,6 +24,18 @@ interface ApiFailure {
 
 type ApiEnvelope<T> = ApiSuccess<T> | ApiFailure;
 
+/** End this session on the server: revoke its refresh token, so a copy
+ * taken earlier stops working too. Best effort — signing out must always
+ * succeed in the browser, so a failure here is ignored. */
+export function revokeSession(accessToken: string, refreshToken: string): void {
+  void fetch(`${API_URL}/auth/logout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 type TokenGetter = () => string | null;
 type TokenSetter = (
   tokens: { accessToken: string; refreshToken: string } | null,

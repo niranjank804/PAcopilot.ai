@@ -220,6 +220,7 @@ class RoleService:
         user_id: uuid.UUID,
         role_id: uuid.UUID,
         caller_organization_id: uuid.UUID,
+        caller_user_id: uuid.UUID | None = None,
     ) -> None:
 
         user = await user_repository.get_by_id(
@@ -230,6 +231,19 @@ class RoleService:
         if not user or user.organization_id != caller_organization_id:
             raise PermissionDeniedException(
                 "Cannot remove roles from a user outside your organization."
+            )
+
+        # The mirror of assign_role's guard: a workspace admin must not be
+        # able to strip the platform's Super Admin of that role either.
+        role = await role_repository.get_by_id(db, role_id)
+        if (
+            role is not None
+            and role.is_system
+            and role.name == SUPER_ADMIN_ROLE
+            and not (caller_user_id and await self.is_super_admin(db, caller_user_id))
+        ):
+            raise PermissionDeniedException(
+                "Only a Super Admin can remove the Super Admin role."
             )
 
         existing = await user_role_repository.get_by_user_and_role(

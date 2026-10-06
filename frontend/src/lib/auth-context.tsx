@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { apiRequest, registerTokenAccessors } from "@/lib/api-client";
+import { apiRequest, registerTokenAccessors, revokeSession } from "@/lib/api-client";
 
 export interface AuthUser {
   id: string;
@@ -196,6 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    // Clearing the browser alone left the refresh token valid on the
+    // server for the rest of its life.
+    const tokens = tokensRef.current;
+    if (tokens) revokeSession(tokens.accessToken, tokens.refreshToken);
     applyTokens(null);
     setUser(null);
   }, [applyTokens]);

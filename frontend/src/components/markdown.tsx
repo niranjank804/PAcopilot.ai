@@ -30,7 +30,9 @@ const components: Components = {
     <ol className="mb-2 list-decimal space-y-0.5 pl-4 last:mb-0">{children}</ol>
   ),
   li: ({ children }) => <li>{children}</li>,
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  strong: ({ children }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
   h1: ({ children }) => (
     <h3 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h3>
   ),
@@ -55,16 +57,24 @@ const components: Components = {
         {children}
       </code>
     ),
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="underline underline-offset-2"
-    >
-      {children}
-    </a>
-  ),
+  // Only web links are followed: an answer is model output, and model
+  // output can be steered by text planted in TM1 data or documents.
+  a: ({ href, children }) =>
+    href && /^https?:\/\//i.test(href) ? (
+      <a
+        href={href}
+        title={href}
+        target="_blank"
+        rel="noreferrer"
+        className="underline underline-offset-2"
+      >
+        {children}
+      </a>
+    ) : (
+      <span className="underline decoration-dotted underline-offset-2">
+        {children}
+      </span>
+    ),
   table: ({ children }) => (
     <div className="mb-2 overflow-x-auto last:mb-0">
       <table className="text-xs">{children}</table>

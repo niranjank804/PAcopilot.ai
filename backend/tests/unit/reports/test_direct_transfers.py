@@ -27,10 +27,13 @@ class FakeS3:
             def __init__(self, data):
                 self.data = data
 
-            def read(self):
-                return self.data
+            def read(self, amount=None):
+                return self.data if amount is None else self.data[:amount]
 
-        return {"Body": Body(self.objects[Key])}
+            def close(self):
+                pass
+
+        return {"Body": Body(self.objects[Key]), "ContentLength": len(self.objects[Key])}
 
     def delete_object(self, Bucket, Key):
         self.deleted.append(Key)
@@ -95,4 +98,18 @@ async def test_read_upload_returns_the_bytes_and_delete_removes_them(fake_s3):
 
     assert key in fake_s3.deleted
     with pytest.raises(NotFoundException):
+        await s3.read_upload(org, key)
+
+
+@pytest.mark.asyncio
+async def test_an_upload_larger_than_declared_is_refused_before_it_is_read(fake_s3, monkeypatch):
+    from src.core.config import settings
+    from src.core.exceptions import ValidationException
+
+    monkeypatch.setattr(settings, "DIRECT_UPLOAD_MAX_BYTES", 3)
+    org = uuid.uuid4()
+    key = s3.upload_object_key(org, "big.pdf")
+    fake_s3.objects[key] = b"%PDF-too-big"
+
+    with pytest.raises(ValidationException):
         await s3.read_upload(org, key)

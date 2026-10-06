@@ -43,7 +43,7 @@ from functools import lru_cache
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
-from src.core.exceptions import NotFoundException
+from src.core.exceptions import NotFoundException, ValidationException
 from src.core.logging import app_logger
 from src.reports.storage import StorageBackend
 
@@ -324,7 +324,17 @@ async def read_upload(organization_id: uuid.UUID, key: str) -> bytes:
 
             raise
 
-        return response["Body"].read()
+        # The size a client declared when asking for the URL is only a
+        # claim; the object is checked before any of it is read into
+        # memory, and the read itself is capped.
+        limit = settings.DIRECT_UPLOAD_MAX_BYTES
+        if (response.get("ContentLength") or 0) > limit:
+            response["Body"].close()
+            raise ValidationException(f"File exceeds the {limit // (1024 * 1024)}MB upload limit.")
+        data = response["Body"].read(limit + 1)
+        if len(data) > limit:
+            raise ValidationException(f"File exceeds the {limit // (1024 * 1024)}MB upload limit.")
+        return data
 
     return await asyncio.to_thread(_read)
 

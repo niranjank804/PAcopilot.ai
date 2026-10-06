@@ -36,6 +36,19 @@ def environment_of(connection) -> str:
     return getattr(connection, "environment", None) or "dev"
 
 
+_STRICTNESS = {"dev": 0, "qa": 1, "prod": 2}
+
+
+def effective_environment(change, connection) -> str:
+    """The stricter of the environment the change was drafted on and the
+    connection's environment now. Relabelling a connection after drafting
+    (PROD to DEV, say) therefore cannot loosen the rules for that change."""
+
+    current = environment_of(connection)
+    drafted = getattr(change, "environment", None) or current
+    return max(current, drafted, key=lambda env: _STRICTNESS.get(env, 0))
+
+
 async def check_can_apply(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -47,7 +60,7 @@ async def check_can_apply(
     """Raise unless this user may apply (`execute`) or roll back
     (`rollback`) this change on this connection's environment."""
 
-    environment = environment_of(connection)
+    environment = effective_environment(change, connection)
     permission = DEPLOY_PERMISSION[environment]
 
     if not await auth_repository.user_has_permission(db, user_id, permission):
@@ -76,10 +89,17 @@ def check_ai_may_draft(connection) -> None:
 async def check_environment_change(
     db: AsyncSession, user_id: uuid.UUID, current: str, requested: str
 ) -> None:
-    if current == "prod" and requested != "prod" and not (
-        await auth_repository.user_has_permission(db, user_id, "tm1.deploy.prod")
-    ):
-        raise PermissionDeniedException(
-            "Only someone with the 'tm1.deploy.prod' permission can take a "
-            "connection out of PROD."
-        )
+    """Relabelling a connection is a way round its rules (QA to DEV, then
+    deploy without the QA right), so it needs the deploy right of both the
+    environment it leaves and the one it enters, whenever either is QA or
+    PROD."""
+
+    if current == requested:
+        return
+    for environment in {current, requested} - {"dev"}:
+        permission = DEPLOY_PERMISSION[environment]
+        if not await auth_repository.user_has_permission(db, user_id, permission):
+            raise PermissionDeniedException(
+                f"Moving a connection {'out of' if environment == current else 'into'} "
+                f"{environment.upper()} needs the '{permission}' permission."
+            )

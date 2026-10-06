@@ -5,9 +5,9 @@ from TM1py import TM1Service
 
 from src.core.config import settings
 from src.database.models.tm1_connection import TM1Connection
-from src.tm1.addressing import parse_address
+from src.tm1.addressing import PRIVATE_ADDRESS_REFUSED, is_private_address, parse_address
 from src.tm1.crypto import decrypt_password
-from src.tm1.exceptions import TM1ConnectionSuspendedError
+from src.tm1.exceptions import TM1ConnectionError, TM1ConnectionSuspendedError
 from src.tm1.gateway.relay import install as install_gateway_transport
 from src.tm1.resilience import call_with_resilience, remove_circuit_breaker
 
@@ -112,6 +112,34 @@ def _logout_quietly(client: TM1Service) -> None:
         pass
 
 
+async def _refuse_private_destination(connection: TM1Connection) -> None:
+    """Refuse to send credentials to a host that resolves to a private,
+    loopback or link-local address when this deployment does not allow it.
+
+    Saving a connection only checks IP literals; a hostname such as
+    127.0.0.1.nip.io, or the decimal form of an address, passes that check.
+    So the name is resolved here, at the moment credentials would be sent.
+    A connection through a gateway is reached inside the customer's own
+    network and is not subject to this.
+    """
+
+    if settings.TM1_ALLOW_PRIVATE_ADDRESSES:
+        return
+    if getattr(connection, "gateway_id", None) and connection.authentication_type == "native":
+        return
+
+    host = parse_address(connection.address).host
+    if is_private_address(host):
+        raise TM1ConnectionError(PRIVATE_ADDRESS_REFUSED)
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None)
+    except OSError:
+        return  # Unresolvable: TM1py reports it as unreachable.
+    for info in infos:
+        if is_private_address(info[4][0]):
+            raise TM1ConnectionError(PRIVATE_ADDRESS_REFUSED)
+
+
 class TM1ConnectionManager:
 
     def __init__(self):
@@ -137,6 +165,7 @@ class TM1ConnectionManager:
         return client
 
     async def _connect(self, connection: TM1Connection) -> TM1Service:
+        await _refuse_private_destination(connection)
         password = decrypt_password(connection.encrypted_password)
 
         return await call_with_resilience(

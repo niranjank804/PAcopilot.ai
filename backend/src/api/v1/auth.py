@@ -17,6 +17,7 @@ from src.schemas.auth import (
 from src.schemas.response import ApiResponse
 from src.core.exceptions import AppException
 from src.repositories.user_role_repository import user_role_repository
+from src.services.audit_service import audit_service
 from src.services.auth_service import auth_service
 from src.services.sign_in_service import sign_in_service
 
@@ -33,6 +34,7 @@ router = APIRouter(
 )
 async def register(
     request: RegisterRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     _throttle: None = Depends(auth_throttle("register", "AUTH_REGISTER_PER_WINDOW")),
 ):
@@ -40,6 +42,7 @@ async def register(
         db,
         request,
     )
+    await audit_service.record(db, user, "register", "User", user.id, {"email": user.email}, http_request)
 
     return ApiResponse(success=True, data=user)
 
@@ -130,10 +133,16 @@ async def google_login(
 )
 async def forgot_password(
     request: ForgotPasswordRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     _throttle: None = Depends(auth_throttle("forgot_password", "AUTH_PASSWORD_RESET_PER_WINDOW")),
 ):
     await auth_service.request_password_reset(db, request.email)
+    # Recorded whether or not the email exists (the answer never says);
+    # account recovery must leave a trail.
+    await audit_service.record(
+        db, None, "password_reset_requested", "User", None, {"email": request.email[:255]}, http_request
+    )
 
     # Always the same response whether or not the email exists — see the
     # service method's own comment on why.
@@ -146,10 +155,12 @@ async def forgot_password(
 )
 async def reset_password(
     request: ResetPasswordRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     _throttle: None = Depends(auth_throttle("reset_password", "AUTH_PASSWORD_RESET_PER_WINDOW")),
 ):
     await auth_service.reset_password(db, request.token, request.new_password)
+    await audit_service.record(db, None, "password_reset_completed", "User", None, None, http_request)
 
     return ApiResponse(success=True, data=None)
 
@@ -160,12 +171,14 @@ async def reset_password(
 )
 async def logout(
     request: RefreshRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user),
 ):
     """End this session by revoking its refresh token."""
 
     await auth_service.logout(db, current_user.id, request.refresh_token)
+    await audit_service.record(db, current_user, "logout", "User", current_user.id, None, http_request)
 
     return ApiResponse(success=True, data=None)
 
@@ -175,12 +188,14 @@ async def logout(
     response_model=ApiResponse[None],
 )
 async def logout_all(
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user),
 ):
     """End every session for this user, on every device."""
 
     await auth_service.logout_all(db, current_user.id)
+    await audit_service.record(db, current_user, "logout_all", "User", current_user.id, None, http_request)
 
     return ApiResponse(success=True, data=None)
 

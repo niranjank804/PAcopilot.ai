@@ -487,6 +487,8 @@ export default function ConnectionsPage() {
             <DialogTitle>Edit &quot;{editTarget?.name}&quot;</DialogTitle>
             <DialogDescription>
               Leave the password/API key blank to keep the current credential.
+              If you change the server (address, port, SSL, type or gateway), enter it
+              again: saved credentials are never sent to a new server.
             </DialogDescription>
           </DialogHeader>
           <form

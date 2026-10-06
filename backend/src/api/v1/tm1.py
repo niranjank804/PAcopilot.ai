@@ -14,7 +14,8 @@ from src.database.models.tm1_connection import TM1Connection
 from src.database.session import get_db
 from src.schemas.auth import UserResponse
 from src.schemas.response import ApiResponse
-from src.core.exceptions import NotFoundException, PermissionDeniedException
+from src.core.exceptions import NotFoundException, PermissionDeniedException, ValidationException
+from src.tm1.addressing import parse_address
 from src.repositories.auth_repository import auth_repository
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.schemas.tm1 import (
@@ -70,6 +71,19 @@ def _client_context(http_request: Request) -> tuple[str | None, str | None]:
     user_agent = http_request.headers.get("user-agent")
 
     return ip_address, user_agent
+
+
+# Connection fields an edit records before and after. Never the password.
+_AUDITED_CONNECTION_FIELDS = (
+    "name", "address", "port", "ssl", "username", "authentication_type", "tenant",
+    "database", "gateway_id", "environment", "visibility",
+)
+# Where the saved credentials would be sent.
+_ENDPOINT_FIELDS = ("address", "port", "ssl", "authentication_type", "tenant", "database", "gateway_id")
+
+
+def _plain(value):
+    return str(value) if isinstance(value, uuid.UUID) else value
 
 
 async def _log_tm1_access(
@@ -267,19 +281,62 @@ async def update_connection(
             "Only the connection's owner or an organization admin can change who sees it."
         )
 
+    # A private connection's audience is its owner's decision alone: an
+    # admin may manage it, but sharing it would let everyone use the
+    # owner's credentials.
+    if (
+        request.visibility is not None
+        and request.visibility != existing.visibility
+        and existing.visibility == "private"
+        and existing.created_by != current_user.id
+    ):
+        raise PermissionDeniedException("Only its owner can share a private connection.")
+
     if request.environment is not None:
         await governance.check_environment_change(
             db, current_user.id, governance.environment_of(existing), request.environment
         )
 
+    fields = request.model_dump(exclude_unset=True)
+    before = {key: getattr(existing, key, None) for key in _AUDITED_CONNECTION_FIELDS}
+
+    # Pointing saved credentials somewhere new would send the stored
+    # password to that place on the next use. A new endpoint needs the
+    # password typed again.
+    proposed = dict(fields)
+    if proposed.get("address"):
+        # Compared as stored: "https://host:8010" and "host" are one server.
+        proposed["address"] = parse_address(proposed["address"]).host
+    moved = [
+        key for key in _ENDPOINT_FIELDS
+        if key in proposed and proposed[key] != getattr(existing, key, None)
+    ]
+    if moved and not fields.get("password"):
+        raise ValidationException(
+            "Re-enter the password (or API key) when changing the server's "
+            f"{', '.join(moved)}: saved credentials are never sent to a new endpoint."
+        )
+
+    # On QA and PROD, where the server is and who it signs in as are as
+    # sensitive as a deployment: they need that environment's deploy right.
+    environment = governance.environment_of(existing)
+    if environment != "dev" and (moved or fields.get("password") or "username" in fields):
+        permission = governance.DEPLOY_PERMISSION[environment]
+        if not await auth_repository.user_has_permission(db, current_user.id, permission):
+            raise PermissionDeniedException(
+                f"Changing a {environment.upper()} connection's server or credentials needs "
+                f"the '{permission}' permission."
+            )
+
     connection = await tm1_integration_service.update_connection(
         db,
         connection_id,
         current_user.organization_id,
-        **request.model_dump(exclude_unset=True),
+        **fields,
     )
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
+    after = {key: getattr(connection, key, None) for key in _AUDITED_CONNECTION_FIELDS}
 
     await _log_tm1_access(
         db,
@@ -288,6 +345,14 @@ async def update_connection(
         action="update_connection",
         connection=connection,
         elapsed_ms=elapsed_ms,
+        extra={
+            # What changed, never the secret itself.
+            "changed": {
+                key: {"from": _plain(before[key]), "to": _plain(after[key])}
+                for key in _AUDITED_CONNECTION_FIELDS if before[key] != after[key]
+            },
+            "password_changed": bool(fields.get("password")),
+        },
     )
 
     return ApiResponse(

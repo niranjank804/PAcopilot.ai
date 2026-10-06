@@ -360,6 +360,14 @@ class TM1IntegrationService:
 
         next_address = address if address is not None else connection.address
         next_auth_type = authentication_type or connection.authentication_type
+
+        # A gateway carries only native connections: changing the type (or
+        # leaving the gateway) makes the server connect directly, so the
+        # address must then pass the same policy as a direct one.
+        if (address is not None or authentication_type is not None or gateway_id is not _UNSET) and (
+            next_gateway is None or next_auth_type != "native"
+        ):
+            _check_address_reachable_by_policy(next_address)
         next_tenant = tenant if tenant is not None else connection.tenant
         next_database = database if database is not None else connection.database
 

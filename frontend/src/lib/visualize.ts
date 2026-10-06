@@ -250,7 +250,12 @@ export function formatNumber(value: number, format: NumberFormat, total = 0): st
 }
 
 function csvField(value: unknown): string {
-  const text = value === null || value === undefined ? "" : String(value);
+  let text = value === null || value === undefined ? "" : String(value);
+  // Element and series names come from the TM1 server, where anyone who
+  // can name an element could make it a formula that runs when the CSV
+  // is opened in Excel. Text only: numbers (including negatives) stay
+  // numbers.
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

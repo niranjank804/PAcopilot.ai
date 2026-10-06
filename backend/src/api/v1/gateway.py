@@ -35,6 +35,7 @@ from src.schemas.tm1_gateway import (
 )
 from src.tm1.gateway.relay import get_broker
 from src.tm1.gateway.service import is_online, tm1_gateway_service
+from src.services.audit_service import audit_service
 
 admin_router = APIRouter(prefix="/tm1/gateways", tags=["TM1 Gateways"])
 agent_router = APIRouter(prefix="/gateway", tags=["TM1 Gateway (agent)"])
@@ -111,6 +112,8 @@ async def create_gateway(
     )
     await db.refresh(gateway)
     app_logger.info(f"tm1_gateway_created id={gateway.id} by={current_user.id}")
+    await audit_service.record(db, current_user, "gateway_created", "TM1Gateway", gateway.id,
+                               {"name": gateway.name}, request)
     return ApiResponse(
         success=True,
         data=GatewayKeyResponse(
@@ -131,6 +134,8 @@ async def rotate_gateway_key(
     )
     counts = await _connection_counts(db, current_user.organization_id)
     app_logger.info(f"tm1_gateway_key_rotated id={gateway.id} by={current_user.id}")
+    await audit_service.record(db, current_user, "gateway_key_rotated", "TM1Gateway", gateway.id,
+                               {"name": gateway.name}, request)
     return ApiResponse(
         success=True,
         data=GatewayKeyResponse(
@@ -142,11 +147,13 @@ async def rotate_gateway_key(
 @admin_router.delete("/{gateway_id}", response_model=ApiResponse[dict])
 async def delete_gateway(
     gateway_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(require_permission("tm1.write")),
 ):
     await tm1_gateway_service.delete(db, gateway_id, current_user.organization_id)
     app_logger.info(f"tm1_gateway_deleted id={gateway_id} by={current_user.id}")
+    await audit_service.record(db, current_user, "gateway_deleted", "TM1Gateway", gateway_id, None, request)
     return ApiResponse(success=True, data={"deleted": True})
 
 

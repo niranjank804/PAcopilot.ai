@@ -31,6 +31,7 @@ from src.schemas.knowledge import (
     VisualStatusResponse,
 )
 from src.schemas.response import ApiResponse
+from src.services.audit_service import audit_service
 
 router = APIRouter(
     prefix="/knowledge",
@@ -73,6 +74,8 @@ async def upload_document(
         content_type=content_type,
         file_bytes=file_bytes,
     )
+    await audit_service.record(db, current_user, "document_uploaded", "KnowledgeDocument", document.id,
+                               {"filename": document.filename, "bytes": len(file_bytes)})
 
     return ApiResponse(success=True, data=DocumentResponse.model_validate(document))
 
@@ -108,6 +111,8 @@ async def upload_document_from_upload(
         )
     finally:
         await delete_upload(payload.key)
+    await audit_service.record(db, current_user, "document_uploaded", "KnowledgeDocument", document.id,
+                               {"filename": document.filename, "bytes": len(file_bytes)})
 
     return ApiResponse(success=True, data=DocumentResponse.model_validate(document))
 
@@ -163,6 +168,7 @@ async def delete_document(
         document_id,
         current_user.organization_id,
     )
+    await audit_service.record(db, current_user, "document_deleted", "KnowledgeDocument", document_id)
 
     return ApiResponse(success=True, data=None)
 
