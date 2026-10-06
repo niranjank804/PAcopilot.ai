@@ -28,6 +28,19 @@ export interface AuthUser {
    * can still be talking to an API that predates these fields. */
   onboarding_completed_at?: string | null;
   onboarding_dismissed_at?: string | null;
+
+  /** Role names, from /auth/me. Optional for the same reason as above. */
+  roles?: string[];
+}
+
+export const SUPER_ADMIN_ROLE = "Super Admin";
+
+/** Whether the signed-in person is the platform's Super Admin. Safe
+ * outside an AuthProvider (it then says no), so shared chrome such as the
+ * sidebar can ask without every test having to provide one. */
+export function useIsSuperAdmin(): boolean {
+  const ctx = useContext(AuthContext);
+  return Boolean(ctx?.user?.roles?.includes(SUPER_ADMIN_ROLE));
 }
 
 interface Tokens {

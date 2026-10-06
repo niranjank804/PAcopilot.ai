@@ -136,6 +136,12 @@ export const PRODUCT_TOUR: TourStep[] = [
     body: "Your organization's details and plan.",
   },
   {
+    target: "nav-platform",
+    route: "/dashboard",
+    title: "Platform (Super Admin)",
+    body: "Everyone across every workspace: sign-ins with time and address, TM1 connections and the TM1 user each uses (never a password), who used which server and on what, and the audit log — with deactivate, sign-out and suspend to stop misuse.",
+  },
+  {
     target: "page-tour",
     route: "/dashboard",
     title: "A tour for every page",
@@ -327,6 +333,53 @@ export function useTour(steps: TourStep[] = PRODUCT_TOUR) {
  * Related controls share a step so a tour stays short enough to finish.
  */
 export const FEATURE_TOURS: Record<string, TourStep[]> = {
+  "/platform": [
+    {
+      target: "platform-overview",
+      title: "The platform at a glance",
+      body: "Workspaces, people and those waiting for approval, who was active and signed in over the last day (with failed attempts), TM1 connections and how many are suspended, and AI requests and cost.",
+    },
+    {
+      target: "platform-search",
+      title: "Find anyone or anything",
+      body: "Filters every tab at once: names, emails, workspaces, server names and addresses, TM1 users and IP addresses.",
+    },
+    {
+      target: "platform-tabs",
+      title: "Four views",
+      body: "People, TM1 connections, Sign-ins and the Audit log. Each lists every workspace, newest or most recently active first.",
+    },
+    {
+      target: "platform-people",
+      title: "People",
+      body: "Each person's workspace and roles, status, last sign-in, last activity, the address they last signed in from, how many TM1 servers they used and own in 30 days, and their AI requests and cost.",
+    },
+    {
+      target: "platform-person-actions",
+      title: "Activity, sign out, deactivate",
+      body: "The clock shows what they did in 30 days — each action, every TM1 call the assistant made for them with the server and objects touched — and their sign-ins. Sign out ends every session; Deactivate also blocks sign-in until you reactivate. Your reason goes into the audit log.",
+    },
+    {
+      target: "platform-connections",
+      title: "TM1 connections",
+      body: "Every server each workspace connected: address and port, database and tenant for cloud servers, the TM1 user it signs in as, environment, owner, when it was last used and by whom. Passwords and API keys are never shown.",
+    },
+    {
+      target: "platform-connection-actions",
+      title: "Suspend a connection",
+      body: "Stops every use of its credentials — chat, alerts, deployments, scheduled jobs — until you resume it. Its owner sees that it is suspended and your reason.",
+    },
+    {
+      target: "platform-sign-ins",
+      title: "Sign-ins",
+      body: "Every attempt with its time, result, method, address and device, including failures for names that match no account — what a password-guessing run looks like.",
+    },
+    {
+      target: "platform-audit",
+      title: "Audit log",
+      body: "Every recorded action across all workspaces with who, where from and on which server. Export CSV saves it for a review or an incident.",
+    },
+  ],
   "/dashboard": [
     {
       target: "dashboard-ask",

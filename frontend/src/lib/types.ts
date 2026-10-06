@@ -23,6 +23,9 @@ export interface TM1Connection {
   created_by?: string;
   // False for a member's private connection an admin can manage, not use.
   can_use?: boolean;
+  /** Set when the platform administrator suspended it; nothing can use it. */
+  suspended_at?: string | null;
+  suspended_reason?: string | null;
 }
 
 export type RegistrationStatus = "pending" | "approved" | "rejected";

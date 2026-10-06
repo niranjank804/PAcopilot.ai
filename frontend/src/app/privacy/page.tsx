@@ -49,6 +49,13 @@ export default function PrivacyPage() {
           <strong>Audit records</strong> — significant actions, such as
           deploying a change to a TM1 server.
         </li>
+        <li>
+          <strong>Sign-in and activity records</strong> — when you sign in
+          (successfully or not), from which IP address and browser, and when
+          you were last active. The platform operator reviews these, your
+          TM1 connection details (never their credentials) and your actions
+          in the application to keep the service secure and to stop misuse.
+        </li>
       </ul>
 
       <h2>Who else processes it</h2>

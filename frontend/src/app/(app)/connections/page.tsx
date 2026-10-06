@@ -357,6 +357,14 @@ export default function ConnectionsPage() {
                     <Badge variant={connection.is_active ? "success" : "secondary"}>
                       {connection.is_active ? "active" : "inactive"}
                     </Badge>
+                    {connection.suspended_at ? (
+                      <Badge
+                        variant="destructive"
+                        title={connection.suspended_reason ?? "Suspended by the platform administrator"}
+                      >
+                        suspended by the platform administrator
+                      </Badge>
+                    ) : null}
                   </span>
                 </div>
                 <CardDescription>

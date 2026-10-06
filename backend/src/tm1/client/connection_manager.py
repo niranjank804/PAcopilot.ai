@@ -7,6 +7,7 @@ from src.core.config import settings
 from src.database.models.tm1_connection import TM1Connection
 from src.tm1.addressing import parse_address
 from src.tm1.crypto import decrypt_password
+from src.tm1.exceptions import TM1ConnectionSuspendedError
 from src.tm1.gateway.relay import install as install_gateway_transport
 from src.tm1.resilience import call_with_resilience, remove_circuit_breaker
 
@@ -117,6 +118,16 @@ class TM1ConnectionManager:
         self._clients: dict[uuid.UUID, TM1Service] = {}
 
     async def get_client(self, connection: TM1Connection) -> TM1Service:
+        # Every use of a connection's credentials passes through here, so
+        # this one check stops chat tools, monitors, deployments and
+        # scheduled jobs alike — including a session opened before the
+        # suspension, which is dropped rather than reused.
+        if getattr(connection, "suspended_at", None) is not None:
+            self.invalidate(connection.id)
+            raise TM1ConnectionSuspendedError(
+                "This TM1 connection has been suspended by the platform administrator."
+            )
+
         if connection.id in self._clients:
             return self._clients[connection.id]
 

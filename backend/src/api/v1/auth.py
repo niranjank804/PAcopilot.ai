@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.auth import get_current_active_user
@@ -15,7 +15,10 @@ from src.schemas.auth import (
     UserResponse,
 )
 from src.schemas.response import ApiResponse
+from src.core.exceptions import AppException
+from src.repositories.user_role_repository import user_role_repository
 from src.services.auth_service import auth_service
+from src.services.sign_in_service import sign_in_service
 
 router = APIRouter(
     prefix="/auth",
@@ -47,12 +50,28 @@ async def register(
 )
 async def login(
     request: LoginRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     _throttle: None = Depends(auth_throttle("login", "AUTH_LOGIN_ATTEMPTS_PER_WINDOW")),
 ):
-    token = await auth_service.login(
-        db,
-        request,
+    try:
+        token = await auth_service.login(
+            db,
+            request,
+        )
+    except AppException as error:
+        await sign_in_service.record(
+            db, http_request, method="password", success=False,
+            identifier=request.username, reason=str(error),
+        )
+        # Committed before re-raising: the request rolls back on an
+        # exception, and a failed attempt is exactly what must be kept.
+        await db.commit()
+        raise
+
+    await sign_in_service.record(
+        db, http_request, method="password", success=True,
+        identifier=request.username, access_token=token.access_token,
     )
 
     return ApiResponse(success=True, data=token)
@@ -72,6 +91,10 @@ async def refresh(
         request,
     )
 
+    # A refresh happens about every half hour of use, so it marks the
+    # person as active without a write on every request.
+    await sign_in_service.seen(db, token.access_token)
+
     return ApiResponse(success=True, data=token)
 
 
@@ -81,10 +104,22 @@ async def refresh(
 )
 async def google_login(
     request: GoogleLoginRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     _throttle: None = Depends(auth_throttle("google_login", "AUTH_LOGIN_ATTEMPTS_PER_WINDOW")),
 ):
-    token = await auth_service.google_login(db, request.id_token)
+    try:
+        token = await auth_service.google_login(db, request.id_token)
+    except AppException as error:
+        await sign_in_service.record(
+            db, http_request, method="google", success=False, reason=str(error),
+        )
+        await db.commit()
+        raise
+
+    await sign_in_service.record(
+        db, http_request, method="google", success=True, access_token=token.access_token,
+    )
 
     return ApiResponse(success=True, data=token)
 
@@ -155,6 +190,13 @@ async def logout_all(
     response_model=ApiResponse[UserResponse],
 )
 async def get_me(
+    db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user),
 ):
-    return ApiResponse(success=True, data=current_user)
+    # Role names, so the app can show what only some roles may open (the
+    # platform view is the Super Admin's) without a request of its own.
+    roles = await user_role_repository.role_names_by_user(db, [current_user.id])
+    return ApiResponse(
+        success=True,
+        data=current_user.model_copy(update={"roles": roles.get(current_user.id, [])}),
+    )

@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -114,4 +115,23 @@ class TM1Connection(BaseModel, OrganizationScoped):
         ForeignKey("tm1_gateways.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
+    )
+
+    # Set by the platform owner (Super Admin) to stop all use of this
+    # connection's credentials, whatever the organization's own settings.
+    # Enforced where a TM1 session is opened (tm1/client/connection_manager).
+    suspended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    suspended_reason: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
+    suspended_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
     )

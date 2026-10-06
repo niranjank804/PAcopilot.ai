@@ -18,6 +18,7 @@ import {
   Rocket,
   Server,
   Settings,
+  ShieldAlert,
   Users,
   UsersRound,
   type LucideIcon,
@@ -26,6 +27,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Tip } from "@/components/ui/tooltip";
+import { useIsSuperAdmin } from "@/lib/auth-context";
 import { useRememberedFlag } from "@/lib/use-remembered-flag";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +48,9 @@ interface NavItem {
   /** Shown only while the user is inside this section, so the first
    * level of navigation stays short. */
   children?: NavItem[];
+  /** Only the platform's Super Admin sees it. Hiding is convenience; the
+   * API refuses everyone else regardless. */
+  superAdminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -206,6 +211,14 @@ const NAV_GROUPS: NavGroup[] = [
         tour: "nav-settings",
         help: "Your organization's name and plan.",
       },
+      {
+        label: "Platform",
+        href: "/platform",
+        icon: ShieldAlert,
+        tour: "nav-platform",
+        superAdminOnly: true,
+        help: "Super Admin only: every workspace's people, sign-ins with time and address, TM1 connections and the TM1 user each signs in with (never a password), who used which server and on what, and the audit log — with deactivate, sign-out and suspend to stop misuse.",
+      },
     ],
   },
 ];
@@ -231,6 +244,7 @@ export function SidebarNav({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
+  const superAdmin = useIsSuperAdmin();
 
   return (
     <nav className={cn("flex-1 overflow-y-auto py-4", collapsed ? "space-y-4 px-2" : "space-y-6 px-3")}>
@@ -242,7 +256,7 @@ export function SidebarNav({
             </p>
           ) : null}
 
-          {group.items.map((item) => {
+          {group.items.filter((item) => superAdmin || !item.superAdminOnly).map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
 

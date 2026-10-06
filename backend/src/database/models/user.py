@@ -93,6 +93,19 @@ class User(BaseModel, OrganizationScoped):
         nullable=True,
     )
 
+    # For the platform owner's view of who is using the product: set on
+    # each successful sign-in, and on each token refresh (about every half
+    # hour of activity), so neither costs a write per request.
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     registration_status: Mapped[str] = mapped_column(
         String(20),
         default="approved",

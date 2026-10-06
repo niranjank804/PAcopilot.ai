@@ -13,6 +13,14 @@ class TM1OutcomeUnknownError(TM1ConnectionError):
     knows whether it happened, and nothing may assume it did not."""
 
 
+class TM1ConnectionSuspendedError(AppException):
+    """The platform owner suspended this connection: nothing may open a
+    session with its credentials until it is resumed."""
+
+    status_code = 403
+    code = "TM1_CONNECTION_SUSPENDED"
+
+
 class TM1AuthenticationError(AppException):
     status_code = 401
     code = "TM1_AUTHENTICATION_ERROR"

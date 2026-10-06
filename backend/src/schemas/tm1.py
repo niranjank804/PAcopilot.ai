@@ -67,6 +67,10 @@ class ConnectionResponse(BaseModel):
     # False when the caller may manage this connection (an admin seeing a
     # member's private one) but not use it: pickers leave it out.
     can_use: bool = True
+    # Set when the platform owner suspended it: nothing can use it until
+    # it is resumed, so the Connections page says so instead of failing.
+    suspended_at: datetime | None = None
+    suspended_reason: str | None = None
 
 
 class TestConnectionResponse(BaseModel):
