@@ -239,3 +239,31 @@ describe("turn timings (fake clock)", () => {
     expect(turns.timings).toEqual({ speech_started: 900, answer_done: 1500, listening_again: 3400 });
   });
 });
+
+describe("listening watchdog (fake clock)", () => {
+  it("treats a session that reports nothing as silence, then pauses", async () => {
+    const { LISTEN_TIMEOUT_MS } = await import("../hands-free");
+    const { io, turns } = setup();
+    turns.enable();
+    vi.advanceTimersByTime(LISTEN_TIMEOUT_MS);
+    expect(io.stopListening).toHaveBeenCalled();
+    turns.onNoSpeech(); // the closed session's late end: ignored
+    vi.advanceTimersByTime(RESTART_DELAY_MS);
+    expect(turns.state).toBe("listening");
+    vi.advanceTimersByTime(LISTEN_TIMEOUT_MS + RESTART_DELAY_MS);
+    vi.advanceTimersByTime(LISTEN_TIMEOUT_MS);
+    expect(turns.state).toBe("paused");
+    expect(turns.message).toBe(PAUSED_SILENCE);
+  });
+
+  it("words arriving keep the microphone open", async () => {
+    const { LISTEN_TIMEOUT_MS } = await import("../hands-free");
+    const { io, turns } = setup();
+    turns.enable();
+    vi.advanceTimersByTime(LISTEN_TIMEOUT_MS - 100);
+    turns.onHeard();
+    vi.advanceTimersByTime(LISTEN_TIMEOUT_MS - 100);
+    expect(io.stopListening).not.toHaveBeenCalled();
+    expect(turns.state).toBe("listening");
+  });
+});

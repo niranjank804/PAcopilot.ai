@@ -45,6 +45,10 @@ export const STOP_PHRASE = /^(stop|stop listening|that's all|thats all|goodbye|b
 
 export const SILENT_LIMIT = 3;
 export const RESTART_DELAY_MS = 400;
+/** A listening session that hears nothing at all for this long is treated
+ *  as silence. Chrome sometimes leaves the recogniser open indefinitely in
+ *  a quiet room (seen live: over 70 s), showing "Listening" to nobody. */
+export const LISTEN_TIMEOUT_MS = 15000;
 export const ERROR_RETRY_DELAYS_MS = [500, 1000, 2000];
 /** The same words again this soon are the browser repeating itself. */
 export const DUPLICATE_WINDOW_MS = 3000;
@@ -61,6 +65,7 @@ export class HandsFreeTurns {
   message: string | null = null;
   private enabled = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private watchdog: ReturnType<typeof setTimeout> | null = null;
   private silent = 0;
   private errors = 0;
   private failedAnswers = 0;
@@ -88,6 +93,41 @@ export class HandsFreeTurns {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    this.clearWatchdog();
+  }
+
+  private clearWatchdog() {
+    if (this.watchdog !== null) {
+      clearTimeout(this.watchdog);
+      this.watchdog = null;
+    }
+  }
+
+  /** Open the microphone now, with a watchdog for a session that never
+   *  reports anything. */
+  private listen() {
+    this.set("listening");
+    this.io.startListening();
+    this.armWatchdog();
+  }
+
+  private armWatchdog() {
+    this.clearWatchdog();
+    this.watchdog = setTimeout(() => {
+      this.watchdog = null;
+      if (!this.enabled || this.state !== "listening") return;
+      // Close it ourselves and count it as silence. The session's own late
+      // end is then ignored, because we are no longer "listening".
+      this.silent += 1;
+      this.io.stopListening();
+      if (this.silent >= SILENT_LIMIT) return this.pause(PAUSED_SILENCE);
+      this.listenAfter(RESTART_DELAY_MS);
+    }, LISTEN_TIMEOUT_MS);
+  }
+
+  /** Words are arriving: the speaker is mid-sentence, keep listening. */
+  onHeard() {
+    if (this.enabled && this.state === "listening") this.armWatchdog();
   }
 
   /** Open the microphone after `delay`; any earlier pending restart is
@@ -99,8 +139,7 @@ export class HandsFreeTurns {
       this.timer = null;
       if (!this.enabled || this.answering || this.state === "paused") return;
       this.mark("listening_again");
-      this.set("listening");
-      this.io.startListening();
+      this.listen();
     }, delay);
   }
 
@@ -123,8 +162,7 @@ export class HandsFreeTurns {
       return;
     }
     this.clearTimer();
-    this.set("listening");
-    this.io.startListening();
+    this.listen();
   }
 
   disable() {
@@ -143,8 +181,7 @@ export class HandsFreeTurns {
     this.failedAnswers = 0;
     if (this.answering) return this.set("processing");
     this.clearTimer();
-    this.set("listening");
-    this.io.startListening();
+    this.listen();
   }
 
   /** Tap while the assistant speaks: stop it and listen now. */
@@ -152,8 +189,7 @@ export class HandsFreeTurns {
     if (!this.enabled) return;
     this.io.stopSpeaking();
     this.clearTimer();
-    this.set("listening");
-    this.io.startListening();
+    this.listen();
   }
 
   /** The microphone stopped with everything it heard. Only counts while

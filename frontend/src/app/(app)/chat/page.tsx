@@ -600,7 +600,10 @@ export default function ChatPage() {
       setLastInputWasVoice(true);
       // Hands-free sends the whole sentence when the microphone stops
       // (onFinal) instead of filling the box.
-      if (handsFreeRef.current) return;
+      if (handsFreeRef.current) {
+        turnsRef.current?.onHeard();
+        return;
+      }
       // The guess replaces what this dictation wrote so far; anything
       // typed before it stays.
       const base = dictationBaseRef.current;
