@@ -136,6 +136,7 @@ class SearchTaskMemoryTool(Tool):
                     "decisions": [d["text"] for d in (t.state or {}).get("decisions", [])[-3:]],
                     "changes": (t.state or {}).get("actions", [])[-5:],
                     "next_step": (t.state or {}).get("next_step"),
+                    "last_answer": ((t.state or {}).get("last_answer") or {}).get("text"),
                 }
                 for t in tasks
             ],

@@ -173,12 +173,23 @@ class TaskMemoryService:
         await db.flush()
         return task
 
-    async def end_turn(self, db, task: AITask | None, user_id) -> None:
-        """After the answer: the task waits on the person, or on approval."""
+    async def end_turn(self, db, task: AITask | None, user_id, answer: str | None = None) -> None:
+        """After the answer: the task waits on the person, or on approval.
+
+        The answer's opening is kept as `last_answer`, marked as such — not
+        as a finding. The assistant does not always record its findings with
+        update_task_memory (seen live, 2026-10-07), and without this a task
+        picked up later in another conversation would have lost what the
+        last turn concluded."""
 
         if task is None:
             return
         task = await self._locked(db, task)
+        if answer and answer.strip():
+            state = dict(task.state or {})
+            state["last_answer"] = {"text": _cut(answer, 600), "at": _now().isoformat()}
+            self._touch(task, state)
+            await self._event(db, task, "answer", {"text": _cut(answer, 2000)}, "assistant", user_id)
         await self.refresh_actions(db, task, user_id)
         if task.status == "active":
             pending = any(a.get("status") == "draft" for a in task.state.get("actions", []))
@@ -394,6 +405,9 @@ class TaskMemoryService:
             ]
         if state.get("next_step"):
             lines.append(f"Next step: {state['next_step']}")
+        if state.get("last_answer"):
+            lines.append("Your last answer in this task began (a summary of what you said, not a verified "
+                         f"finding): {state['last_answer']['text']}")
         return "\n".join(lines)
 
     def summary(self, task: AITask) -> dict:

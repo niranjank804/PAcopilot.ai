@@ -1353,7 +1353,7 @@ class AIOrchestrator:
             user_agent=user_agent,
         )
 
-        await task_memory_service.end_turn(db, task, user_id)
+        await task_memory_service.end_turn(db, task, user_id, response.content)
 
         return ChatResult(
             conversation_id=conversation.id,
@@ -1796,7 +1796,7 @@ class AIOrchestrator:
             user_agent=user_agent,
         )
 
-        await task_memory_service.end_turn(db, task, user_id)
+        await task_memory_service.end_turn(db, task, user_id, "".join(final_content_parts))
 
         yield OrchestratedStreamEvent(
             type="done",

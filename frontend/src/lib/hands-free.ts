@@ -156,9 +156,11 @@ export class HandsFreeTurns {
     this.io.startListening();
   }
 
-  /** The microphone stopped with everything it heard. */
+  /** The microphone stopped with everything it heard. Only counts while
+   *  this controller is listening: a session it closed itself (to think or
+   *  speak) ending late must not start a turn. */
   onFinal(text: string) {
-    if (!this.enabled) return;
+    if (!this.enabled || this.state !== "listening") return;
     const said = text.trim();
     if (!said) return this.listenAfter(RESTART_DELAY_MS);
     this.silent = 0;
@@ -179,14 +181,14 @@ export class HandsFreeTurns {
   }
 
   onNoSpeech() {
-    if (!this.enabled || this.state === "paused") return;
+    if (!this.enabled || this.state !== "listening") return;
     this.silent += 1;
     if (this.silent >= SILENT_LIMIT) return this.pause(PAUSED_SILENCE);
     this.listenAfter(RESTART_DELAY_MS);
   }
 
   onError(code: string) {
-    if (!this.enabled || this.state === "paused") return;
+    if (!this.enabled || (this.state !== "listening" && this.state !== "restarting")) return;
     if (code === "not-allowed" || code === "service-not-allowed") return this.pause(PAUSED_BLOCKED);
     // "aborted" is our own stop; nothing to recover.
     if (code === "aborted") return;

@@ -443,3 +443,19 @@ async def test_a_work_item_recorded_in_the_task_links_to_it(db_session):
     assert "Work item: PBI 77" in block
     found = await task_memory_service.search(db_session, org.id, admin.id, work_item_id=item.id)
     assert [t.id for t in found] == [task.id]
+
+
+@pytest.mark.asyncio
+async def test_the_last_answer_is_kept_even_when_no_finding_was_recorded(
+    client, db_session, scripted, tm1_credentials_key, fake_tm1_client,
+):
+    _org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    scripted.connection_id = await _connection(client, headers, "dev")
+    first = await _say(client, headers, "Look at the Sales cube", connection_id=scripted.connection_id)
+    await _say(client, headers, "and then?", first["conversation_id"], connection_id=scripted.connection_id)
+    # The model recorded no finding; its answer still carries over, labelled as an answer.
+    assert "Your last answer in this task began" in scripted.turns[-1]["context"]
+    assert "Here is what I know." in scripted.turns[-1]["context"]
+    [task] = await _tasks(db_session, first["conversation_id"])
+    assert task.state.get("findings") in (None, [])

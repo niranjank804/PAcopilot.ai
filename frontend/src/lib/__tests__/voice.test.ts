@@ -262,3 +262,25 @@ describe("newSpeech — one sentence said once lands once", () => {
     expect(dictate(["Can you hear me"])).toBe("Can you hear me");
   });
 });
+
+describe("bestGuess (live test, 2026-10-07)", () => {
+  it("keeps the newest guess at the whole sentence instead of adding each one", async () => {
+    const { bestGuess } = await import("../voice");
+    let heard = "";
+    for (const guess of [
+      "Ex about actual al",
+      "Explain about actual all question",
+      "Explain about actual all question process",
+      "Explain about actual algoration process",
+    ]) {
+      heard = bestGuess(heard, guess);
+    }
+    expect(heard).toBe("Explain about actual algoration process");
+  });
+
+  it("ignores a shorter repeat of what was already heard", async () => {
+    const { bestGuess } = await import("../voice");
+    expect(bestGuess("Hi can you hear me", "Hi can you")).toBe("Hi can you hear me");
+    expect(bestGuess("Hi can you", "Hi can you hear me")).toBe("Hi can you hear me");
+  });
+});

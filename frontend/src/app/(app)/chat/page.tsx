@@ -583,6 +583,8 @@ export default function ChatPage() {
   const handsFreeRef = useRef(false);
   const isStreamingRef = useRef(false);
   const sendRef = useRef<(text?: string) => Promise<void>>(async () => {});
+  // What the composer held when dictation started.
+  const dictationBaseRef = useRef("");
   // Whose turn it is in hands-free (src/lib/hands-free.ts): the single
   // source of truth for listening, thinking, speaking and pausing.
   const [turnState, setTurnState] = useState<TurnState>("idle");
@@ -594,14 +596,15 @@ export default function ChatPage() {
   const [newTaskNext, setNewTaskNext] = useState(false);
 
   const voice = useVoice({
-    onTranscript: (transcript) => {
+    onTranscript: (guess) => {
       setLastInputWasVoice(true);
       // Hands-free sends the whole sentence when the microphone stops
-      // (onFinal) instead of filling the box piece by piece.
+      // (onFinal) instead of filling the box.
       if (handsFreeRef.current) return;
-      setInput((previous) =>
-        previous ? `${previous} ${transcript}` : transcript,
-      );
+      // The guess replaces what this dictation wrote so far; anything
+      // typed before it stays.
+      const base = dictationBaseRef.current;
+      setInput(base ? `${base} ${guess}` : guess);
       inputRef.current?.focus();
     },
     onFinal: (text) => turnsRef.current?.onFinal(text),
@@ -610,6 +613,9 @@ export default function ChatPage() {
     onSpeechDone: () => turnsRef.current?.onSpeechDone(),
     onNoSpeech: () => turnsRef.current?.onNoSpeech(),
     onError: (code) => turnsRef.current?.onError(code),
+    // Chrome may end the microphone with no words and no error; for
+    // hands-free that is silence, not a reason to wait forever.
+    onSilentEnd: () => turnsRef.current?.onNoSpeech(),
   });
 
   // The controller talks to the browser through these; read through a ref
@@ -742,6 +748,7 @@ export default function ChatPage() {
       return;
     }
 
+    dictationBaseRef.current = input.trim();
     voice.start();
   };
 

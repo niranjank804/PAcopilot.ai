@@ -159,6 +159,27 @@ export function nextSpeakableChunk(
  * that extends what was heard adds its tail; one already contained in it
  * adds nothing; anything else is a genuinely new phrase and is added whole.
  */
+/**
+ * The best guess at what was said in this listening session.
+ *
+ * With continuous recognition off, every result is a guess at the WHOLE
+ * utterance, and the browser revises it: "Ex about actual al" → "Explain
+ * about actual all question" → "Explain about actual allocation process".
+ * Appending each guess wrote the sentence three or four times (live test,
+ * 2026-10-07). So the newest guess replaces the last — except a shorter
+ * repeat of what is already there (Android re-sends an earlier, partial
+ * guess at the end), which is ignored.
+ */
+export function bestGuess(previous: string, latest: string): string {
+  const text = latest.trim().replace(/\s+/g, " ");
+  if (!text) return previous;
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").trim();
+  if (previous && norm(previous).includes(norm(text)) && norm(text).length < norm(previous).length) {
+    return previous;
+  }
+  return text;
+}
+
 export function newSpeech(
   heard: string,
   latest: string,
@@ -184,7 +205,8 @@ export function newSpeech(
 const MAX_SPEAK_CHARS = 4000;
 
 export function useVoice(options: {
-  /** Called with each new piece of what was said (see newSpeech). */
+  /** Called with the current best guess at everything said in this
+   *  listening session (see bestGuess) — it replaces, never appends. */
   onTranscript: (text: string) => void;
   /** Called once when the microphone stops, with everything it heard in
    *  that session — what hands-free mode sends. */
@@ -196,6 +218,9 @@ export function useVoice(options: {
   /** Called for any other recognition failure, with the browser's code
    *  (`not-allowed`, `network`, `aborted`, `audio-capture`...). */
   onError?: (code: string) => void;
+  /** The microphone stopped having heard nothing, and said no error.
+   *  Chrome does this; without it hands-free waited forever. */
+  onSilentEnd?: () => void;
 }) {
   const { onTranscript } = options;
 
@@ -219,6 +244,9 @@ export function useVoice(options: {
   // Everything already taken from the current listening session; see
   // newSpeech. Reset each time the microphone starts.
   const heardRef = useRef("");
+  // Whether this session already reported an error (whose end then needs
+  // no second report as a silent end).
+  const erroredRef = useRef(false);
   const onTranscriptRef = useRef(onTranscript);
   const optionsRef = useRef(options);
   // Utterances queued and not yet finished. `speechGenRef` changes on
@@ -283,14 +311,15 @@ export function useVoice(options: {
 
     recognition.onresult = (event) => {
       const latest = event.results[event.results.length - 1][0].transcript;
-      const next = newSpeech(heardRef.current, latest);
+      const guess = bestGuess(heardRef.current, latest);
+      if (guess === heardRef.current) return;
 
-      heardRef.current = next.heard;
-      setState("idle");
-      if (next.added) onTranscriptRef.current(next.added);
+      heardRef.current = guess;
+      onTranscriptRef.current(guess);
     };
 
     recognition.onerror = (event) => {
+      erroredRef.current = true;
       // `not-allowed` is a denied permission prompt, not a failure to
       // hear — telling someone to "try again" when the browser is
       // blocking the microphone sends them in a loop.
@@ -312,6 +341,8 @@ export function useVoice(options: {
       const heard = heardRef.current.trim();
       heardRef.current = "";
       if (heard) optionsRef.current.onFinal?.(heard);
+      else if (!erroredRef.current) optionsRef.current.onSilentEnd?.();
+      erroredRef.current = false;
     };
 
     recognitionRef.current = recognition;
@@ -353,6 +384,7 @@ export function useVoice(options: {
     setState("requesting-permission");
 
     heardRef.current = "";
+    erroredRef.current = false;
 
     try {
       recognition.start();

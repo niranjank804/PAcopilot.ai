@@ -463,6 +463,24 @@ describe("voice", () => {
     expect(streamRequest).not.toHaveBeenCalled();
   });
 
+  it("writes a revised sentence once, not every guess (live bug)", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    renderChat();
+    const box = screen.getByPlaceholderText(/what do you want to accomplish/i);
+    await user.type(box, "Context:");
+    await user.click(await screen.findByRole("button", { name: /start voice input/i }));
+
+    for (const guess of ["Ex about actual al", "Explain about actual all question",
+                         "Explain about actual allocation process"]) {
+      act(() => {
+        speech.recognition.onresult?.({ results: { length: 1, 0: { 0: { transcript: guess } } } });
+      });
+    }
+
+    await waitFor(() => expect(box).toHaveValue("Context: Explain about actual allocation process"));
+  });
+
   it("sends a spoken question through the same path as a typed one", async () => {
     // The governance claim, asserted rather than asserted-in-prose: one
     // transport, so one set of permission and audit checks.
@@ -954,6 +972,22 @@ describe("hands-free conversation", () => {
     const resume = screen.getByRole("button", { name: /resume hands-free conversation/i });
     await user.click(resume);
     expect(speech.recognition.started).toBe(true);
+    expect(streamRequest).not.toHaveBeenCalled();
+  });
+
+  it("a microphone that ends silently is listened to again, not left hanging (live bug)", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    renderChat();
+    await user.click(await screen.findByRole("button", { name: /start hands-free conversation/i }));
+    const startSpy = vi.spyOn(speech.recognition, "start");
+
+    // Chrome: the session ends with no words and no error.
+    act(() => {
+      (speech.recognition as unknown as { onend: () => void }).onend();
+    });
+    await waitFor(() => expect(startSpy).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(screen.getByRole("button", { name: /stop hands-free conversation/i })).toBeInTheDocument();
     expect(streamRequest).not.toHaveBeenCalled();
   });
 
