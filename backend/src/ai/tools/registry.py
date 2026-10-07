@@ -20,6 +20,7 @@ from src.ai.tools.tm1.changes import (
     ProposeRuleUpdateTool,
 )
 from src.ai.tools.memory import ProposeEngineeringMemoryTool, SearchEngineeringMemoryTool
+from src.ai.tools.task_memory import SearchTaskMemoryTool, UpdateTaskMemoryTool
 from src.ai.tools.work_items import (
     GetWorkItemTool,
     LinkWorkItemChangeTool,
@@ -135,6 +136,8 @@ TOOLS: dict[str, Tool] = {
         SearchEngineeringMemoryTool(),
         ProposeEngineeringMemoryTool(),
         GetWorkItemTool(),
+        UpdateTaskMemoryTool(),
+        SearchTaskMemoryTool(),
         SaveWorkItemTool(),
         SaveWorkItemDocumentTool(),
         LinkWorkItemChangeTool(),

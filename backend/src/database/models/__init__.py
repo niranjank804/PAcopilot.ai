@@ -1,4 +1,5 @@
 from .ai_conversation import AIConversation
+from .ai_task import AITask, AITaskEvent
 from .ai_message import AIMessage
 from .ai_tool_execution import AIToolExecution
 from .ai_usage import AIUsage
@@ -39,6 +40,8 @@ from .work_item import IncidentInvestigation, WorkItem, WorkItemDocument, WorkIt
 from .monitor import MonitorAlert, MonitorRule
 
 __all__ = [
+    "AITask",
+    "AITaskEvent",
     "RequestLog",
     "SignInEvent",
     "Organization",

@@ -117,6 +117,8 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     "get_work_item": _c("knowledge", R, "Team work item and its linked records", REFERENCE, "reference"),
     # These three write PA-Copilot records only, never TM1, so they are not
     # TM1 writes in this table's sense (which only propose_* tools may be).
+    "update_task_memory": _c("knowledge", R, "This conversation's task memory (PA-Copilot only, not TM1)", DRAFT),
+    "search_task_memory": _c("knowledge", R, "The user's earlier tasks", REFERENCE, "query"),
     "save_work_item": _c("knowledge", R, "Work item record (PA-Copilot only, not TM1)", DRAFT, "reference"),
     "save_work_item_document": _c("knowledge", R, "Work item document (PA-Copilot only, not TM1)", DRAFT, "title"),
     "link_change_to_work_item": _c("knowledge", R, "Work item link (PA-Copilot only, not TM1)", DRAFT, "reference"),

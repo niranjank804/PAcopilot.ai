@@ -117,6 +117,8 @@ async def chat(
             ),
         ip_address=ip_address,
         user_agent=user_agent,
+        task_id=request.task_id,
+        new_task=request.new_task,
     )
 
     return ApiResponse(
@@ -126,6 +128,7 @@ async def chat(
             message_id=result.message_id,
             content=result.content,
             model=result.model,
+            task=result.task,
             usage=UsageResponse(
                 prompt_tokens=result.usage.input_tokens,
                 completion_tokens=result.usage.output_tokens,
@@ -321,6 +324,8 @@ async def chat_stream(
             ),
                 ip_address=ip_address,
                 user_agent=user_agent,
+                task_id=request.task_id,
+                new_task=request.new_task,
             ):
                 yield f"data: {event.model_dump_json()}\n\n"
         except (AIProviderError, ValidationException, QuotaExceededException) as exc:

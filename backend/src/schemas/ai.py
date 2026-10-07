@@ -32,6 +32,10 @@ class ChatRequest(BaseModel):
     # The TM1 server chosen in the chat. Its tools go there and nowhere
     # else; without it the agent is shown every connection and picks.
     connection_id: uuid.UUID | None = None
+    # Task memory: continue this task (one of this conversation's), or
+    # start a new one. Neither: the conversation's current task continues.
+    task_id: uuid.UUID | None = None
+    new_task: bool = False
 
 
 class UsageResponse(BaseModel):
@@ -47,6 +51,7 @@ class ChatResponse(BaseModel):
     content: str
     model: str
     usage: UsageResponse
+    task: dict | None = None
 
 
 class AgentResponse(BaseModel):

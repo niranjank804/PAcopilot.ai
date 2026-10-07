@@ -49,6 +49,8 @@ system_prompt: >-
 tool_names:
   - search_engineering_memory
   - get_work_item
+  - update_task_memory
+  - search_task_memory
   - save_work_item
   - save_work_item_document
   - link_change_to_work_item

@@ -51,10 +51,15 @@ from src.repositories.ai_usage_repository import ai_usage_repository
 from src.repositories.organization_repository import organization_repository
 from src.schemas.ai import AttachmentInput
 from src.services.audit_service import audit_service
+from src.services.task_memory_service import task_memory_service
 from src.services.engineering_memory_service import engineering_memory_service
 from src.tm1.exceptions import TM1NotFoundError
 from src.tm1.resilience import CircuitState, peek_circuit_breaker
 from src.tm1.service import tm1_integration_service
+
+
+# Messages of a conversation replayed to the model each turn (newest).
+HISTORY_LIMIT = 40
 
 
 async def _release_db(db: AsyncSession) -> None:
@@ -352,7 +357,9 @@ class ChatResult:
         model: str,
         usage: Usage,
         estimated_cost_usd,
+        task: dict | None = None,
     ):
+        self.task = task
         self.conversation_id = conversation_id
         self.message_id = message_id
         self.content = content
@@ -406,6 +413,15 @@ class AIOrchestrator:
             conversation.id,
         )
 
+        # Bounded: a long conversation used to resend every message on every
+        # turn. The newest HISTORY_LIMIT carry the thread; what came before
+        # survives as task memory (findings, decisions, changes), which is
+        # what a reference like "fix it" needs. The model must see a user
+        # message first, so a leading assistant reply is dropped.
+        messages = messages[-HISTORY_LIMIT:]
+        while messages and messages[0].role != "user":
+            messages = messages[1:]
+
         return [
             ChatMessage(role=message.role, content=message.content)
             for message in messages
@@ -418,6 +434,7 @@ class AIOrchestrator:
         system: str | None,
         persona: AgentPersona | None = None,
         connection_id: uuid.UUID | None = None,
+        task_context: str | None = None,
     ) -> tuple[str | None, str | None]:
         """Returns (stable, volatile) halves of the system prompt.
 
@@ -522,6 +539,8 @@ class AIOrchestrator:
         volatile_parts = [
             connection_context,
             memory_context,
+            # The active task: per turn, so it belongs in the uncached half.
+            task_context,
             system,
         ]
 
@@ -678,11 +697,12 @@ class AIOrchestrator:
                         db, requested_uuid, organization_id, user_id=user_id
                     )
 
+            extra = {"conversation_id": conversation_id} if getattr(tool, "needs_conversation", False) else {}
             result = await tool.execute(
                 db,
                 organization_id=organization_id,
                 user_id=user_id,
-                **tool_call.input,
+                **{**tool_call.input, **extra},
             )
         except AppException as exc:
             await self._record_tool_execution(
@@ -766,11 +786,50 @@ class AIOrchestrator:
             agent=agent,
         )
 
+        await self._fold_into_task(db, conversation_id, user_id, tool_call, result)
+
         return ToolResult(
             tool_call_id=tool_call.id,
             content=result,
             is_error=False,
         )
+
+    async def _fold_into_task(self, db, conversation_id, user_id, tool_call: ToolCall, result: str) -> None:
+        """Add what a tool call touched to the conversation's task. Never
+        allowed to fail the turn: in a savepoint, and errors are logged."""
+
+        try:
+            async with db.begin_nested():
+                conversation = await db.get(AIConversation, conversation_id)
+                task = await task_memory_service.current(db, conversation) if conversation else None
+                await task_memory_service.record_tool(
+                    db, task, user_id, name=tool_call.name, arguments=tool_call.input, result=result, ok=True,
+                )
+        except Exception:  # noqa: BLE001
+            app_logger.opt(exception=True).warning(f"Task memory not updated after {tool_call.name}")
+
+    async def _task_for_turn(self, db, conversation, user_id, message, *, persona, connection_id, enable_tools,
+                             task_id, new_task):
+        """The task this turn continues or starts, and its prompt block."""
+
+        started = time.monotonic()
+        task = await task_memory_service.begin_turn(
+            db, conversation, user_id, message,
+            agent=persona.name if persona is not None else None,
+            connection_id=connection_id, tools=enable_tools, new_task=new_task, task_id=task_id,
+        )
+        if task is not None:
+            await task_memory_service.refresh_actions(db, task, user_id)
+        block = await task_memory_service.prompt_block(db, task)
+        app_logger.info(
+            f"task_context ms={int((time.monotonic() - started) * 1000)} "
+            f"chars={len(block or '')} task={getattr(task, 'id', None)}"
+        )
+        return task, block
+
+    @staticmethod
+    def _task_ref(task) -> dict | None:
+        return None if task is None else {"id": str(task.id), "title": task.title, "status": task.status}
 
     async def _run_tool_loop(
         self,
@@ -1095,6 +1154,8 @@ class AIOrchestrator:
         connection_id: uuid.UUID | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
+        task_id: uuid.UUID | None = None,
+        new_task: bool = False,
     ) -> ChatResult:
 
         route = await self._route(db, organization_id, model, agent, connection_id, attachments)
@@ -1120,6 +1181,8 @@ class AIOrchestrator:
                 connection_id=connection_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
+                task_id=task_id,
+                new_task=new_task,
             )
         finally:
             _end_turn(organization_id)
@@ -1141,6 +1204,8 @@ class AIOrchestrator:
         connection_id: uuid.UUID | None,
         ip_address: str | None,
         user_agent: str | None,
+        task_id: uuid.UUID | None = None,
+        new_task: bool = False,
     ) -> ChatResult:
 
         persona: AgentPersona | None = None
@@ -1187,6 +1252,11 @@ class AIOrchestrator:
             ),
         )
 
+        task, task_context = await self._task_for_turn(
+            db, conversation, user_id, message, persona=persona, connection_id=connection_id,
+            enable_tools=enable_tools, task_id=task_id, new_task=new_task,
+        )
+
         # Retries once on the neighbouring tier if the model is overloaded
         # before it says anything (src/ai/routing.py).
         provider = FallbackProvider(
@@ -1204,6 +1274,7 @@ class AIOrchestrator:
                 _base_system(system, persona, caller_requested_all_tools),
                 persona,
                 connection_id,
+                task_context,
             )
         )
         response, usage = await self._run_tool_loop(
@@ -1282,6 +1353,8 @@ class AIOrchestrator:
             user_agent=user_agent,
         )
 
+        await task_memory_service.end_turn(db, task, user_id)
+
         return ChatResult(
             conversation_id=conversation.id,
             message_id=assistant_message.id,
@@ -1289,6 +1362,7 @@ class AIOrchestrator:
             model=provider.model_used,
             usage=usage,
             estimated_cost_usd=cost,
+            task=self._task_ref(task),
         )
 
     async def stream_chat(
@@ -1307,6 +1381,8 @@ class AIOrchestrator:
         connection_id: uuid.UUID | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
+        task_id: uuid.UUID | None = None,
+        new_task: bool = False,
     ) -> AsyncIterator[OrchestratedStreamEvent]:
 
         route = await self._route(db, organization_id, model, agent, connection_id, attachments)
@@ -1332,6 +1408,8 @@ class AIOrchestrator:
                 connection_id=connection_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
+                task_id=task_id,
+                new_task=new_task,
             ):
                 yield event
         finally:
@@ -1354,6 +1432,8 @@ class AIOrchestrator:
         connection_id: uuid.UUID | None,
         ip_address: str | None,
         user_agent: str | None,
+        task_id: uuid.UUID | None = None,
+        new_task: bool = False,
     ) -> AsyncIterator[OrchestratedStreamEvent]:
 
         persona: AgentPersona | None = None
@@ -1400,7 +1480,12 @@ class AIOrchestrator:
             ),
         )
 
-        yield OrchestratedStreamEvent(type="start", conversation_id=conversation.id)
+        task, task_context = await self._task_for_turn(
+            db, conversation, user_id, message, persona=persona, connection_id=connection_id,
+            enable_tools=enable_tools, task_id=task_id, new_task=new_task,
+        )
+
+        yield OrchestratedStreamEvent(type="start", conversation_id=conversation.id, task=self._task_ref(task))
 
         # Which model answers and why, before the first word.
         if route is not None:
@@ -1424,6 +1509,7 @@ class AIOrchestrator:
                 _base_system(system, persona, caller_requested_all_tools),
                 persona,
                 connection_id,
+                task_context,
             )
         )
 
@@ -1710,10 +1796,13 @@ class AIOrchestrator:
             user_agent=user_agent,
         )
 
+        await task_memory_service.end_turn(db, task, user_id)
+
         yield OrchestratedStreamEvent(
             type="done",
             conversation_id=conversation.id,
             message_id=assistant_message.id,
+            task=self._task_ref(task),
             usage=usage,
             estimated_cost_usd=float(cost),
             route=(

@@ -117,3 +117,6 @@ class OrchestratedStreamEvent(BaseModel):
     # {model, tier, requested, reason} — on "route", and on "done" with
     # fell_back and the model that actually answered.
     route: dict | None = None
+    # The task this turn belongs to (task memory): {id, title, status}, on
+    # "start" and again on "done" with the status the turn left it in.
+    task: dict | None = None
