@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+import { HandsFreeTurns, type TurnState } from "@/lib/hands-free";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
@@ -87,16 +89,33 @@ import type {
   ConversationSummary,
   MessageResponse,
   StreamEvent,
+  TaskRef,
   ToolAccess,
   ToolExecutionResponse,
 } from "@/lib/types";
 
 const NO_AGENT = "none";
 
-/** Saying one of these ends hands-free instead of being sent. */
-const HANDS_FREE_STOP = /^(stop|stop listening|that's all|thats all|goodbye|bye|thank you,? that's all)[.!]?$/i;
-/** Silent listens in a row before hands-free pauses itself. */
-const HANDS_FREE_SILENT_LIMIT = 3;
+const TASK_STATUS_LABEL: Record<string, string> = {
+  active: "working",
+  waiting_for_user: "waiting for you",
+  waiting_for_approval: "waiting for approval",
+  blocked: "blocked",
+  completed: "completed",
+  failed: "failed",
+};
+
+/** What hands-free is doing, in words. */
+const TURN_LABEL: Record<TurnState, string> = {
+  idle: "Hands-free on",
+  listening: "Listening",
+  processing: "Thinking…",
+  speaking: "Speaking…",
+  restarting: "One moment…",
+  paused: "Paused",
+  error: "Voice error",
+};
+
 
 // A request to see data drawn. General chat has no TM1 access, so such a
 // request goes to the Analyst, which can query the model and chart it.
@@ -563,10 +582,16 @@ export default function ChatPage() {
   const [handsFree, setHandsFree] = useState(false);
   const handsFreeRef = useRef(false);
   const isStreamingRef = useRef(false);
-  // Consecutive listens that heard nothing; hands-free pauses after a
-  // few rather than keeping a microphone open in an empty room.
-  const silentListensRef = useRef(0);
   const sendRef = useRef<(text?: string) => Promise<void>>(async () => {});
+  // Whose turn it is in hands-free (src/lib/hands-free.ts): the single
+  // source of truth for listening, thinking, speaking and pausing.
+  const [turnState, setTurnState] = useState<TurnState>("idle");
+  const [turnMessage, setTurnMessage] = useState<string | null>(null);
+  const turnsRef = useRef<HandsFreeTurns | null>(null);
+  // The task this conversation is working on (task memory), as the last
+  // answer reported it; `newTaskNext` starts a fresh one on the next send.
+  const [task, setTask] = useState<{ id: string; title: string; status: string } | null>(null);
+  const [newTaskNext, setNewTaskNext] = useState(false);
 
   const voice = useVoice({
     onTranscript: (transcript) => {
@@ -579,31 +604,57 @@ export default function ChatPage() {
       );
       inputRef.current?.focus();
     },
-    onFinal: (text) => {
-      if (!handsFreeRef.current) return;
-      silentListensRef.current = 0;
-      if (HANDS_FREE_STOP.test(text.trim())) {
-        endHandsFree();
-        return;
-      }
-      void sendRef.current(text);
-    },
-    onSpeechDone: () => {
-      // Also fires in the pauses between streamed sentences; only an
-      // answer that has finished arriving hands the turn back.
-      if (handsFreeRef.current && !isStreamingRef.current) listenAgain();
-    },
-    onNoSpeech: () => {
-      if (!handsFreeRef.current) return;
-      silentListensRef.current += 1;
-      if (silentListensRef.current >= HANDS_FREE_SILENT_LIMIT) {
-        endHandsFree();
-        toast.info("Hands-free paused — I didn't hear anything. Tap the headphones to continue.");
-        return;
-      }
-      listenAgain();
-    },
+    onFinal: (text) => turnsRef.current?.onFinal(text),
+    // Also fires in the pauses between streamed sentences; the controller
+    // hands the turn back only once the answer has finished arriving.
+    onSpeechDone: () => turnsRef.current?.onSpeechDone(),
+    onNoSpeech: () => turnsRef.current?.onNoSpeech(),
+    onError: (code) => turnsRef.current?.onError(code),
   });
+
+  // The controller talks to the browser through these; read through a ref
+  // because it outlives renders.
+  const voiceRef = useRef(voice);
+  useEffect(() => {
+    voiceRef.current = voice;
+  });
+
+  useEffect(() => {
+    const turns = new HandsFreeTurns({
+      startListening: () => voiceRef.current.start(),
+      stopListening: () => voiceRef.current.stop(),
+      stopSpeaking: () => voiceRef.current.stopSpeaking(),
+      submit: (text) => void sendRef.current(text),
+      onChange: (state, note) => {
+        // One line per spoken turn, measured: submit → answer → speech →
+        // microphone open again.
+        if (state === "listening" && turns.timings.listening_again !== undefined) {
+          console.info("[voice] turn timings (ms since submit)", { ...turns.timings });
+          turns.timings = {};
+        }
+        setTurnState(state);
+        setTurnMessage(note);
+        const on = turns.isOn;
+        handsFreeRef.current = on;
+        setHandsFree(on);
+      },
+    });
+    turnsRef.current = turns;
+    // A tab in the background keeps no open microphone.
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") turns.onHidden();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      turns.dispose();
+    };
+  }, []);
+
+  // Speech of an answer started: the microphone must already be closed.
+  useEffect(() => {
+    if (voice.state === "speaking") turnsRef.current?.onSpeaking();
+  }, [voice.state]);
 
 
   const insertToolPrompt = (tool: string) => {
@@ -694,30 +745,13 @@ export default function ChatPage() {
     voice.start();
   };
 
-  // A short pause first: starting the microphone the instant speech
-  // ends can catch the speaker's last syllable.
-  function listenAgain() {
-    window.setTimeout(() => {
-      if (handsFreeRef.current && !isStreamingRef.current) voice.start();
-    }, 400);
-  }
-
-  function endHandsFree() {
-    handsFreeRef.current = false;
-    setHandsFree(false);
-    voice.stop();
-  }
-
   const toggleHandsFree = () => {
-    if (handsFreeRef.current) {
-      endHandsFree();
-      voice.stopSpeaking();
-      return;
-    }
+    const turns = turnsRef.current;
+    if (!turns) return;
+    if (turns.state === "paused") return turns.resume();
+    if (turns.isOn) return turns.disable();
     handsFreeRef.current = true;
-    silentListensRef.current = 0;
-    setHandsFree(true);
-    if (!isStreamingRef.current) voice.start();
+    turns.enable();
   };
 
   const readFileAsBase64 = (file: File): Promise<string> =>
@@ -876,6 +910,8 @@ export default function ChatPage() {
   const newConversation = () => {
     setConversationId(null);
     setMessages([]);
+    setTask(null);
+    setNewTaskNext(false);
   };
 
   /** Select the agent that owns a task and open its request. */
@@ -889,6 +925,15 @@ export default function ChatPage() {
     if (isStreaming) return;
 
     setConversationId(id);
+    setNewTaskNext(false);
+    // The task this conversation was working on, so the next message —
+    // typed or spoken — continues it.
+    apiRequest<TaskRef[]>(`/ai/tasks?conversation_id=${id}&limit=5`)
+      .then((tasks) => {
+        const open = tasks.find((t) => !["archived", "cancelled"].includes(t.status));
+        setTask(open ? { id: open.id, title: open.title, status: open.status } : null);
+      })
+      .catch(() => setTask(null));
 
     try {
       const [history, executions] = await Promise.all([
@@ -1023,7 +1068,10 @@ export default function ChatPage() {
     setPendingAttachments([]);
     setIsStreaming(true);
     isStreamingRef.current = true;
+    turnsRef.current?.onAnswerStarted();
     setStreamActivity("Thinking…");
+    const startNewTask = newTaskNext;
+    setNewTaskNext(false);
     scrollToBottom();
 
     // Whether the stream reached a real ending. If it did not, the
@@ -1042,6 +1090,7 @@ export default function ChatPage() {
         enable_tools: turnAgent !== NO_AGENT,
         connection_id: server?.id,
         model,
+        new_task: startNewTask || undefined,
         attachments: attachmentsForThisMessage.length
           ? attachmentsForThisMessage
           : undefined,
@@ -1062,6 +1111,7 @@ export default function ChatPage() {
       for await (const event of stream) {
         if (event.type === "start") {
           streamConversationId = event.conversation_id;
+          if (event.task !== undefined) setTask(event.task ?? null);
         } else if (event.type === "text_delta") {
           // Each tool round's narration arrives as its own run of text.
           // Joined directly they read "definition.Let me trace", so a
@@ -1131,6 +1181,7 @@ export default function ChatPage() {
           });
         } else if (event.type === "done") {
           finished = true;
+          if (event.task !== undefined) setTask(event.task ?? null);
           const isNewConversation = conversationId === null;
           setConversationId(event.conversation_id);
 
@@ -1207,7 +1258,7 @@ export default function ChatPage() {
       scrollToBottom();
       // Hands the turn back: at once if nothing is being read aloud
       // (muted, or an error), otherwise when the speech finishes.
-      if (handsFreeRef.current && !voice.isSpeaking()) listenAgain();
+      turnsRef.current?.onAnswerDone(voice.isSpeaking(), !finished && !controller.signal.aborted);
     }
   };
 
@@ -1799,17 +1850,50 @@ export default function ChatPage() {
                 states; without rendering them a blocked microphone was
                 silent — the button simply did nothing and the user had
                 no way to learn why. Caught by a test, not by reading. */}
-            {handsFree ? (
-              <p aria-live="polite" className="mb-2 text-xs font-medium text-primary">
-                Hands-free on —{" "}
-                {isStreaming
-                  ? "thinking…"
-                  : voice.state === "speaking"
-                    ? "speaking…"
-                    : isListening
-                      ? "listening…"
-                      : "one moment…"}{" "}
-                Say “stop” to end.
+            {task || newTaskNext ? (
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs" data-tour="chat-task">
+                {newTaskNext ? (
+                  <span className="text-muted-foreground">Your next message starts a new task.</span>
+                ) : task ? (
+                  <span className="text-muted-foreground">
+                    Task: <span className="font-medium text-foreground">{task.title}</span>
+                    {" · "}
+                    {TASK_STATUS_LABEL[task.status] ?? task.status.replaceAll("_", " ")}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="underline underline-offset-2"
+                  onClick={() => setNewTaskNext((v) => !v)}
+                  disabled={isStreaming}
+                >
+                  {newTaskNext ? "Keep the current task" : "New task"}
+                </button>
+              </div>
+            ) : null}
+            {turnState === "paused" ? (
+              <p role="status" aria-live="polite" className="mb-2 text-xs font-medium text-warning" data-tour="chat-voice-state">
+                {turnMessage}
+              </p>
+            ) : handsFree ? (
+              <p aria-live="polite" className="mb-2 flex items-center gap-1.5 text-xs font-medium text-primary" data-tour="chat-voice-state">
+                <span
+                  className={cn(
+                    "inline-block size-2 rounded-full",
+                    turnState === "listening" ? "animate-pulse bg-destructive" : "bg-primary",
+                  )}
+                  aria-hidden
+                />
+                {TURN_LABEL[turnState]} · Say “stop” to end.
+                {turnState === "speaking" ? (
+                  <button
+                    type="button"
+                    className="ml-1 underline underline-offset-2"
+                    onClick={() => turnsRef.current?.interrupt()}
+                  >
+                    Interrupt and speak
+                  </button>
+                ) : null}
               </p>
             ) : voice.errorMessage ? (
               <p role="alert" className="mb-2 text-xs text-destructive">
@@ -1911,7 +1995,11 @@ export default function ChatPage() {
                   data-tour="chat-hands-free"
                   aria-pressed={handsFree}
                   aria-label={
-                    handsFree ? "Stop hands-free conversation" : "Start hands-free conversation"
+                    turnState === "paused"
+                      ? "Resume hands-free conversation"
+                      : handsFree
+                        ? "Stop hands-free conversation"
+                        : "Start hands-free conversation"
                   }
                 >
                   <Headphones className={cn("h-4 w-4", handsFree && "animate-pulse")} />

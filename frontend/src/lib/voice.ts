@@ -193,6 +193,9 @@ export function useVoice(options: {
   onSpeechDone?: () => void;
   /** Called when the microphone heard nothing at all. */
   onNoSpeech?: () => void;
+  /** Called for any other recognition failure, with the browser's code
+   *  (`not-allowed`, `network`, `aborted`, `audio-capture`...). */
+  onError?: (code: string) => void;
 }) {
   const { onTranscript } = options;
 
@@ -300,6 +303,7 @@ export function useVoice(options: {
             : "Couldn't hear that — try again.",
       );
       if (event.error === "no-speech") optionsRef.current.onNoSpeech?.();
+      else optionsRef.current.onError?.(event.error);
     };
 
     recognition.onend = () => {

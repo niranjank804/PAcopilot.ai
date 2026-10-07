@@ -301,6 +301,7 @@ export type StreamEvent =
       // to, so a dropped connection can still find it.
       type: "start";
       conversation_id: string;
+      task?: TaskRef | null;
     }
   | {
       type: "text_delta";
@@ -343,6 +344,7 @@ export type StreamEvent =
       tool_name: null;
       tool_status: null;
       route?: ModelRoute | null;
+      task?: TaskRef | null;
     }
   | {
       type: "error";
@@ -400,3 +402,9 @@ export interface TM1ChangeDetail {
   lifecycle?: LifecycleStep[];
 }
 
+/** The task a chat turn belongs to (task memory). */
+export interface TaskRef {
+  id: string;
+  title: string;
+  status: string;
+}
