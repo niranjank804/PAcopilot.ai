@@ -459,3 +459,48 @@ async def test_the_last_answer_is_kept_even_when_no_finding_was_recorded(
     assert "Here is what I know." in scripted.turns[-1]["context"]
     [task] = await _tasks(db_session, first["conversation_id"])
     assert task.state.get("findings") in (None, [])
+
+
+@pytest.mark.asyncio
+async def test_five_turns_keep_one_task_and_one_draft(client, db_session, scripted, tm1_credentials_key, fake_tm1_client):
+    """The hands-free conversation, turn by turn, through the one endpoint
+    voice and text share: investigate, ask what caused it, ask for a fix,
+    ask what the fix changes (typed), ask what to check next. The model is
+    scripted, so this proves what each turn was given and what was recorded,
+    not how a real model phrases it."""
+
+    _org, admin = await create_org_admin(db_session)
+    headers = auth_headers(admin)
+    scripted.connection_id = await _connection(client, headers, "dev")
+
+    turns = [
+        "Investigate why the Sales margin totals fail.",
+        "What caused it?",
+        "Okay, fix it.",
+        "Explain the proposed change.",
+        "What should I check next?",
+    ]
+    conversation = None
+    results = []
+    for message in turns:
+        data = await _say(client, headers, message, conversation, connection_id=scripted.connection_id)
+        conversation = data["conversation_id"]
+        results.append(data)
+
+    assert {r["conversation_id"] for r in results} == {conversation}
+    assert len({r["task"]["id"] for r in results}) == 1
+    contexts = [t["context"] for t in scripted.turns]
+    assert len(contexts) == 5
+    # The finding is there from the second turn on; the draft from the fourth.
+    assert all(FINDING in c for c in contexts[1:])
+    assert all("update_rules on Sales: draft" in c for c in contexts[3:])
+    assert "update_rules" not in contexts[1]
+
+    db_session.info.pop("organization_id", None)
+    changes = list((await db_session.execute(
+        select(TM1Change).where(TM1Change.connection_id == uuid.UUID(scripted.connection_id))
+    )).scalars())
+    assert [c.status for c in changes] == ["draft"]  # drafted once, never executed
+    fake_tm1_client.cubes.update.assert_not_called()
+    assert results[2]["task"]["status"] == "waiting_for_approval"
+    assert results[4]["task"]["status"] == "waiting_for_approval"

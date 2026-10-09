@@ -209,8 +209,9 @@ export function useVoice(options: {
    *  listening session (see bestGuess) — it replaces, never appends. */
   onTranscript: (text: string) => void;
   /** Called once when the microphone stops, with everything it heard in
-   *  that session — what hands-free mode sends. */
-  onFinal?: (text: string) => void;
+   *  that session — what hands-free mode sends — and, when the browser
+   *  reported it, the time (Date.now()) the speaker stopped. */
+  onFinal?: (text: string, speechEndedAt?: number) => void;
   /** Called when every queued spoken sentence has finished playing. */
   onSpeechDone?: () => void;
   /** Called when the microphone heard nothing at all. */
@@ -247,6 +248,8 @@ export function useVoice(options: {
   // Whether this session already reported an error (whose end then needs
   // no second report as a silent end).
   const erroredRef = useRef(false);
+  // When the browser noticed the speaker stop, for the turn timings.
+  const speechEndedAtRef = useRef<number | undefined>(undefined);
   const onTranscriptRef = useRef(onTranscript);
   const optionsRef = useRef(options);
   // Utterances queued and not yet finished. `speechGenRef` changes on
@@ -309,6 +312,14 @@ export function useVoice(options: {
     recognition.continuous = false;
     recognition.interimResults = false;
 
+    // "listening" only once the browser says the microphone is open, so
+    // the label never claims to listen while a permission prompt is up
+    // or a start has silently failed.
+    recognition.onstart = () => setState("listening");
+    recognition.onspeechend = () => {
+      speechEndedAtRef.current = Date.now();
+    };
+
     recognition.onresult = (event) => {
       const latest = event.results[event.results.length - 1][0].transcript;
       const guess = bestGuess(heardRef.current, latest);
@@ -336,11 +347,18 @@ export function useVoice(options: {
     };
 
     recognition.onend = () => {
-      setState((current) => (current === "error" ? current : "idle"));
+      // Only the microphone's own states end here: the recogniser is
+      // closed while an answer is spoken, and that must not read as the
+      // speech having stopped.
+      setState((current) =>
+        current === "listening" || current === "requesting-permission" ? "idle" : current,
+      );
       // Everything this session heard, once: hands-free mode sends it.
       const heard = heardRef.current.trim();
+      const endedAt = speechEndedAtRef.current;
       heardRef.current = "";
-      if (heard) optionsRef.current.onFinal?.(heard);
+      speechEndedAtRef.current = undefined;
+      if (heard) optionsRef.current.onFinal?.(heard, endedAt);
       else if (!erroredRef.current) optionsRef.current.onSilentEnd?.();
       erroredRef.current = false;
     };
@@ -349,6 +367,8 @@ export function useVoice(options: {
     setSupport({ listen: true, speak: canSpeak });
 
     return () => {
+      recognition.onstart = null;
+      recognition.onspeechend = null;
       recognition.onresult = null;
       recognition.onerror = null;
       recognition.onend = null;
@@ -369,10 +389,12 @@ export function useVoice(options: {
     setState((current) => (current === "speaking" ? "idle" : current));
   }, [cancelSpeech]);
 
-  const start = useCallback(() => {
+  /** Open the microphone. Returns whether the browser accepted the start;
+   *  the state becomes "listening" when it reports the microphone open. */
+  const start = useCallback((): boolean => {
     const recognition = recognitionRef.current;
 
-    if (!recognition) return;
+    if (!recognition) return false;
 
     // Dictating over the assistant's own voice would feed it back into
     // the microphone.
@@ -385,33 +407,37 @@ export function useVoice(options: {
 
     heardRef.current = "";
     erroredRef.current = false;
+    speechEndedAtRef.current = undefined;
 
     try {
       recognition.start();
-      setState("listening");
+      return true;
     } catch {
       // start() throws if already started — recover to a truthful state
       // rather than leaving the button stuck.
       setState("idle");
+      return false;
     }
   }, [cancelSpeech]);
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
-    setState("idle");
+    setState((current) =>
+      current === "listening" || current === "requesting-permission" ? "idle" : current,
+    );
   }, []);
 
   const speak = useCallback(
     // `explicit`: the person pressed a read-aloud button, so the mute —
     // which silences answers read out automatically — does not apply.
-    (markdown: string, options?: { explicit?: boolean }) => {
+    (markdown: string, options?: { explicit?: boolean }): boolean => {
       const synthesis = window.speechSynthesis;
 
-      if (!synthesis || (mutedRef.current && !options?.explicit)) return;
+      if (!synthesis || (mutedRef.current && !options?.explicit)) return false;
 
       const text = speakableText(markdown).slice(0, MAX_SPEAK_CHARS);
 
-      if (!text) return;
+      if (!text) return false;
 
       // Without this, a second answer queues behind the first and the
       // user hears a stale one.
@@ -420,6 +446,7 @@ export function useVoice(options: {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-US";
       playUtterance(utterance);
+      return true;
     },
     [cancelSpeech, playUtterance],
   );

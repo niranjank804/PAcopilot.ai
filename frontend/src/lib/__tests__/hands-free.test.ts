@@ -11,9 +11,11 @@ import {
   ERROR_RETRY_DELAYS_MS,
   HandsFreeTurns,
   PAUSED_BLOCKED,
+  PAUSED_BY_USER,
   PAUSED_HIDDEN,
   PAUSED_LOST,
   PAUSED_SILENCE,
+  RECONNECTING,
   RESTART_DELAY_MS,
   SILENT_LIMIT,
   type TurnState,
@@ -28,13 +30,15 @@ function setup() {
     starts: 0,
     submitted: [] as string[],
     states: [] as TurnState[],
-    startListening: vi.fn(() => {
+    startListening: vi.fn((): boolean => {
       // The real useVoice never opens the mic over speech; this fake makes
       // overlapping a test failure instead.
       expect(io.speaking).toBe(false);
       io.listening = true;
       io.starts += 1;
+      return true;
     }),
+    speak: undefined as undefined | ((text: string) => boolean),
     stopListening: vi.fn(() => {
       io.listening = false;
     }),
@@ -236,7 +240,14 @@ describe("turn timings (fake clock)", () => {
     turns.onSpeechDone();
     clock = 4400;
     vi.advanceTimersByTime(RESTART_DELAY_MS);
-    expect(turns.timings).toEqual({ speech_started: 900, answer_done: 1500, listening_again: 3400 });
+    expect(turns.timings).toEqual({
+      transcript_final: 0,
+      submitted: 0,
+      speech_started: 900,
+      answer_done: 1500,
+      speech_done: 3000,
+      listening_again: 3400,
+    });
   });
 });
 
@@ -260,10 +271,136 @@ describe("listening watchdog (fake clock)", () => {
     const { LISTEN_TIMEOUT_MS } = await import("../hands-free");
     const { io, turns } = setup();
     turns.enable();
+    io.stopListening.mockClear();
     vi.advanceTimersByTime(LISTEN_TIMEOUT_MS - 100);
     turns.onHeard();
     vi.advanceTimersByTime(LISTEN_TIMEOUT_MS - 100);
     expect(io.stopListening).not.toHaveBeenCalled();
     expect(turns.state).toBe("listening");
+  });
+});
+
+describe("greeting, start failures, pause, cancellation, teardown (fake browser)", () => {
+  it("speaks the greeting first and opens the microphone only when it has finished", async () => {
+    const { GREETING } = await import("../hands-free");
+    const { io, turns } = setup();
+    const spoken: string[] = [];
+    io.speak = vi.fn((text: string) => {
+      spoken.push(text);
+      io.speaking = true;
+      return true;
+    });
+    turns.enable(GREETING);
+    expect(spoken).toEqual([GREETING]);
+    expect(turns.state).toBe("speaking");
+    expect(io.starts).toBe(0);
+    io.speaking = false;
+    turns.onSpeechDone();
+    vi.advanceTimersByTime(RESTART_DELAY_MS);
+    expect(turns.state).toBe("listening");
+    expect(io.starts).toBe(1);
+  });
+
+  it("skips the greeting when nothing can be spoken (muted) and listens at once", async () => {
+    const { GREETING } = await import("../hands-free");
+    const { io, turns } = setup();
+    io.speak = vi.fn(() => false);
+    turns.enable(GREETING);
+    expect(turns.state).toBe("listening");
+    expect(io.starts).toBe(1);
+  });
+
+  it("never claims to listen over a microphone that would not start: retries, then pauses", () => {
+    const { io, turns } = setup();
+    io.startListening = vi.fn(() => false);
+    turns.enable();
+    expect(turns.state).not.toBe("listening");
+    expect(turns.message).toBe(RECONNECTING);
+    for (const delay of ERROR_RETRY_DELAYS_MS) {
+      vi.advanceTimersByTime(delay);
+    }
+    expect(turns.state).toBe("paused");
+    expect(turns.message).toBe(PAUSED_LOST);
+    expect(io.startListening).toHaveBeenCalledTimes(ERROR_RETRY_DELAYS_MS.length + 1);
+  });
+
+  it("hands-free off never restarts listening, whatever arrives later", () => {
+    const { io, turns } = setup();
+    turns.enable();
+    turns.disable();
+    turns.onSpeechDone();
+    turns.onNoSpeech();
+    turns.onError("network");
+    turns.onAnswerDone(false);
+    vi.advanceTimersByTime(10_000);
+    expect(io.starts).toBe(1);
+    expect(turns.state).toBe("idle");
+  });
+
+  it("pause stops speech and the microphone; resume listens again", () => {
+    const { io, turns } = setup();
+    turns.enable();
+    io.speaking = true;
+    turns.pauseByUser();
+    expect(io.stopSpeaking).toHaveBeenCalled();
+    expect(io.listening).toBe(false);
+    expect(turns.state).toBe("paused");
+    expect(turns.message).toBe(PAUSED_BY_USER);
+    expect(turns.isOn).toBe(true);
+    io.speaking = false;
+    turns.resume();
+    expect(turns.state).toBe("listening");
+  });
+
+  it("speech cancelled from outside hands the turn back instead of sticking in speaking", () => {
+    const { io, turns } = setup();
+    turns.enable();
+    turns.onFinal("why");
+    io.speaking = true;
+    turns.onSpeaking();
+    turns.onAnswerDone(true);
+    expect(turns.state).toBe("speaking");
+    // The page reports any end of speech — finished, failed or cancelled.
+    io.speaking = false;
+    turns.onSpeechDone();
+    vi.advanceTimersByTime(RESTART_DELAY_MS);
+    expect(turns.state).toBe("listening");
+  });
+
+  it("never opens a second microphone session while one is open", () => {
+    const { io, turns } = setup();
+    io.startListening = vi.fn(() => {
+      expect(io.listening).toBe(false);
+      io.listening = true;
+      io.starts += 1;
+      return true;
+    });
+    turns.enable();
+    // The browser closed the session (silence) — only then is it reopened.
+    io.listening = false;
+    turns.onNoSpeech();
+    vi.advanceTimersByTime(RESTART_DELAY_MS);
+    // A typed question closes it; speech keeps it closed; it reopens after.
+    turns.onAnswerStarted();
+    io.speaking = true;
+    turns.onSpeaking();
+    turns.onAnswerDone(true);
+    io.speaking = false;
+    turns.onSpeechDone();
+    vi.advanceTimersByTime(RESTART_DELAY_MS);
+    expect(io.starts).toBe(3);
+  });
+
+  it("dispose on unmount cancels timers and ignores every later callback", () => {
+    const { io, turns } = setup();
+    turns.enable();
+    turns.onNoSpeech();
+    turns.dispose();
+    vi.advanceTimersByTime(10_000);
+    turns.onSpeechDone();
+    turns.onFinal("hello");
+    expect(io.starts).toBe(1);
+    expect(io.submitted).toEqual([]);
+    expect(io.onChange).not.toHaveBeenLastCalledWith("listening", null);
   });
 });

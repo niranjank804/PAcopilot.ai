@@ -36,7 +36,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { HandsFreeTurns, type TurnState } from "@/lib/hands-free";
+import { GREETING, HandsFreeTurns, type TurnState } from "@/lib/hands-free";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 
@@ -113,7 +113,7 @@ const TURN_LABEL: Record<TurnState, string> = {
   speaking: "Speaking…",
   restarting: "One moment…",
   paused: "Paused",
-  error: "Voice error",
+  error: "Reconnecting to the microphone…",
 };
 
 
@@ -610,7 +610,7 @@ export default function ChatPage() {
       setInput(base ? `${base} ${guess}` : guess);
       inputRef.current?.focus();
     },
-    onFinal: (text) => turnsRef.current?.onFinal(text),
+    onFinal: (text, speechEndedAt) => turnsRef.current?.onFinal(text, speechEndedAt),
     // Also fires in the pauses between streamed sentences; the controller
     // hands the turn back only once the answer has finished arriving.
     onSpeechDone: () => turnsRef.current?.onSpeechDone(),
@@ -633,12 +633,14 @@ export default function ChatPage() {
       startListening: () => voiceRef.current.start(),
       stopListening: () => voiceRef.current.stop(),
       stopSpeaking: () => voiceRef.current.stopSpeaking(),
+      speak: (text) => voiceRef.current.speak(text),
       submit: (text) => void sendRef.current(text),
       onChange: (state, note) => {
-        // One line per spoken turn, measured: submit → answer → speech →
-        // microphone open again.
+        // One line per spoken turn, measured from the moment the speaker
+        // stopped: transcript, submission, first words, answer done,
+        // speech start and end, microphone open again.
         if (state === "listening" && turns.timings.listening_again !== undefined) {
-          console.info("[voice] turn timings (ms since submit)", { ...turns.timings });
+          console.info("[voice] turn timings (ms since speech ended)", { ...turns.timings });
           turns.timings = {};
         }
         setTurnState(state);
@@ -661,8 +663,12 @@ export default function ChatPage() {
   }, []);
 
   // Speech of an answer started: the microphone must already be closed.
+  // Speech ending by any route — finished, failed, or cancelled from a
+  // button — hands the turn back, so the conversation cannot sit in
+  // "speaking" with nothing playing.
   useEffect(() => {
     if (voice.state === "speaking") turnsRef.current?.onSpeaking();
+    else turnsRef.current?.onSpeechDone();
   }, [voice.state]);
 
 
@@ -761,7 +767,18 @@ export default function ChatPage() {
     if (turns.state === "paused") return turns.resume();
     if (turns.isOn) return turns.disable();
     handsFreeRef.current = true;
-    turns.enable();
+    turns.enable(GREETING);
+  };
+
+  /** What the status line says. "Listening" only while the browser has
+   *  the microphone open; a controller waiting on it says so. */
+  const voiceLabel = (): string => {
+    if (turnMessage) return turnMessage;
+    if (turnState === "listening") {
+      if (voice.state === "requesting-permission") return "Waiting for microphone permission…";
+      if (voice.state !== "listening") return "Reconnecting to the microphone…";
+    }
+    return TURN_LABEL[turnState];
   };
 
   const readFileAsBase64 = (file: File): Promise<string> =>
@@ -1133,6 +1150,7 @@ export default function ChatPage() {
           const text = separator + event.text;
 
           lastEventWasTool = false;
+          if (!assistantText) turnsRef.current?.onFirstToken();
           assistantText += text;
           setStreamActivity("Writing…");
 
@@ -1886,15 +1904,17 @@ export default function ChatPage() {
                 {turnMessage}
               </p>
             ) : handsFree ? (
-              <p aria-live="polite" className="mb-2 flex items-center gap-1.5 text-xs font-medium text-primary" data-tour="chat-voice-state">
+              <p aria-live="polite" className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-medium text-primary" data-tour="chat-voice-state">
                 <span
                   className={cn(
                     "inline-block size-2 rounded-full",
-                    turnState === "listening" ? "animate-pulse bg-destructive" : "bg-primary",
+                    turnState === "listening" && voice.state === "listening"
+                      ? "animate-pulse bg-destructive"
+                      : "bg-primary",
                   )}
                   aria-hidden
                 />
-                {TURN_LABEL[turnState]} · Say “stop” to end.
+                {voiceLabel()} · Say “stop” to end.
                 {turnState === "speaking" ? (
                   <button
                     type="button"
@@ -1904,6 +1924,14 @@ export default function ChatPage() {
                     Interrupt and speak
                   </button>
                 ) : null}
+                <button
+                  type="button"
+                  className="ml-1 underline underline-offset-2"
+                  onClick={() => turnsRef.current?.pauseByUser()}
+                  aria-label="Pause hands-free conversation"
+                >
+                  Pause
+                </button>
               </p>
             ) : voice.errorMessage ? (
               <p role="alert" className="mb-2 text-xs text-destructive">
@@ -2025,7 +2053,7 @@ export default function ChatPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={voice.stopSpeaking}
+                  onClick={() => (handsFree ? turnsRef.current?.interrupt() : voice.stopSpeaking())}
                   aria-label="Stop speaking"
                 >
                   <Square className="h-4 w-4" />
@@ -2070,7 +2098,7 @@ export default function ChatPage() {
                 <Square className="h-4 w-4 fill-current" />
               </Button>
               </Tip>
-            ) : (
+            ) : handsFree && !input.trim() && pendingAttachments.length === 0 ? null : (
               <Tip content="Send (Enter). Shift+Enter starts a new line.">
               <Button
                 onClick={() => send()}

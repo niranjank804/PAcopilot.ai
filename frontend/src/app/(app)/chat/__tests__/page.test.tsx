@@ -358,6 +358,8 @@ function installSpeech({ supported = true } = {}) {
     lang = "";
     continuous = false;
     interimResults = false;
+    onstart: (() => void) | null = null;
+    onspeechend: (() => void) | null = null;
     onresult: ((event: unknown) => void) | null = null;
     onerror: ((event: unknown) => void) | null = null;
     onend: (() => void) | null = null;
@@ -368,10 +370,20 @@ function installSpeech({ supported = true } = {}) {
     }
 
     start() {
+      // The real recogniser throws on a second start; the page must
+      // never ask for one while a session is open.
+      if (this.started) throw new Error("already started");
       this.started = true;
+      this.onstart?.();
     }
 
     stop() {
+      this.started = false;
+      this.onend?.();
+    }
+
+    /** The browser closed the session by itself (end of speech, silence). */
+    end() {
       this.started = false;
       this.onend?.();
     }
@@ -850,13 +862,32 @@ describe("reading an answer aloud", () => {
 // ======================================================================
 
 describe("hands-free conversation", () => {
+  /** Every queued utterance finishes playing. */
+  function finishSpeech(speech: ReturnType<typeof installSpeech>) {
+    act(() => {
+      for (const [utterance] of speech.synthesis.speak.mock.calls) {
+        (utterance as unknown as { onend?: () => void }).onend?.();
+      }
+    });
+  }
+
+  /** Turns hands-free on: the greeting is spoken, then the microphone
+   *  opens when it has finished. */
+  async function enableHandsFree(user: ReturnType<typeof userEvent.setup>, speech: ReturnType<typeof installSpeech>) {
+    await user.click(await screen.findByRole("button", { name: /start hands-free conversation/i }));
+    await waitFor(() => expect(speech.utterances.join(" ")).toContain("I'm listening"));
+    expect(speech.recognition.started).toBe(false);
+    finishSpeech(speech);
+    await waitFor(() => expect(speech.recognition.started).toBe(true), { timeout: 2000 });
+  }
+
   function say(speech: ReturnType<typeof installSpeech>, words: string) {
     act(() => {
       speech.recognition.onresult?.({
         results: { length: 1, 0: { 0: { transcript: words } } },
       });
       // The recogniser ends by itself when the speaker pauses.
-      (speech.recognition as unknown as { onend: () => void }).onend();
+      speech.recognition.end();
     });
   }
 
@@ -871,10 +902,7 @@ describe("hands-free conversation", () => {
     );
 
     renderChat();
-    await user.click(
-      await screen.findByRole("button", { name: /start hands-free conversation/i }),
-    );
-    expect(speech.recognition.started).toBe(true);
+    await enableHandsFree(user, speech);
     const startSpy = vi.spyOn(speech.recognition, "start");
 
     say(speech, "Can you hear me");
@@ -890,11 +918,7 @@ describe("hands-free conversation", () => {
     expect(startSpy).not.toHaveBeenCalled();
 
     // When the last sentence finishes, the microphone opens again.
-    act(() => {
-      for (const [utterance] of speech.synthesis.speak.mock.calls) {
-        (utterance as unknown as { onend?: () => void }).onend?.();
-      }
-    });
+    finishSpeech(speech);
     await waitFor(() => expect(startSpy).toHaveBeenCalled(), { timeout: 2000 });
     expect(await screen.findByText(/^Listening/)).toBeInTheDocument();
   });
@@ -920,7 +944,7 @@ describe("hands-free conversation", () => {
     expect(await screen.findByText(/Actual Allocation failure/)).toBeInTheDocument();
 
     // Spoken, through hands-free.
-    await user.click(screen.getByRole("button", { name: /start hands-free conversation/i }));
+    await enableHandsFree(user, speech);
     say(speech, "Okay, fix it");
     await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(2));
     await user.click(screen.getByRole("button", { name: /stop hands-free conversation/i }));
@@ -956,12 +980,12 @@ describe("hands-free conversation", () => {
     const speech = installSpeech();
     const user = userEvent.setup();
     renderChat();
-    await user.click(await screen.findByRole("button", { name: /start hands-free conversation/i }));
+    await enableHandsFree(user, speech);
 
     for (let i = 0; i < 3; i++) {
       act(() => {
         speech.recognition.onerror?.({ error: "no-speech" });
-        (speech.recognition as unknown as { onend: () => void }).onend();
+        speech.recognition.end();
       });
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 450));
@@ -979,12 +1003,12 @@ describe("hands-free conversation", () => {
     const speech = installSpeech();
     const user = userEvent.setup();
     renderChat();
-    await user.click(await screen.findByRole("button", { name: /start hands-free conversation/i }));
+    await enableHandsFree(user, speech);
     const startSpy = vi.spyOn(speech.recognition, "start");
 
     // Chrome: the session ends with no words and no error.
     act(() => {
-      (speech.recognition as unknown as { onend: () => void }).onend();
+      speech.recognition.end();
     });
     await waitFor(() => expect(startSpy).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(screen.getByRole("button", { name: /stop hands-free conversation/i })).toBeInTheDocument();
@@ -995,7 +1019,7 @@ describe("hands-free conversation", () => {
     const speech = installSpeech();
     const user = userEvent.setup();
     renderChat();
-    await user.click(await screen.findByRole("button", { name: /start hands-free conversation/i }));
+    await enableHandsFree(user, speech);
     act(() => {
       speech.recognition.onerror?.({ error: "not-allowed" });
     });
@@ -1014,9 +1038,7 @@ describe("hands-free conversation", () => {
     const user = userEvent.setup();
 
     renderChat();
-    await user.click(
-      await screen.findByRole("button", { name: /start hands-free conversation/i }),
-    );
+    await enableHandsFree(user, speech);
 
     say(speech, "Stop");
 
@@ -1040,5 +1062,100 @@ describe("hands-free conversation", () => {
       ),
     );
     expect(streamRequest).not.toHaveBeenCalled();
+  });
+
+  it("hides Send while hands-free waits on an empty box, and shows it again for typed text", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    renderChat();
+    expect(screen.getByRole("button", { name: /send message/i })).toBeInTheDocument();
+    await enableHandsFree(user, speech);
+    expect(screen.queryByRole("button", { name: /send message/i })).not.toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText(/what do you want to accomplish/i), "typed instead");
+    expect(screen.getByRole("button", { name: /send message/i })).toBeInTheDocument();
+  });
+
+  it("Pause stops listening without turning hands-free off; the headphones resume it", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    renderChat();
+    await enableHandsFree(user, speech);
+    await user.click(screen.getByRole("button", { name: /pause hands-free conversation/i }));
+    expect(speech.recognition.started).toBe(false);
+    expect(await screen.findByText(/voice paused/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /resume hands-free conversation/i }));
+    expect(speech.recognition.started).toBe(true);
+  });
+
+  it("stopping the spoken answer by its button listens again rather than sticking in speaking", async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    streamRequest.mockReturnValue(streamOf([{ type: "text_delta", text: "A long answer. More of it." }, DONE]));
+    renderChat();
+    await enableHandsFree(user, speech);
+    say(speech, "tell me everything");
+    await waitFor(() => expect(speech.utterances.join(" ")).toContain("A long answer."));
+    await screen.findByText(/^Speaking/);
+    const startSpy = vi.spyOn(speech.recognition, "start");
+    await user.click(screen.getByRole("button", { name: /stop speaking/i }));
+    expect(speech.synthesis.cancel).toHaveBeenCalled();
+    await waitFor(() => expect(startSpy).toHaveBeenCalled(), { timeout: 2000 });
+    expect(await screen.findByText(/^Listening/)).toBeInTheDocument();
+  });
+
+  it("five turns by voice and text keep one conversation and one task, one request each", { timeout: 20_000 }, async () => {
+    const speech = installSpeech();
+    const user = userEvent.setup();
+    const task = { id: "t-aa", title: "Actual Allocation failure", status: "waiting_for_user" };
+    const answers = [
+      "The Actual Allocation - Copy Version process failed.",
+      "It refers to a dimension the cube does not have.",
+      "I have drafted the fix for review; nothing was executed.",
+      "The draft renames the dimension reference.",
+      "Check the next run and the cube totals.",
+    ];
+    for (const text of answers) {
+      streamRequest.mockReturnValueOnce(
+        streamOf([
+          { type: "start", conversation_id: "c-aa", task },
+          { type: "text_delta", text },
+          { ...DONE, conversation_id: "c-aa", task },
+        ]),
+      );
+    }
+    renderChat();
+    await enableHandsFree(user, speech);
+
+    const spoken = ["Investigate why Actual Allocation failed", "What caused it", "Okay, prepare a fix"];
+    for (const [i, words] of spoken.entries()) {
+      say(speech, words);
+      await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(i + 1));
+      await waitFor(() => expect(speech.utterances.join(" ")).toContain(answers[i]));
+      finishSpeech(speech);
+      await waitFor(() => expect(speech.recognition.started).toBe(true), { timeout: 2000 });
+    }
+
+    // A typed turn in the middle: the microphone closes for it and reopens after.
+    await user.click(screen.getByRole("button", { name: /pause hands-free conversation/i }));
+    await sendMessage(user, "Explain the proposed change.");
+    await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(4));
+    await user.click(screen.getByRole("button", { name: /resume hands-free conversation/i }));
+    await waitFor(() => expect(speech.recognition.started).toBe(true), { timeout: 2000 });
+
+    say(speech, "What should I check next");
+    await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(5));
+
+    const bodies = streamRequest.mock.calls.map((call) => call[1] as Record<string, unknown>);
+    expect(bodies.map((b) => b.message)).toEqual([
+      "Investigate why Actual Allocation failed",
+      "What caused it",
+      "Okay, prepare a fix",
+      "Explain the proposed change.",
+      "What should I check next",
+    ]);
+    expect(bodies.slice(1).every((b) => b.conversation_id === "c-aa" && !b.new_task)).toBe(true);
+    expect(screen.getByText(/Actual Allocation failure/)).toBeInTheDocument();
+    // One user bubble per utterance: nothing was sent twice.
+    for (const words of spoken) expect(screen.getAllByText(words)).toHaveLength(1);
   });
 });

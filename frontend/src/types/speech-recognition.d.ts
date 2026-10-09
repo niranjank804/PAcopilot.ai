@@ -28,6 +28,8 @@ interface SpeechRecognition extends EventTarget {
   onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
+  onstart: (() => void) | null;
+  onspeechend: (() => void) | null;
 }
 
 interface Window {
