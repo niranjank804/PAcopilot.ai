@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.tools.base import Tool
 from src.core.exceptions import PermissionDeniedException, ValidationException
 from src.core.config import settings
+from src.repositories.ai_tool_execution_repository import ai_tool_execution_repository
 from src.repositories.auth_repository import auth_repository
 from src.repositories.tm1_change_repository import tm1_change_repository
 from src.services.audit_service import audit_service
@@ -682,18 +683,26 @@ class ApplyChangeTool(Tool):
     draft must have passed validation, the user must hold the deploy right
     for DEV, the current state is snapshotted, the result is verified and
     audited, and Deployments can roll it back. Offered to the model only in
-    readwrite mode (src/ai/orchestrator.py), and refused here regardless."""
+    readwrite mode (src/ai/orchestrator.py), and refused here regardless.
+
+    The assistant may apply only what it drafted itself, in this very
+    conversation: the draft must be marked ai_generated and a successful
+    propose_* call of this user in this conversation must have produced it
+    (ai_tool_executions). A draft made in the console, or in another
+    conversation, is a person's to execute in Deployments."""
 
     name = "apply_change"
+    needs_conversation = True
     description = (
-        "Execute a change you drafted in this conversation, on a DEV connection, "
-        "because the user explicitly asked you to apply it (\"fix it\", \"apply it\", "
-        "\"go ahead\"). Available only where the deployment's TM1_MODE is "
-        "readwrite; never on QA or PROD, where a person approves in the console. "
-        "The draft must have no validation errors. Set acknowledge_impact only "
-        "after telling the user the change affects critical or high-severity "
-        "objects and they still asked for it. Afterwards tell the user exactly "
-        "what was applied, on which server, and that Deployments can roll it back."
+        "Execute a change you drafted earlier in this conversation, on a DEV "
+        "connection, because the user explicitly asked you to apply it (\"fix it\", "
+        "\"apply it\", \"go ahead\"). Available only where the deployment's TM1_MODE is "
+        "readwrite; never on QA or PROD, where a person approves in the console; "
+        "never for a draft made in the console or in another conversation. The "
+        "draft must have no validation errors. Set acknowledge_impact only after "
+        "telling the user the change affects critical or high-severity objects and "
+        "they still asked for it. Afterwards tell the user exactly what was applied, "
+        "on which server, and that Deployments can roll it back."
     )
     required_permission = "tm1.deploy"
     input_schema = {
@@ -734,6 +743,21 @@ class ApplyChangeTool(Tool):
             or change.created_by != user_id
         ):
             return json.dumps({"applied": False, "error": "No such draft of yours on this connection."})
+        conversation_id = kwargs.get("conversation_id")
+        drafted_here = (
+            conversation_id is not None
+            and (change.new_content or {}).get("ai_generated") is True
+            and await ai_tool_execution_repository.drafted_in_conversation(
+                db, uuid.UUID(str(conversation_id)), user_id, change.id
+            )
+        )
+        if not drafted_here:
+            return json.dumps({
+                "applied": False,
+                "error": "Only a draft you proposed in this conversation can be applied; this one was "
+                         "drafted elsewhere (the console, or another conversation). A person executes "
+                         "it in Deployments.",
+            })
         if change.status != "draft":
             return json.dumps({"applied": False, "error": f"The change is already {change.status}."})
         if change.validation_errors:
@@ -760,6 +784,10 @@ class ApplyChangeTool(Tool):
                 "target": change.target_name,
                 "result_status": change.status,
                 "applied_by": "assistant",
+                "conversation_id": str(conversation_id),
+                # The approver's reading of the impact was relayed by the
+                # assistant, not ticked in the console.
+                "impact_acknowledged": bool(kwargs.get("acknowledge_impact")),
                 "tm1_mode": settings.TM1_MODE,
             },
         )

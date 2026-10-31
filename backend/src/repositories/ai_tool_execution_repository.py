@@ -37,6 +37,31 @@ class AIToolExecutionRepository:
 
         return list(result.scalars().all())
 
+    async def drafted_in_conversation(
+        self,
+        db: AsyncSession,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        change_id: uuid.UUID,
+    ) -> bool:
+        """Whether a propose_* call by this user, in this conversation,
+        produced the draft `change_id`. A propose result names the draft
+        first, so the 500-character summary always still holds the id."""
+
+        result = await db.execute(
+            select(AIToolExecution.id)
+            .where(
+                AIToolExecution.conversation_id == conversation_id,
+                AIToolExecution.user_id == user_id,
+                AIToolExecution.tool_name.startswith("propose_", autoescape=True),
+                AIToolExecution.status == "success",
+                AIToolExecution.result_summary.contains(str(change_id)),
+            )
+            .limit(1)
+        )
+
+        return result.scalar_one_or_none() is not None
+
     async def summarize_by_tool(
         self,
         db: AsyncSession,
