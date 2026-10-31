@@ -677,6 +677,18 @@ class ProposeViewTool(Tool):
         )
 
 
+# The tools whose result is a TM1 change draft (first field draft_change_id).
+# apply_change accepts a draft only from one of these, in its conversation.
+DRAFT_TOOLS = frozenset({
+    "propose_rule_update",
+    "propose_process_update",
+    "propose_process_copy",
+    "propose_process_run",
+    "propose_cell_write",
+    "propose_view",
+})
+
+
 class ApplyChangeTool(Tool):
     """Execute a draft on a DEV connection — only where the operator set
     TM1_MODE=readwrite. Everything else about the write is unchanged: the
@@ -748,7 +760,7 @@ class ApplyChangeTool(Tool):
             conversation_id is not None
             and (change.new_content or {}).get("ai_generated") is True
             and await ai_tool_execution_repository.drafted_in_conversation(
-                db, uuid.UUID(str(conversation_id)), user_id, change.id
+                db, uuid.UUID(str(conversation_id)), user_id, change.id, DRAFT_TOOLS
             )
         )
         if not drafted_here:

@@ -7,6 +7,7 @@ with the same checks, snapshot, audit and rollback. readonly: nobody
 applies, rolls back or promotes anything here.
 """
 
+import inspect
 import json
 import uuid
 
@@ -15,7 +16,13 @@ from sqlalchemy import select
 
 from src.ai import orchestrator as orchestrator_module
 from src.ai.tools.registry import list_tools
-from src.ai.tools.tm1.changes import ApplyChangeTool, ProposeProcessUpdateTool, ProposeRuleUpdateTool
+from src.ai.tools.registry import TOOLS
+from src.ai.tools.tm1.changes import (
+    DRAFT_TOOLS,
+    ApplyChangeTool,
+    ProposeProcessUpdateTool,
+    ProposeRuleUpdateTool,
+)
 from src.core.config import settings
 from src.database.models.ai_conversation import AIConversation
 from src.database.models.ai_tool_execution import AIToolExecution
@@ -89,6 +96,18 @@ async def _status(db_session, change_id):
 
 def _offered() -> set[str]:
     return {t.name for t in orchestrator_module._tools_for_mode(list_tools())}
+
+
+def test_draft_tools_are_exactly_the_registered_tools_that_return_a_draft():
+    """A new propose_* tool that drafts a change must be listed, and one
+    that drafts something else (a monitor, a memory) must not be."""
+
+    returns_draft = set()
+    for name, tool in TOOLS.items():
+        source = inspect.getsource(type(tool).execute)
+        if name.startswith("propose_") and ("_create_draft(" in source or "draft_change_id" in source):
+            returns_draft.add(name)
+    assert DRAFT_TOOLS == returns_draft
 
 
 @pytest.mark.asyncio
@@ -168,6 +187,27 @@ async def test_readwrite_applies_only_what_it_drafted_in_this_conversation(clien
         result = await _apply(db_session, who, dev, change, here)
         assert result["applied"] is False and "proposed in this conversation" in result["error"], result
         assert await _status(db_session, change) == "draft"
+
+    # Records in this conversation that merely mention the other draft's id
+    # do not make it this conversation's: the id must be the first field of
+    # a draft tool's own result. (An error message or rule text echoed into
+    # a result could otherwise carry any id.)
+    org_id, user_id = who
+    forged = [
+        ("propose_rule_update", json.dumps({"draft_change_id": own_draft, "validation_errors": [other_draft]})),
+        ("propose_rule_update", json.dumps({"note": "see", "draft_change_id": other_draft})),
+        ("propose_monitor", json.dumps({"draft_change_id": other_draft})),  # not a change draft tool
+        ("get_change_status", json.dumps({"draft_change_id": other_draft})),
+    ]
+    for tool_name, summary in forged:
+        db_session.add(AIToolExecution(
+            conversation_id=here, organization_id=org_id, user_id=user_id, tool_name=tool_name,
+            arguments={}, status="success", result_summary=summary, duration_ms=1,
+        ))
+    await db_session.flush()
+    result = await _apply(db_session, who, dev, other_draft, here)
+    assert result["applied"] is False and "proposed in this conversation" in result["error"], result
+    assert await _status(db_session, other_draft) == "draft"
 
     result = await _apply(db_session, who, dev, own_draft, None)
     assert result["applied"] is False and "proposed in this conversation" in result["error"]

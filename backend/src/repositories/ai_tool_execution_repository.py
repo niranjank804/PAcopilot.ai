@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 
@@ -43,19 +44,27 @@ class AIToolExecutionRepository:
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
         change_id: uuid.UUID,
+        tool_names: frozenset[str],
     ) -> bool:
-        """Whether a propose_* call by this user, in this conversation,
-        produced the draft `change_id`. A propose result names the draft
-        first, so the 500-character summary always still holds the id."""
+        """Whether one of the `tool_names` (the draft-producing tools), called
+        by this user in this conversation, produced the draft `change_id`.
 
+        A draft tool's result is JSON whose first field is draft_change_id,
+        and the summary is that JSON re-serialised in the same order, so the
+        stored text begins `{"draft_change_id": "<id>"` — a position only
+        the tool writes to. The match is on that prefix, never on the id
+        appearing anywhere in the text, where echoed input (a rule, an
+        error message) could place it."""
+
+        prefix = json.dumps({"draft_change_id": str(change_id)})[:-1]
         result = await db.execute(
             select(AIToolExecution.id)
             .where(
                 AIToolExecution.conversation_id == conversation_id,
                 AIToolExecution.user_id == user_id,
-                AIToolExecution.tool_name.startswith("propose_", autoescape=True),
+                AIToolExecution.tool_name.in_(tool_names),
                 AIToolExecution.status == "success",
-                AIToolExecution.result_summary.contains(str(change_id)),
+                AIToolExecution.result_summary.startswith(prefix, autoescape=True),
             )
             .limit(1)
         )
