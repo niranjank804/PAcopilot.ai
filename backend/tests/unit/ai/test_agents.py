@@ -64,12 +64,16 @@ def test_no_ai_tool_can_execute_or_roll_back_a_change():
     # and executes/rolls back via the existing Deployments pipeline. This
     # guards against a future round accidentally wiring real execution into
     # the AI's own tool-calling loop, whether directly or by name collision.
+    # The one exception is apply_change: offered only where the operator set
+    # TM1_MODE=readwrite, and then only on DEV, at the user's request
+    # (tests/integration/ai/test_apply_change_tool.py). No tool rolls back.
     for tool_name, tool in TOOLS.items():
         assert "execute_change" not in tool_name
         assert "rollback" not in tool_name
 
         source = inspect.getsource(type(tool).execute)
-        assert "execute_change" not in source
+        if tool_name != "apply_change":
+            assert "execute_change" not in source
         assert "rollback_change" not in source
 
 

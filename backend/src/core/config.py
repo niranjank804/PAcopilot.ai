@@ -348,6 +348,16 @@ class Settings(BaseSettings):
     # requests there with the caller's chosen port and scheme. A
     # self-hosted deployment whose TM1 sits on the LAN turns this on.
     TM1_ALLOW_PRIVATE_ADDRESSES: bool = False
+    # How far this deployment may go in changing TM1:
+    #   readonly  — nobody applies, rolls back or promotes a change here;
+    #               drafting and review still work.
+    #   governed  — the default: the assistant drafts, a person with deploy
+    #               rights executes (two people on PROD).
+    #   readwrite — as governed, and on DEV connections the assistant may
+    #               execute its own draft when the user asks it to, with the
+    #               same validation, snapshot, audit and rollback. QA and
+    #               PROD are unchanged. Set by the operator, never by a user.
+    TM1_MODE: Literal["readonly", "governed", "readwrite"] = "governed"
     TM1_CIRCUIT_BREAKER_THRESHOLD: int = 5
     TM1_CIRCUIT_BREAKER_COOLDOWN_SECONDS: float = 30.0
 

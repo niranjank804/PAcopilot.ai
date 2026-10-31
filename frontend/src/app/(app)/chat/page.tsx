@@ -464,6 +464,8 @@ const NAME_ARG_KEYS = [
 // (draft_change_id, status, validation_errors, impact, a fixed disclaimer
 // note) — well under the 500-char audit-log truncation limit, so this is
 // safe to parse directly rather than needing a dedicated field.
+// apply_change (TM1_MODE=readwrite, DEV only) returns the same change as
+// change_id once executed; the card then offers to roll it back.
 const DRAFT_TOOL_NAMES = new Set([
   "propose_rule_update",
   "propose_cell_write",
@@ -471,6 +473,7 @@ const DRAFT_TOOL_NAMES = new Set([
   "propose_process_update",
   "propose_process_copy",
   "propose_process_run",
+  "apply_change",
 ]);
 
 function draftChangeId(execution: ToolExecutionResponse): string | null {
@@ -481,7 +484,8 @@ function draftChangeId(execution: ToolExecutionResponse): string | null {
 
   try {
     const parsed = JSON.parse(execution.result_summary ?? "");
-    return typeof parsed.draft_change_id === "string" ? parsed.draft_change_id : null;
+    const id = execution.tool_name === "apply_change" ? parsed.change_id : parsed.draft_change_id;
+    return typeof id === "string" ? id : null;
   } catch {
     return null;
   }

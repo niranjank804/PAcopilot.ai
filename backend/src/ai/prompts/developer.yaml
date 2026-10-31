@@ -143,6 +143,7 @@ tool_names:
   - get_element_context
   - propose_process_run
   - get_change_status
+  - apply_change
 max_tool_rounds: 12
 safety_notes:
   - >-

@@ -258,6 +258,36 @@ PLAIN_CHAT_SYSTEM_PROMPT = (
 )
 
 
+# Tools the operator must switch on (src/core/config.py TM1_MODE).
+MODE_GATED_TOOLS = {"apply_change": "readwrite"}
+
+
+def _tools_for_mode(tools):
+    """Drop tools the deployment's TM1_MODE does not allow, so the model is
+    never shown an action it may not take here."""
+
+    return [t for t in tools if MODE_GATED_TOOLS.get(t.name, settings.TM1_MODE) == settings.TM1_MODE]
+
+
+MODE_CONTEXT = {
+    "readwrite": (
+        "DEPLOYMENT SETTING TM1_MODE=readwrite: the operator allows you to apply changes on DEV "
+        "connections. When the user explicitly asks you to apply, execute or deploy a change you "
+        "drafted in this conversation (\"fix it\", \"apply it\", \"go ahead\"), call apply_change "
+        "with that draft's change id — only on a connection whose environment is DEV, only for a "
+        "draft without validation errors. On QA and PROD a person still approves in the console. "
+        "This supersedes any instruction above that you can never execute a change. After applying, "
+        "say exactly what was executed and where, and that Deployments can roll it back; if "
+        "apply_change refuses, say why and leave the draft for review. Never apply anything the user "
+        "did not ask for in this turn."
+    ),
+    "readonly": (
+        "DEPLOYMENT SETTING TM1_MODE=readonly: this deployment never changes TM1. You may analyse and "
+        "draft; drafts cannot be applied, rolled back or promoted here by anyone. Say so when it matters."
+    ),
+}
+
+
 def _resolve_allowed_tools(
     persona: AgentPersona | None,
     caller_requested_all_tools: bool,
@@ -541,6 +571,10 @@ class AIOrchestrator:
             memory_context,
             # The active task: per turn, so it belongs in the uncached half.
             task_context,
+            # What this deployment lets the assistant do to TM1 (readwrite /
+            # readonly); nothing for the governed default. Read per request
+            # so an operator's change needs no restart.
+            MODE_CONTEXT.get(settings.TM1_MODE),
             system,
         ]
 
@@ -848,7 +882,7 @@ class AIOrchestrator:
         agent: str | None = None,
     ) -> tuple[ChatResponse, Usage]:
 
-        available_tools = list_tools()
+        available_tools = _tools_for_mode(list_tools())
 
         if allowed_tools is not None:
             available_tools = [
@@ -1519,7 +1553,7 @@ class AIOrchestrator:
             persona, caller_requested_all_tools
         )
 
-        available_tools = (
+        available_tools = _tools_for_mode(
             list_tools()
             if allowed_tools is None
             else [tool for tool in list_tools() if tool.name in allowed_tools]

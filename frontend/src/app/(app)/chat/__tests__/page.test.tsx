@@ -861,6 +861,8 @@ describe("reading an answer aloud", () => {
 // Hands-free: talk, it sends, answers aloud, and listens again.
 // ======================================================================
 
+// The multi-turn tests type and speak several whole turns through a real
+// DOM: measured at 4-6 s on a laptop, so they carry their own timeout.
 describe("hands-free conversation", () => {
   /** Every queued utterance finishes playing. */
   function finishSpeech(speech: ReturnType<typeof installSpeech>) {
@@ -923,7 +925,7 @@ describe("hands-free conversation", () => {
     expect(await screen.findByText(/^Listening/)).toBeInTheDocument();
   });
 
-  it("keeps one conversation and one task across typed and spoken turns", async () => {
+  it("keeps one conversation and one task across typed and spoken turns", { timeout: 20_000 }, async () => {
     const speech = installSpeech();
     const user = userEvent.setup();
     const task = { id: "t1", title: "Actual Allocation failure", status: "waiting_for_user" };
@@ -959,7 +961,7 @@ describe("hands-free conversation", () => {
     expect(bodies.every((b) => !b.new_task)).toBe(true);
   });
 
-  it("New task starts a fresh task on the next message", async () => {
+  it("New task starts a fresh task on the next message", { timeout: 20_000 }, async () => {
     const user = userEvent.setup();
     const task = { id: "t1", title: "First task", status: "waiting_for_user" };
     streamRequest.mockReturnValue(

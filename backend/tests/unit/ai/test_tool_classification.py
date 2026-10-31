@@ -3,7 +3,9 @@
 1. Every registered tool is classified: a tool the UI cannot describe
    honestly (what it reads, whether it changes anything) fails the build.
 2. No AI tool changes TM1. Only `propose_*` tools are above VALIDATE, and
-   those only draft a change a person approves.
+   those only draft a change a person approves — with one operator-gated
+   exception, `apply_change`, offered only where TM1_MODE=readwrite and
+   then only on DEV (tests/integration/ai/test_apply_change_tool.py).
 """
 
 import inspect
@@ -21,7 +23,7 @@ def test_every_registered_tool_is_classified_and_nothing_else_is():
 
 def test_only_propose_tools_write_or_execute_and_they_ask_first():
     for name, classification in CLASSIFICATION.items():
-        drafts = name.startswith("propose_")
+        drafts = name.startswith("propose_") or name == "apply_change"
         acts = classification.access in (ToolAccess.WRITE, ToolAccess.EXECUTE)
 
         assert drafts == acts, name

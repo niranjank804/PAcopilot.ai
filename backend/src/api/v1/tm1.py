@@ -1623,6 +1623,7 @@ async def execute_change(
     current_user: UserResponse = Depends(require_permission("tm1.deploy")),
 ):
     start = time.monotonic()
+    governance.check_writes_enabled()
 
     change = await _get_change_checked(
         db, connection_id, change_id, current_user.organization_id
@@ -1733,6 +1734,7 @@ async def rollback_change(
     current_user: UserResponse = Depends(require_permission("tm1.deploy")),
 ):
     start = time.monotonic()
+    governance.check_writes_enabled()
 
     change = await _get_change_checked(
         db, connection_id, change_id, current_user.organization_id
@@ -1781,6 +1783,7 @@ async def promote_change(
     rules; nothing is applied here."""
 
     start = time.monotonic()
+    governance.check_writes_enabled()
 
     source = await _get_change_checked(
         db, connection_id, change_id, current_user.organization_id

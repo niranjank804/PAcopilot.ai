@@ -170,6 +170,7 @@ the other behaviour, and `.env.example` says which that is.
 | Models a chat request may name | Opus 5, Sonnet 5 | `AI_ALLOWED_MODELS` |
 | Turns in flight count against the quota | 50k tokens each | `AI_QUOTA_RESERVATION_TOKENS` |
 | TM1 connection to a loopback / link-local / private IP | refused | `TM1_ALLOW_PRIVATE_ADDRESSES=false` |
+| The assistant executing a change itself | refused — a person executes every draft | `TM1_MODE=governed` (the default). `readwrite` lets the assistant execute its own validated draft on **DEV** connections when the user asks, with the same snapshot, audit and rollback; QA/PROD unchanged. `readonly` refuses apply, rollback and promote for everyone. |
 | TM1 request timeout and thread pool | 30 s, 16 threads | `TM1_REQUEST_TIMEOUT_SECONDS`, `TM1_MAX_CONCURRENT_CALLS` |
 | Parsing, embedding, corpus and extraction routes | 10/min/user, 40/min/org | `RATE_LIMIT_HEAVY_*` |
 | Password-reset email without SMTP in production | dropped, not printed | `SMTP_HOST` |

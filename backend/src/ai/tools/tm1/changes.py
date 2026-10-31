@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.tools.base import Tool
 from src.core.exceptions import PermissionDeniedException, ValidationException
+from src.core.config import settings
 from src.repositories.auth_repository import auth_repository
+from src.repositories.tm1_change_repository import tm1_change_repository
+from src.services.audit_service import audit_service
 from src.tm1.client.connection_manager import tm1_connection_manager
 from src.tm1 import governance
 from src.tm1.deployment.change_service import change_service
@@ -671,3 +674,106 @@ class ProposeViewTool(Tool):
                 "ai_generated": True,
             },
         )
+
+
+class ApplyChangeTool(Tool):
+    """Execute a draft on a DEV connection — only where the operator set
+    TM1_MODE=readwrite. Everything else about the write is unchanged: the
+    draft must have passed validation, the user must hold the deploy right
+    for DEV, the current state is snapshotted, the result is verified and
+    audited, and Deployments can roll it back. Offered to the model only in
+    readwrite mode (src/ai/orchestrator.py), and refused here regardless."""
+
+    name = "apply_change"
+    description = (
+        "Execute a change you drafted in this conversation, on a DEV connection, "
+        "because the user explicitly asked you to apply it (\"fix it\", \"apply it\", "
+        "\"go ahead\"). Available only where the deployment's TM1_MODE is "
+        "readwrite; never on QA or PROD, where a person approves in the console. "
+        "The draft must have no validation errors. Set acknowledge_impact only "
+        "after telling the user the change affects critical or high-severity "
+        "objects and they still asked for it. Afterwards tell the user exactly "
+        "what was applied, on which server, and that Deployments can roll it back."
+    )
+    required_permission = "tm1.deploy"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "connection_id": {"type": "string", "description": "The DEV connection the draft is on."},
+            "change_id": {"type": "string", "description": "The draft_change_id a propose_* tool returned."},
+            "acknowledge_impact": {"type": "boolean", "description": "Only after the user accepted the impact."},
+        },
+        "required": ["connection_id", "change_id"],
+    }
+
+    async def execute(self, db: AsyncSession, *, organization_id, user_id, **kwargs) -> str:
+        if settings.TM1_MODE != "readwrite":
+            return json.dumps({
+                "applied": False,
+                "error": "This deployment does not let the assistant apply changes (TM1_MODE is "
+                         f"{settings.TM1_MODE}). The draft waits for a person to execute it in Deployments.",
+            })
+        if not await auth_repository.user_has_permission(db, user_id, self.required_permission):
+            raise PermissionDeniedException(f"Missing permission: {self.required_permission}")
+
+        connection = await tm1_integration_service.get_connection(
+            db, uuid.UUID(str(kwargs["connection_id"])), organization_id, user_id=user_id
+        )
+        if not governance.assistant_may_apply(connection):
+            return json.dumps({
+                "applied": False,
+                "error": f"'{connection.name}' is a {governance.environment_of(connection).upper()} connection: "
+                         "the assistant applies changes on DEV only. A person approves this one in Deployments.",
+            })
+
+        change = await tm1_change_repository.get_by_id(db, uuid.UUID(str(kwargs["change_id"])))
+        if (
+            change is None
+            or change.connection_id != connection.id
+            or change.organization_id != organization_id
+            or change.created_by != user_id
+        ):
+            return json.dumps({"applied": False, "error": "No such draft of yours on this connection."})
+        if change.status != "draft":
+            return json.dumps({"applied": False, "error": f"The change is already {change.status}."})
+        if change.validation_errors:
+            return json.dumps({"applied": False, "error": "The draft has validation errors; fix and re-propose it."})
+        if change.change_type == "run_process" and not await auth_repository.user_has_permission(
+            db, user_id, "tm1.execute"
+        ):
+            raise PermissionDeniedException("You do not have permission to run TM1 processes.")
+
+        await governance.check_can_apply(db, user_id, change, connection, action="execute")
+        change = await change_service.execute_change(
+            db, change, user_id, acknowledge_impact=bool(kwargs.get("acknowledge_impact")),
+        )
+        await audit_service.log(
+            db,
+            organization_id=organization_id,
+            user_id=user_id,
+            action="execute_change",
+            entity="TM1Connection",
+            entity_id=connection.id,
+            new_values={
+                "change_id": str(change.id),
+                "change_type": change.change_type,
+                "target": change.target_name,
+                "result_status": change.status,
+                "applied_by": "assistant",
+                "tm1_mode": settings.TM1_MODE,
+            },
+        )
+        return json.dumps({
+            "applied": change.status == "executed",
+            "change_id": str(change.id),
+            "status": change.status,
+            "change_type": change.change_type,
+            "target": change.target_name,
+            "connection": connection.name,
+            "environment": governance.environment_of(connection),
+            "error_message": change.error_message,
+            "note": "Executed on DEV at the user's request; the previous state was saved first and "
+                    "Deployments can roll it back."
+                    if change.status == "executed" else
+                    "Not applied; nothing was changed on the server.",
+        })

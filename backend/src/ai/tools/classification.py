@@ -161,6 +161,9 @@ CLASSIFICATION: dict[str, ToolClassification] = {
     # --- Change management (drafts only) ---
     "propose_rule_update": _c("change_management", W, "Draft for human review", DRAFT, "cube_name"),
     "propose_cell_write": _c("change_management", W, "Cell write draft for human review", DRAFT, "cube_name"),
+    # The one tool that acts on TM1: offered only where the operator set
+    # TM1_MODE=readwrite, and then only on DEV, at the user's request.
+    "apply_change": _c("change_management", X, "Executes a validated draft on a DEV connection (TM1_MODE=readwrite)", LIVE, "change_id"),
     "propose_view": _c("change_management", W, "View draft for human review", DRAFT, "cube_name"),
     "propose_process_update": _c("change_management", W, "Draft for human review", DRAFT, "process_name"),
     "propose_process_copy": _c("change_management", W, "Draft for human review", DRAFT, "source_process", "new_process_name"),

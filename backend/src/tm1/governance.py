@@ -20,6 +20,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
 from src.core.exceptions import PermissionDeniedException
 from src.repositories.auth_repository import auth_repository
 
@@ -30,6 +31,24 @@ DEPLOY_PERMISSION = {
     "qa": "tm1.deploy.qa",
     "prod": "tm1.deploy.prod",
 }
+
+
+def check_writes_enabled() -> None:
+    """TM1_MODE=readonly: this deployment never changes TM1. Drafting and
+    review work; applying, rolling back and promoting are refused."""
+
+    if settings.TM1_MODE == "readonly":
+        raise PermissionDeniedException(
+            "This deployment is read-only (TM1_MODE=readonly): changes can be "
+            "drafted and reviewed, but not applied, rolled back or promoted."
+        )
+
+
+def assistant_may_apply(connection) -> bool:
+    """Whether the assistant itself may execute a draft here: only when the
+    operator set TM1_MODE=readwrite, and only on a DEV connection."""
+
+    return settings.TM1_MODE == "readwrite" and environment_of(connection) == "dev"
 
 
 def environment_of(connection) -> str:
