@@ -122,6 +122,21 @@ class User(BaseModel, OrganizationScoped):
         nullable=False,
     )
 
+    # Set when a Super Admin hands this person a one-time password
+    # (Platform → Users). While it is set, every request but the password
+    # change itself is refused, and the one-time password stops signing in
+    # at the expiry. Cleared when the person sets their own password.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+    )
+    temporary_password_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     organization = relationship(
         "Organization",
         back_populates="users",

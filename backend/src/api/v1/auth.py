@@ -5,6 +5,7 @@ from src.api.dependencies.auth import get_current_active_user
 from src.api.dependencies.rate_limit import auth_throttle
 from src.database.session import get_db
 from src.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     GoogleLoginRequest,
     LoginRequest,
@@ -163,6 +164,31 @@ async def reset_password(
     await audit_service.record(db, None, "password_reset_completed", "User", None, None, http_request)
 
     return ApiResponse(success=True, data=None)
+
+
+@router.post(
+    "/change-password",
+    response_model=ApiResponse[TokenResponse],
+)
+async def change_password(
+    request: ChangePasswordRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_active_user),
+    _throttle: None = Depends(auth_throttle("change_password", "AUTH_PASSWORD_RESET_PER_WINDOW")),
+):
+    """Set a new password knowing the current one — also how a temporary
+    password from a Super Admin is replaced. Every session ends, this one
+    included; the response carries a fresh session to continue with."""
+
+    tokens = await auth_service.change_password(
+        db, current_user.id, request.current_password, request.new_password
+    )
+    await audit_service.record(
+        db, current_user.id, "password_changed", "User", current_user.id, None, http_request
+    )
+
+    return ApiResponse(success=True, data=tokens)
 
 
 @router.post(

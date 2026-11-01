@@ -31,6 +31,9 @@ export interface PlatformUser {
   roles: string[];
   registration_status: string;
   is_active: boolean;
+  /** A Super Admin's one-time password is in force; they must set their
+   * own before the app answers. Optional: older APIs do not send it. */
+  must_change_password?: boolean;
   created_at: string;
   last_login_at: string | null;
   last_seen_at: string | null;

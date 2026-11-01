@@ -42,6 +42,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=8)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
 class GoogleLoginRequest(BaseModel):
     id_token: str
 
@@ -57,6 +62,11 @@ class UserResponse(BaseModel):
     is_active: bool
     organization_id: UUID
     registration_status: str
+
+    # True while a temporary password from a Super Admin is in force: the
+    # app sends the person to set their own before anything else, and the
+    # API refuses everything else meanwhile.
+    must_change_password: bool = False
 
     # Role names, so a list of users can show who is an admin without a
     # request per row. Defaults empty: most places construct this from a

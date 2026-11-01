@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, History, LogOut, Pause, Play, ShieldOff, ShieldCheck } from "lucide-react";
+import { Download, History, KeyRound, LogOut, Pause, Play, ShieldOff, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { TemporaryPasswordDialog } from "@/components/temporary-password-dialog";
 import { download } from "@/components/visualize/chart-builder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export default function PlatformPage() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [reason, setReason] = useState("");
   const [activityFor, setActivityFor] = useState<PlatformUser | null>(null);
+  const [temporaryFor, setTemporaryFor] = useState<PlatformUser | null>(null);
 
   const overview = useQuery({
     queryKey: ["platform-overview"],
@@ -224,6 +226,10 @@ export default function PlatformPage() {
                           <Badge variant="destructive">deactivated</Badge>
                         ) : u.registration_status !== "approved" ? (
                           <Badge variant="warning">{u.registration_status}</Badge>
+                        ) : u.must_change_password ? (
+                          <Badge variant="warning" title="Signed in only to set a password of their own">
+                            temporary password
+                          </Badge>
                         ) : (
                           <Badge variant="success">active</Badge>
                         )}
@@ -243,6 +249,14 @@ export default function PlatformPage() {
                         <div className="flex justify-end gap-1" data-tour="platform-person-actions">
                           <Button size="sm" variant="ghost" onClick={() => setActivityFor(u)} title="What they did">
                             <History className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Give a temporary password"
+                            onClick={() => setTemporaryFor(u)}
+                          >
+                            <KeyRound className="h-4 w-4" />
                           </Button>
                           <Button
                             size="sm"
@@ -548,6 +562,7 @@ export default function PlatformPage() {
       </Dialog>
 
       <ActivityDialog person={activityFor} onClose={() => setActivityFor(null)} />
+      <TemporaryPasswordDialog person={temporaryFor} onClose={() => setTemporaryFor(null)} />
     </div>
   );
 }

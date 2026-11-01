@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import secrets
 import uuid
@@ -12,6 +13,7 @@ from src.core.exceptions import (
     ConflictException,
     NotFoundException,
     PermissionDeniedException,
+    ValidationException,
 )
 from src.database.models.organization import Organization
 from src.database.models.password_reset_token import PasswordResetToken
@@ -81,6 +83,22 @@ def _check_can_authenticate(user: User) -> None:
 
     if not user.is_active:
         raise PermissionDeniedException("User account is inactive")
+
+
+def _check_temporary_password(user: User) -> None:
+    """A temporary password (Platform → Users) signs in only until it
+    expires. Checked wherever a password or a refresh token is turned into
+    a session — not on the password change itself, so someone already
+    signed in with it can still replace it."""
+
+    if (
+        user.must_change_password
+        and user.temporary_password_expires_at is not None
+        and user.temporary_password_expires_at < datetime.now(timezone.utc)
+    ):
+        raise AuthenticationException(
+            "This temporary password has expired. Ask your administrator for a new one."
+        )
 
 
 class AuthService:
@@ -251,6 +269,7 @@ class AuthService:
             raise AuthenticationException("Invalid username or password")
 
         _check_can_authenticate(user)
+        _check_temporary_password(user)
 
         access_token = jwt_service.create_access_token(
             str(user.id)
@@ -288,6 +307,7 @@ class AuthService:
             raise AuthenticationException("Invalid or expired refresh token")
 
         _check_can_authenticate(user)
+        _check_temporary_password(user)
 
         # Reuse detection. Rotation retires each refresh token as it is
         # spent, so a *second* presentation means either a replay or a
@@ -413,6 +433,46 @@ class AuthService:
         # still be holding live tokens. Ending every session is the point of
         # resetting, not a side effect of it.
         await token_revocation_service.revoke_all_for_user(db, user.id)
+
+    async def change_password(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        current_password: str,
+        new_password: str,
+    ) -> TokenResponse:
+        """Replace the signed-in person's password, knowing the current one.
+
+        Also how a temporary password from a Super Admin is retired: the
+        flag that confines the session to this call is cleared here and
+        nowhere else. Every session ends, this one included, and a fresh
+        one is returned for the caller to continue with."""
+
+        user = await user_repository.get_by_id(db, user_id)
+        if user is None:
+            raise NotFoundException("User not found")
+        if not password_service.verify_password(current_password, user.password_hash):
+            raise ValidationException("The current password is not right.")
+        if password_service.verify_password(new_password, user.password_hash):
+            raise ValidationException("Choose a password different from the current one.")
+
+        user.password_hash = password_service.hash_password(new_password)
+        user.must_change_password = False
+        user.temporary_password_expires_at = None
+        await user_repository.update(db, user)
+        await token_revocation_service.revoke_all_for_user(db, user.id)
+
+        # `iat` is whole seconds and a token from the cutoff's own second
+        # counts as revoked, so the new session is minted once that second
+        # has passed — at most a second's wait, instead of a sign-in that
+        # bounces straight back to the login page.
+        cutoff = user.tokens_valid_from
+        wait = 1 - cutoff.microsecond / 1_000_000 + 0.01
+        await asyncio.sleep(wait)
+        return TokenResponse(
+            access_token=jwt_service.create_access_token(str(user.id)),
+            refresh_token=jwt_service.create_refresh_token(str(user.id)),
+        )
 
     async def google_login(
         self,

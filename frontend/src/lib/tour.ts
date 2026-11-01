@@ -356,8 +356,8 @@ export const FEATURE_TOURS: Record<string, TourStep[]> = {
     },
     {
       target: "platform-person-actions",
-      title: "Activity, sign out, deactivate",
-      body: "The clock shows what they did in 30 days — each action, every TM1 call the assistant made for them with the server and objects touched — and their sign-ins. Sign out ends every session; Deactivate also blocks sign-in until you reactivate. Your reason goes into the audit log.",
+      title: "Activity, temporary password, sign out, deactivate",
+      body: "The clock shows what they did in 30 days — each action, every TM1 call the assistant made for them with the server and objects touched — and their sign-ins. The key gives someone locked out a one-time password when no reset email can reach them: shown to you once, it only lets them set their own. Sign out ends every session; Deactivate also blocks sign-in until you reactivate. Your reason goes into the audit log.",
     },
     {
       target: "platform-connections",

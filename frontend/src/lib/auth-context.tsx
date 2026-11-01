@@ -31,6 +31,10 @@ export interface AuthUser {
 
   /** Role names, from /auth/me. Optional for the same reason as above. */
   roles?: string[];
+
+  /** True while a temporary password from the Super Admin is in force:
+   * the app sends the person to set their own before anything else. */
+  must_change_password?: boolean;
 }
 
 export const SUPER_ADMIN_ROLE = "Super Admin";
@@ -66,6 +70,9 @@ interface AuthContextValue {
    * signed-in user — onboarding, profile — need a way to pull the new
    * value rather than invalidating a key that does not exist. */
   refreshUser: () => Promise<void>;
+  /** Continue with a session the server just issued (a password change
+   * ends every session and returns a fresh one). */
+  adoptSession: (tokens: { access_token: string; refresh_token: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -195,6 +202,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyTokens],
   );
 
+  const adoptSession = useCallback(
+    async (tokens: { access_token: string; refresh_token: string }) => {
+      applyTokens({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token });
+      setUser(await apiRequest<AuthUser>("/auth/me"));
+    },
+    [applyTokens],
+  );
+
   const logout = useCallback(() => {
     // Clearing the browser alone left the refresh token valid on the
     // server for the rest of its life.
@@ -214,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithGoogle,
         logout,
         refreshUser,
+        adoptSession,
       }}
     >
       {children}

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { ChangePasswordForm } from "@/components/change-password-form";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -29,7 +30,7 @@ const THEME_OPTIONS = [
 ] as const;
 
 export default function SettingsPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, adoptSession } = useAuth();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const queryClient = useQueryClient();
@@ -201,6 +202,23 @@ export default function SettingsPage() {
               Save
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+          <CardDescription>
+            Changing it signs out your other sessions; this one continues.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm
+            onChanged={async (session) => {
+              await adoptSession(session);
+              toast.success("Password changed. Other sessions were signed out.");
+            }}
+          />
         </CardContent>
       </Card>
 

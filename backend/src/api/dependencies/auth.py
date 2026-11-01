@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,22 @@ from src.services.token_revocation_service import token_revocation_service
 security = HTTPBearer()
 
 
+# With a temporary password from the Super Admin a session may ask who it
+# is, set its own password, or sign out — nothing else, whatever the UI.
+_ALLOWED_WITH_TEMPORARY_PASSWORD = (
+    "/auth/change-password",
+    "/auth/me",
+    "/auth/logout",
+    "/auth/logout-all",
+)
+
+
+def _may_run_with_temporary_password(request: Request) -> bool:
+    return request.url.path.rstrip("/").endswith(_ALLOWED_WITH_TEMPORARY_PASSWORD)
+
+
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
@@ -75,6 +90,14 @@ async def get_current_user(
     if current_user.registration_status != "approved":
         raise PermissionDeniedException(
             "Your account is pending administrator approval."
+        )
+
+    # A temporary password buys one thing: setting a real one. Enforced
+    # here, so no route needs to remember it.
+    if current_user.must_change_password and not _may_run_with_temporary_password(request):
+        raise PermissionDeniedException(
+            "Set a new password before continuing.",
+            code="PASSWORD_CHANGE_REQUIRED",
         )
 
     return current_user

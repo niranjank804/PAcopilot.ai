@@ -3,13 +3,15 @@
 Who has an account, who signed in and from where, which TM1 servers each
 organization connected and with which TM1 user, who used those connections
 and on what — and the levers to stop misuse: deactivate a person, end their
-sessions, or suspend a connection.
+sessions, or suspend a connection — and one to let a locked-out person back
+in: a one-time password, shown once, that only lets them set their own.
 
 What it never shows: a password, API key or any other secret. Connection
 rows are built field by field below, so a column added to TM1Connection
 later cannot leak into this view by accident.
 """
 
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -19,6 +21,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.v1.signups import _every_organization, require_super_admin
+from src.core.config import settings
 from src.core.exceptions import NotFoundException, ValidationException
 from src.core.rate_limit import client_ip_of
 from src.database.models.ai_tool_execution import AIToolExecution
@@ -35,6 +38,8 @@ from src.repositories.user_role_repository import user_role_repository
 from src.schemas.auth import UserResponse
 from src.schemas.response import ApiResponse
 from src.services.audit_service import audit_service
+from src.services.password_service import password_service
+from src.services.role_service import role_service
 from src.services.token_revocation_service import token_revocation_service
 from src.tm1.client.connection_manager import tm1_connection_manager
 
@@ -178,6 +183,7 @@ async def list_users(
             "roles": roles.get(user.id, []),
             "registration_status": user.registration_status,
             "is_active": user.is_active,
+            "must_change_password": user.must_change_password,
             "created_at": user.created_at,
             "last_login_at": user.last_login_at,
             "last_seen_at": user.last_seen_at,
@@ -551,6 +557,62 @@ async def _target_connection(db: AsyncSession, connection_id: uuid.UUID) -> TM1C
     if connection is None:
         raise NotFoundException("TM1 connection not found.")
     return connection
+
+
+# Readable over the phone: no 0/O/1/l/I, three groups of five.
+_TEMPORARY_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+
+
+def _temporary_password() -> str:
+    return "-".join(
+        "".join(secrets.choice(_TEMPORARY_ALPHABET) for _ in range(5)) for _ in range(3)
+    )
+
+
+@router.post("/users/{user_id}/temporary-password", response_model=ApiResponse[dict])
+async def set_temporary_password(
+    user_id: uuid.UUID,
+    body: Reason,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    caller: UserResponse = Depends(require_super_admin),
+):
+    """A one-time password for someone locked out when no reset email can
+    reach them. Returned once, here, to the Super Admin, who passes it on
+    themselves. It signs in for TEMPORARY_PASSWORD_EXPIRE_HOURS and buys
+    only the password change; the person's current password stops working
+    and every session of theirs ends now. The audit log records that this
+    happened and why — never the password."""
+
+    with _every_organization(db):
+        user = await _target_user(db, user_id, caller)
+        if not user.is_active or user.registration_status != "approved":
+            raise ValidationException("Reactivate (or approve) the account first.")
+        if await role_service.is_super_admin(db, user.id):
+            raise ValidationException("Another Super Admin resets their own password.")
+        password = _temporary_password()
+        expires_at = _now() + timedelta(hours=settings.TEMPORARY_PASSWORD_EXPIRE_HOURS)
+        user.password_hash = password_service.hash_password(password)
+        user.must_change_password = True
+        user.temporary_password_expires_at = expires_at
+        await token_revocation_service.revoke_all_for_user(db, user.id)
+    await audit_service.log(
+        db,
+        organization_id=user.organization_id,
+        user_id=caller.id,
+        action="platform_temporary_password",
+        entity="User",
+        entity_id=user.id,
+        new_values={"reason": body.reason, "by": "platform_admin", "expires_at": expires_at.isoformat()},
+        ip_address=client_ip_of(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    return ApiResponse(success=True, data={
+        "id": str(user.id),
+        "username": user.username,
+        "temporary_password": password,
+        "expires_at": expires_at,
+    })
 
 
 @router.post("/connections/{connection_id}/suspend", response_model=ApiResponse[dict])

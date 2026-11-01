@@ -243,6 +243,11 @@ class Settings(BaseSettings):
     # emails (e.g. the password reset link). Not the API's own URL.
     FRONTEND_URL: str = "http://localhost:3000"
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+    # A one-time password a Super Admin hands to someone who is locked out
+    # when no reset email can reach them (Platform → Users). It signs in
+    # until this many hours have passed, and only to set a password of
+    # their own.
+    TEMPORARY_PASSWORD_EXPIRE_HOURS: int = 24
 
     # ------------------------------------------------------------------
     # Email

@@ -12,23 +12,29 @@ import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   // The assistant is a workspace, not a document: it takes the whole width
   // and less padding, so a long answer or a draft has room.
   const workspace = pathname === "/chat" || pathname.startsWith("/chat/");
 
+  // A temporary password from the Super Admin: nothing in the app answers
+  // until a real one is set (the API refuses too), so the shell is not shown.
+  const mustChangePassword = Boolean(user?.must_change_password);
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace("/login");
+    } else if (!isLoading && mustChangePassword) {
+      router.replace("/change-password");
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, mustChangePassword, router]);
 
-  // Resolved, and not signed in — the effect above is redirecting. Rendering
-  // the shell here would flash a navigable app at someone on their way to
-  // /login.
-  if (!isLoading && !isAuthenticated) {
+  // Resolved, and not signed in (or not yet allowed in) — the effect above
+  // is redirecting. Rendering the shell here would flash a navigable app at
+  // someone on their way to /login.
+  if (!isLoading && (!isAuthenticated || mustChangePassword)) {
     return null;
   }
 

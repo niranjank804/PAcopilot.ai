@@ -101,3 +101,20 @@ describe("when signed in", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 });
+
+describe("when signed in with a temporary password", () => {
+  beforeEach(() => {
+    useAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { must_change_password: true },
+    });
+  });
+
+  it("sends the person to choose a password and shows no app meanwhile", () => {
+    const { container } = render(<AppLayout>page content</AppLayout>);
+
+    expect(replace).toHaveBeenCalledWith("/change-password");
+    expect(container).toBeEmptyDOMElement();
+  });
+});

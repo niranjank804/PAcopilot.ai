@@ -174,6 +174,7 @@ the other behaviour, and `.env.example` says which that is.
 | TM1 request timeout and thread pool | 30 s, 16 threads | `TM1_REQUEST_TIMEOUT_SECONDS`, `TM1_MAX_CONCURRENT_CALLS` |
 | Parsing, embedding, corpus and extraction routes | 10/min/user, 40/min/org | `RATE_LIMIT_HEAVY_*` |
 | Password-reset email without SMTP in production | dropped, not printed | `SMTP_HOST` |
+| A temporary password from the Super Admin (Platform → Users) | signs in for 24 h, and only to set a new password; shown once, never logged | `TEMPORARY_PASSWORD_EXPIRE_HOURS` |
 | Log file on disk | none (stdout only) | `LOG_FILE` |
 
 Two things are not settings. A TM1 error message never carries the
