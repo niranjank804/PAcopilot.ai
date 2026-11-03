@@ -129,3 +129,30 @@ async def test_an_analysts_own_connection_stays_private_dev_and_direct(client, d
         resp = await client.patch(f"/tm1/connections/{mine}", json=change, headers=analyst)
         assert resp.status_code == 403, resp.text
         assert why in resp.json()["error"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_an_analyst_cannot_edit_their_connection_once_an_admin_shared_it(client, db_session,
+                                                                                tm1_credentials_key,
+                                                                                fake_tm1_client):
+    """Out of scope as it stands is out of scope to edit, whoever added it:
+    here the analyst's own connection, labelled QA by an admin."""
+
+    from sqlalchemy import update
+
+    from src.database.models.tm1_connection import TM1Connection
+
+    org, _admin = await create_org_admin(db_session)
+    analyst = await _analyst(db_session, org.id)
+    mine = (await client.post("/tm1/connections", json=_body("Mine"), headers=analyst)).json()["data"]["id"]
+
+    db_session.info.pop("organization_id", None)
+    await db_session.execute(update(TM1Connection).where(TM1Connection.id == mine).values(environment="qa"))
+    await db_session.commit()
+
+    for resp in (
+        await client.patch(f"/tm1/connections/{mine}", json={"address": "elsewhere.example.com"}, headers=analyst),
+        await client.delete(f"/tm1/connections/{mine}", headers=analyst),
+    ):
+        assert resp.status_code == 403, resp.text
+        assert "DEV connections" in resp.json()["error"]["message"]

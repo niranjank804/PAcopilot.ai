@@ -321,6 +321,15 @@ async def update_connection(
         db, connection_id, current_user.organization_id, purpose="manage"
     )
     await _check_owns(db, current_user, existing)
+    # Both the connection as it is (one they added while they held more
+    # rights, or an admin since shared or relabelled, is no longer theirs
+    # to edit) and as it would become.
+    await _check_own_scope(
+        db, current_user,
+        environment=governance.environment_of(existing),
+        visibility=existing.visibility,
+        gateway_id=existing.gateway_id,
+    )
     await _check_own_scope(
         db, current_user,
         environment=request.environment, visibility=request.visibility, gateway_id=request.gateway_id,
