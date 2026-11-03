@@ -138,6 +138,37 @@ async def _check_owns(db: AsyncSession, current_user: UserResponse, connection) 
     )
 
 
+async def _check_own_scope(
+    db: AsyncSession,
+    current_user: UserResponse,
+    *,
+    environment: str | None,
+    visibility: str | None,
+    gateway_id,
+) -> None:
+    """What tm1.connections.own does not reach, for someone without
+    tm1.write: a connection of theirs stays private, labelled DEV, and
+    direct. Labelling one QA/PROD would mark it for the stricter deploy
+    rules without holding them; sharing it would put their credentials in
+    everyone's hands; and an organization gateway reaches the customer's
+    internal network, which is the admins' to hand out."""
+
+    if await auth_repository.user_has_permission(db, current_user.id, "tm1.write"):
+        return
+    if environment not in (None, "dev"):
+        raise PermissionDeniedException(
+            "Your own connections are DEV connections. An organization admin labels QA and PROD."
+        )
+    if visibility not in (None, "private"):
+        raise PermissionDeniedException(
+            "Your own connections are private to you. An organization admin can share a connection."
+        )
+    if gateway_id is not None:
+        raise PermissionDeniedException(
+            "Connecting through the organization's gateway needs an organization admin."
+        )
+
+
 @router.post(
     "/connections",
     response_model=ApiResponse[ConnectionResponse],
@@ -150,6 +181,11 @@ async def create_connection(
     current_user: UserResponse = Depends(_MANAGE_CONNECTIONS),
 ):
     start = time.monotonic()
+
+    await _check_own_scope(
+        db, current_user,
+        environment=request.environment, visibility=request.visibility, gateway_id=request.gateway_id,
+    )
 
     connection = await tm1_integration_service.create_connection(
         db,
@@ -285,6 +321,10 @@ async def update_connection(
         db, connection_id, current_user.organization_id, purpose="manage"
     )
     await _check_owns(db, current_user, existing)
+    await _check_own_scope(
+        db, current_user,
+        environment=request.environment, visibility=request.visibility, gateway_id=request.gateway_id,
+    )
 
     # Who can see a connection is its owner's decision (or an admin's): a
     # member using a shared connection must not be able to make it private
@@ -406,6 +446,14 @@ async def delete_connection(
         purpose="manage",
     )
     await _check_owns(db, current_user, connection)
+    # Only a DEV, private, direct connection is an own-only caller's to
+    # remove — the scope they could have created.
+    await _check_own_scope(
+        db, current_user,
+        environment=governance.environment_of(connection),
+        visibility=connection.visibility,
+        gateway_id=connection.gateway_id,
+    )
 
     await tm1_integration_service.delete_connection(
         db,

@@ -99,3 +99,33 @@ async def test_a_viewer_cannot_add_a_connection(client, db_session, tm1_credenti
 
     resp = await client.post("/tm1/connections", json=_body("Nope"), headers=viewer)
     assert resp.status_code == 403, resp.text
+
+
+@pytest.mark.asyncio
+async def test_an_analysts_own_connection_stays_private_dev_and_direct(client, db_session, tm1_credentials_key,
+                                                                        fake_tm1_client):
+    import uuid
+
+    org, _admin = await create_org_admin(db_session)
+    analyst = await _analyst(db_session, org.id)
+
+    refused = [
+        ({**_body("Q"), "environment": "qa"}, "DEV connections"),
+        ({**_body("P"), "environment": "prod"}, "DEV connections"),
+        (_body("Shared", "organization"), "private to you"),
+        ({**_body("G"), "gateway_id": str(uuid.uuid4())}, "gateway"),
+    ]
+    for body, why in refused:
+        resp = await client.post("/tm1/connections", json=body, headers=analyst)
+        assert resp.status_code == 403, resp.text
+        assert why in resp.json()["error"]["message"]
+
+    mine = (await client.post("/tm1/connections", json=_body("Mine"), headers=analyst)).json()["data"]["id"]
+    for change, why in (
+        ({"environment": "prod"}, "DEV connections"),
+        ({"visibility": "organization"}, "private to you"),
+        ({"gateway_id": str(uuid.uuid4())}, "gateway"),
+    ):
+        resp = await client.patch(f"/tm1/connections/{mine}", json=change, headers=analyst)
+        assert resp.status_code == 403, resp.text
+        assert why in resp.json()["error"]["message"]
