@@ -26,6 +26,10 @@ PERMISSIONS = [
     ("knowledge.write", "Upload and delete knowledge base documents."),
     ("tm1.read", "View TM1 connections and query cube/dimension metadata."),
     ("tm1.write", "Create and delete TM1 connections."),
+    # Narrower than tm1.write: someone who works with their own TM1 server
+    # can add it, and change or delete only what they added. tm1.write also
+    # gates drafting changes to TM1 and managing anyone's connection.
+    ("tm1.connections.own", "Add your own TM1 connections, and change or delete the ones you added."),
     ("tm1.security.read", "View TM1 security groups and their members."),
     ("tm1.deploy", "Execute and roll back TM1 changes (rules, TI processes) on DEV connections."),
     # Higher environments are separate grants (src/tm1/governance.py);
@@ -101,6 +105,12 @@ PLANNING_ROLE_PERMISSIONS = GENERAL_ROLE_PERMISSIONS + ["tm1.read"]
 # nothing here: report artifacts can contain financial detail that the
 # least-privileged role has no reason to reach.
 PLANNING_ROLE_PERMISSIONS = PLANNING_ROLE_PERMISSIONS + ["reports.read"]
+
+# Bringing your own TM1 server is part of analysing it: Planner/Analyst can
+# add connections and manage the ones they added (tm1.connections.own),
+# but not draft changes to TM1 or touch anyone else's connection
+# (tm1.write stays admin-only).
+PLANNING_ROLE_PERMISSIONS = PLANNING_ROLE_PERMISSIONS + ["tm1.connections.own"]
 
 # tm1.deploy (executing writes against live TM1 servers) follows the same
 # admin-only pattern as tm1.security.read: Super Admin/Organization Admin

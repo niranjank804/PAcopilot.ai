@@ -275,7 +275,11 @@ async def test_metadata_extract_requires_write_permission(
         f"/tm1/connections/{connection_id}/metadata/extract",
         headers=auth_headers(analyst),
     )
-    assert resp.status_code == 403
+    # Analysts may extract only from connections they added
+    # (tm1.connections.own). This one is the admin's and private, so to the
+    # analyst it does not exist; a shared one is refused with 403
+    # (tests/integration/tm1/test_own_connections.py).
+    assert resp.status_code in (403, 404)
 
 
 @pytest.mark.asyncio

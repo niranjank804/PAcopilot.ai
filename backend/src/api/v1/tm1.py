@@ -4,7 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies.permissions import require_permission
+from src.api.dependencies.permissions import require_any_permission, require_permission
 from src.api.dependencies.rate_limit import (
     ai_rate_limited,
     general_rate_limited,
@@ -120,6 +120,24 @@ async def _log_tm1_access(
     )
 
 
+# Adding a connection, and managing one you added, is open to tm1.write
+# (admins) and to tm1.connections.own (Planner/Analyst); see _check_owns.
+_MANAGE_CONNECTIONS = require_any_permission("tm1.write", "tm1.connections.own")
+
+
+async def _check_owns(db: AsyncSession, current_user: UserResponse, connection) -> None:
+    """tm1.connections.own covers only connections this person added;
+    anyone else's needs tm1.write."""
+
+    if connection.created_by == current_user.id:
+        return
+    if await auth_repository.user_has_permission(db, current_user.id, "tm1.write"):
+        return
+    raise PermissionDeniedException(
+        "You can change only the connections you added. Ask an organization admin for this one."
+    )
+
+
 @router.post(
     "/connections",
     response_model=ApiResponse[ConnectionResponse],
@@ -129,7 +147,7 @@ async def create_connection(
     request: ConnectionCreate,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: UserResponse = Depends(require_permission("tm1.write")),
+    current_user: UserResponse = Depends(_MANAGE_CONNECTIONS),
 ):
     start = time.monotonic()
 
@@ -259,13 +277,14 @@ async def update_connection(
     request: ConnectionUpdate,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: UserResponse = Depends(require_permission("tm1.write")),
+    current_user: UserResponse = Depends(_MANAGE_CONNECTIONS),
 ):
     start = time.monotonic()
 
     existing = await tm1_integration_service.get_connection(
         db, connection_id, current_user.organization_id, purpose="manage"
     )
+    await _check_owns(db, current_user, existing)
 
     # Who can see a connection is its owner's decision (or an admin's): a
     # member using a shared connection must not be able to make it private
@@ -376,7 +395,7 @@ async def delete_connection(
     connection_id: uuid.UUID,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: UserResponse = Depends(require_permission("tm1.write")),
+    current_user: UserResponse = Depends(_MANAGE_CONNECTIONS),
 ):
     start = time.monotonic()
 
@@ -386,6 +405,7 @@ async def delete_connection(
         current_user.organization_id,
         purpose="manage",
     )
+    await _check_owns(db, current_user, connection)
 
     await tm1_integration_service.delete_connection(
         db,
@@ -743,7 +763,7 @@ async def extract_connection_metadata(
     connection_id: uuid.UUID,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: UserResponse = Depends(require_permission("tm1.write")),
+    current_user: UserResponse = Depends(_MANAGE_CONNECTIONS),
     _: UserResponse = Depends(heavy_rate_limited),
 ):
     start = time.monotonic()
@@ -753,6 +773,7 @@ async def extract_connection_metadata(
         connection_id,
         current_user.organization_id,
     )
+    await _check_owns(db, current_user, connection)
 
     summary, record = await extraction_history.run_extraction(
         db,
