@@ -240,3 +240,20 @@ def test_haiku_gets_no_thinking_or_effort_settings():
 
     assert _reasoning_kwargs("claude-haiku-4-5") == {}
     assert "output_config" in _reasoning_kwargs("claude-sonnet-5")
+
+
+def test_current_models_keep_thinking_and_ask_for_server_side_fallback():
+    """Fable 5.2, Opus 5.5 and Sonnet 5.5 can decline a request on safety
+    grounds; the API then answers on a suitable model instead of returning
+    nothing. Haiku 5.5 takes adaptive thinking, unlike Haiku 4.5."""
+
+    from src.ai.providers.anthropic_provider import _fallback_kwargs, _reasoning_kwargs
+
+    for model in ("claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5"):
+        assert _fallback_kwargs(model) == {
+            "extra_headers": {"anthropic-beta": "server-side-fallback-2026-07-01"},
+            "extra_body": {"fallbacks": "default"},
+        }, model
+        assert "thinking" in _reasoning_kwargs(model), model
+    assert _fallback_kwargs("claude-opus-5") == {}
+    assert "thinking" in _reasoning_kwargs("claude-haiku-5-5")

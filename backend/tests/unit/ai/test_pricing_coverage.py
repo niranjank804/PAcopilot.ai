@@ -73,3 +73,15 @@ def test_unknown_model_falls_back_rather_than_raising():
     usage = Usage(input_tokens=1_000_000, output_tokens=0)
 
     assert estimate_cost("some-unreleased-model", usage) == DEFAULT_PRICING[0]
+
+
+def test_current_models_bill_their_own_cache_read_rate():
+    """Cache reads on Fable 5.2 / Opus 5.5 cost $0.20 per 1M, on Sonnet
+    5.5 $0.10 — not the usual 10% of input."""
+
+    usage = Usage(input_tokens=0, output_tokens=0, cache_read_input_tokens=1_000_000)
+
+    assert estimate_cost("claude-fable-5-2", usage) == Decimal("0.20")
+    assert estimate_cost("claude-opus-5-5", usage) == Decimal("0.20")
+    assert estimate_cost("claude-sonnet-5-5", usage) == Decimal("0.10")
+    assert estimate_cost("claude-opus-5", usage) == Decimal("0.50")

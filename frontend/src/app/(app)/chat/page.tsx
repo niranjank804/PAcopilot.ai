@@ -185,17 +185,17 @@ const MODELS = [
   {
     id: "fast",
     label: "Fast",
-    help: "Claude Haiku 4.5. Quickest and cheapest — for plain questions and explanations.",
+    help: "Claude Sonnet 5.5. Quickest and cheapest — for plain questions and explanations.",
   },
   {
     id: "balanced",
     label: "Balanced",
-    help: "Claude Sonnet 5. Quick, about 40% cheaper than Best per token — the right choice for most TI development and troubleshooting.",
+    help: "Claude Opus 5.5. Strong and about half the price of Best per token — the right choice for most TI development and troubleshooting.",
   },
   {
     id: "best",
     label: "Best",
-    help: "Claude Opus 5. Slower and dearer, with the most careful reasoning — for tangled rule and feeder logic or a large TI refactor.",
+    help: "Claude Fable 5.2, the most capable Claude model. Slower and dearer, with the most careful reasoning — for tangled rule and feeder logic or a large TI refactor.",
   },
 ] as const;
 
@@ -203,6 +203,8 @@ const MODELS = [
 const LEGACY_MODEL_CHOICES: Record<string, string> = {
   "claude-sonnet-5": "balanced",
   "claude-opus-5": "best",
+  "claude-opus-5-5": "balanced",
+  "claude-fable-5-2": "best",
 };
 
 const TIER_LABEL: Record<string, string> = { fast: "Fast", balanced: "Balanced", best: "Best" };

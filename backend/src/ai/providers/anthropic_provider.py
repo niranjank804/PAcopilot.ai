@@ -75,7 +75,7 @@ _LOOKBACK_BLOCKS = 15
 # sends documentation questions and plain chat to the fast tier, Haiku, so
 # with Haiku allowed those chats failed outright. Found by the live accuracy
 # run, 2026-10-06; both answers confirmed against the API.
-_NO_REASONING_SETTINGS = ("claude-haiku-",)
+_NO_REASONING_SETTINGS = ("claude-haiku-4-",)
 
 
 def _reasoning_kwargs(model: str | None = None) -> dict:
@@ -105,6 +105,22 @@ def _reasoning_kwargs(model: str | None = None) -> dict:
             "display": settings.AI_THINKING_DISPLAY,
         },
         "output_config": {"effort": settings.AI_EFFORT},
+    }
+
+
+# Models whose safety classifiers can decline a request (stop_reason
+# "refusal"). With server-side fallback the API retries a declined request
+# on a model suited to its refusal category instead of returning nothing.
+_SERVER_FALLBACK_PREFIXES = ("claude-fable-5-", "claude-opus-5-5", "claude-sonnet-5-5")
+_SERVER_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+
+def _fallback_kwargs(model: str | None) -> dict:
+    if not model or not model.startswith(_SERVER_FALLBACK_PREFIXES):
+        return {}
+    return {
+        "extra_headers": {"anthropic-beta": _SERVER_FALLBACK_BETA},
+        "extra_body": {"fallbacks": "default"},
     }
 
 
@@ -291,6 +307,7 @@ class AnthropicProvider(AIProvider):
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
                 **_reasoning_kwargs(request.model),
+                **_fallback_kwargs(request.model),
             )
         except _anthropic().RateLimitError as exc:
             raise AIProviderRateLimitError(str(exc)) from exc
@@ -330,6 +347,7 @@ class AnthropicProvider(AIProvider):
                 messages=self._messages_payload(request),
                 tools=self._tools_payload(request.tools),
                 **_reasoning_kwargs(request.model),
+                **_fallback_kwargs(request.model),
             ) as stream:
                 async for text in stream.text_stream:
                     yield StreamEvent(type="text_delta", text=text)

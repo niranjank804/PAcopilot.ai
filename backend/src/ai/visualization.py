@@ -19,9 +19,9 @@ from src.tm1.services.mdx_table import execute_mdx_table, flat_cells
 _FENCED = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 _BARE = re.compile(r"(\{[^{}]*\"mdx\"[^{}]*\})", re.DOTALL)
 
-# The analyst's MDX work is a few quick tool rounds; the faster model does
-# it well and keeps the page from waiting on the slowest one.
-_PREFERRED_MODEL = "claude-sonnet-5"
+# The analyst's MDX work is a few quick tool rounds: the balanced tier does
+# it well without the page waiting on the slowest model.
+_PREFERRED_MODEL = "claude-opus-5-5"
 
 
 class VisualizationResult:

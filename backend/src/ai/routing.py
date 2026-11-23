@@ -3,9 +3,9 @@
 Three tiers, all Anthropic (the owner's choice: TM1 data goes to one AI
 company, and every tool is tested on these models):
 
-    FAST      claude-haiku-4-5   plain questions, documentation
-    BALANCED  claude-sonnet-5    TI development, troubleshooting, analysis
-    BEST      claude-opus-5      architecture, review, anything on PROD
+    FAST      claude-sonnet-5-5  plain questions, documentation
+    BALANCED  claude-opus-5-5    TI development, troubleshooting, analysis
+    BEST      claude-fable-5-2   architecture, review, anything on PROD
 
 A person can pick a tier, or AUTO, which applies the fixed rules in
 `auto_tier` — no model call, no guessing, the same message always routes
@@ -29,9 +29,9 @@ from src.core.config import settings
 from src.core.exceptions import ValidationException
 
 TIER_MODELS = {
-    "fast": "claude-haiku-4-5",
-    "balanced": "claude-sonnet-5",
-    "best": "claude-opus-5",
+    "fast": "claude-sonnet-5-5",
+    "balanced": "claude-opus-5-5",
+    "best": "claude-fable-5-2",
 }
 TIERS = tuple(TIER_MODELS)
 CHOICES = ("auto", *TIERS)

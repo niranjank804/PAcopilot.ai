@@ -266,7 +266,7 @@ class Settings(BaseSettings):
     # AI
     # ------------------------------------------------------------------
     ANTHROPIC_API_KEY: str | None = None
-    AI_DEFAULT_MODEL: str = "claude-opus-5"
+    AI_DEFAULT_MODEL: str = "claude-opus-5-5"
 
     # The models a chat request may ask for by name. Anything else is a
     # 422, whatever the caller's role: the request body is the one place a
@@ -277,7 +277,7 @@ class Settings(BaseSettings):
     # AI_DEFAULT_MODEL must be one of them. JSON list in the environment,
     # like CORS_ALLOWED_ORIGINS.
     # One per routing tier (src/ai/routing.py): best, balanced, fast.
-    AI_ALLOWED_MODELS: list[str] = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"]
+    AI_ALLOWED_MODELS: list[str] = ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5"]
 
     # Adaptive thinking lets the model decide how much to reason per turn.
     # It is NOT the default on the wire: a request that omits `thinking`

@@ -83,12 +83,12 @@ async def test_chat_runs_on_a_listed_model_by_name(client, db_session, fake_prov
 
     resp = await client.post(
         "/ai/chat",
-        json={"message": "hello", "model": "claude-sonnet-5"},
+        json={"message": "hello", "model": "claude-opus-5-5"},
         headers=auth_headers(admin),
     )
 
     assert resp.status_code == 200
-    assert resp.json()["data"]["model"] == "claude-sonnet-5"
+    assert resp.json()["data"]["model"] == "claude-opus-5-5"
 
 
 @pytest.mark.asyncio

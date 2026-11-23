@@ -14,6 +14,12 @@ from src.ai.schemas import Usage
 # claude-sonnet-5's introductory $2.00 / $10.00 rate ended 2026-08-31, so
 # the standard rate below is now the rate actually billed.
 PRICING: dict[str, tuple[Decimal, Decimal]] = {
+    "claude-fable-5-2": (Decimal("8.00"), Decimal("40.00")),
+    "claude-fable-5-1": (Decimal("10.00"), Decimal("50.00")),
+    "claude-opus-5-5": (Decimal("4.00"), Decimal("20.00")),
+    "claude-sonnet-5-5": (Decimal("2.00"), Decimal("10.00")),
+    # Up to 100K-token prompts; longer ones bill at $0.50 / $2.50.
+    "claude-haiku-5-5": (Decimal("0.10"), Decimal("0.50")),
     "claude-opus-5": (Decimal("5.00"), Decimal("25.00")),
     "claude-opus-4-8": (Decimal("5.00"), Decimal("25.00")),
     "claude-opus-4-7": (Decimal("5.00"), Decimal("25.00")),
@@ -37,6 +43,17 @@ DEFAULT_PRICING = (Decimal("5.00"), Decimal("25.00"))
 CACHE_WRITE_MULTIPLIER = Decimal("1.25")
 CACHE_READ_MULTIPLIER = Decimal("0.10")
 
+# Models whose cache reads are not 10% of input: a flat USD per 1M tokens.
+CACHE_READ_PRICE: dict[str, Decimal] = {
+    "claude-fable-5-2": Decimal("0.20"),
+    "claude-opus-5-5": Decimal("0.20"),
+    "claude-sonnet-5-5": Decimal("0.10"),
+}
+
+
+def _cache_read_rate(model: str, input_price: Decimal) -> Decimal:
+    return CACHE_READ_PRICE.get(model, input_price * CACHE_READ_MULTIPLIER)
+
 _MILLION = Decimal("1000000")
 
 
@@ -55,8 +72,7 @@ def estimate_cost(model: str, usage: Usage) -> Decimal:
 
     cache_read = (
         (Decimal(usage.cache_read_input_tokens) / _MILLION)
-        * input_price
-        * CACHE_READ_MULTIPLIER
+        * _cache_read_rate(model, input_price)
     )
 
     output = (Decimal(usage.output_tokens) / _MILLION) * output_price

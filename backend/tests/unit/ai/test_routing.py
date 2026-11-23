@@ -37,35 +37,35 @@ def test_auto_never_sends_a_tool_agent_below_balanced():
 def test_a_decision_names_the_model_and_why():
     decision = decide(None, agent="developer", environment="dev")
 
-    assert decision.model == "claude-sonnet-5" and decision.tier == "balanced"
+    assert decision.model == "claude-opus-5-5" and decision.tier == "balanced"
     assert decision.requested == "auto"
     assert decision.reason.startswith("AUTO:") and "developer" in decision.reason
-    assert decision.fallback_model == "claude-opus-5"
+    assert decision.fallback_model == "claude-fable-5-2"
 
 
 def test_a_chosen_tier_overrides_auto():
-    assert decide("best", agent=None, environment=None).model == "claude-opus-5"
-    assert decide("fast", agent="architect", environment=None).model == "claude-haiku-4-5"
+    assert decide("best", agent=None, environment=None).model == "claude-fable-5-2"
+    assert decide("fast", agent="architect", environment=None).model == "claude-sonnet-5-5"
 
 
 def test_a_model_named_outright_must_be_allowed():
-    assert decide("claude-sonnet-5", agent=None, environment=None).tier is None
+    assert decide("claude-opus-5-5", agent=None, environment=None).tier is None
     with pytest.raises(ValidationException):
         decide("gpt-5", agent=None, environment=None)
 
 
 def test_a_tier_this_deployment_does_not_allow_moves_up_and_says_so(monkeypatch):
-    monkeypatch.setattr(settings, "AI_ALLOWED_MODELS", ["claude-opus-5", "claude-sonnet-5"])
+    monkeypatch.setattr(settings, "AI_ALLOWED_MODELS", ["claude-fable-5-2", "claude-opus-5-5"])
 
     decision = decide(None, agent=None, environment=None)
 
-    assert decision.model == "claude-sonnet-5"
+    assert decision.model == "claude-opus-5-5"
     assert "FAST is not enabled here" in decision.reason
 
 
 def test_the_fallback_is_never_cheaper_than_balanced():
-    assert decide("fast", agent=None, environment=None).fallback_model == "claude-sonnet-5"
-    assert decide("best", agent=None, environment=None).fallback_model == "claude-sonnet-5"
+    assert decide("fast", agent=None, environment=None).fallback_model == "claude-opus-5-5"
+    assert decide("best", agent=None, environment=None).fallback_model == "claude-opus-5-5"
 
 
 def test_only_errors_another_model_could_avoid_are_retried():
@@ -103,32 +103,32 @@ def _request(model):
 
 @pytest.mark.asyncio
 async def test_an_overloaded_model_falls_back_once_and_stays_there():
-    inner = _Inner(fail_on={"claude-opus-5"})
-    provider = FallbackProvider(inner, "claude-opus-5", "claude-sonnet-5")
+    inner = _Inner(fail_on={"claude-fable-5-2"})
+    provider = FallbackProvider(inner, "claude-fable-5-2", "claude-opus-5-5")
 
-    assert await provider.chat(_request("claude-opus-5")) == "answered by claude-sonnet-5"
-    assert provider.fell_back and provider.model_used == "claude-sonnet-5"
+    assert await provider.chat(_request("claude-fable-5-2")) == "answered by claude-opus-5-5"
+    assert provider.fell_back and provider.model_used == "claude-opus-5-5"
     # The next round of the same turn goes straight to the fallback.
-    await provider.chat(_request("claude-opus-5"))
-    assert inner.models == ["claude-opus-5", "claude-sonnet-5", "claude-sonnet-5"]
+    await provider.chat(_request("claude-fable-5-2"))
+    assert inner.models == ["claude-fable-5-2", "claude-opus-5-5", "claude-opus-5-5"]
 
 
 @pytest.mark.asyncio
 async def test_a_stream_falls_back_only_before_its_first_word():
-    early = FallbackProvider(_Inner(fail_on={"claude-opus-5"}), "claude-opus-5", "claude-sonnet-5")
-    assert [e async for e in early.stream_chat(_request("claude-opus-5"))] == [
-        "claude-sonnet-5:0", "claude-sonnet-5:1"
+    early = FallbackProvider(_Inner(fail_on={"claude-fable-5-2"}), "claude-fable-5-2", "claude-opus-5-5")
+    assert [e async for e in early.stream_chat(_request("claude-fable-5-2"))] == [
+        "claude-opus-5-5:0", "claude-opus-5-5:1"
     ]
 
-    late = FallbackProvider(_Inner(fail_on={"claude-opus-5"}, after_events=1), "claude-opus-5", "claude-sonnet-5")
+    late = FallbackProvider(_Inner(fail_on={"claude-fable-5-2"}, after_events=1), "claude-fable-5-2", "claude-opus-5-5")
     with pytest.raises(AIProviderError):
         # Half an answer from one model is never finished by another.
-        [e async for e in late.stream_chat(_request("claude-opus-5"))]
+        [e async for e in late.stream_chat(_request("claude-fable-5-2"))]
 
 
 @pytest.mark.asyncio
 async def test_without_a_fallback_the_error_stands():
-    provider = FallbackProvider(_Inner(fail_on={"claude-sonnet-5"}), "claude-sonnet-5", None)
+    provider = FallbackProvider(_Inner(fail_on={"claude-opus-5-5"}), "claude-opus-5-5", None)
 
     with pytest.raises(AIProviderError):
-        await provider.chat(_request("claude-sonnet-5"))
+        await provider.chat(_request("claude-opus-5-5"))
