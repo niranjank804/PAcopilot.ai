@@ -50,6 +50,7 @@ import {
 import { ObjectGraph } from "@/components/object-graph";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { fetchUsableConnections, USABLE_CONNECTIONS_KEY } from "@/lib/connections";
+import { hiddenConnectionCount, hiddenConnectionsNote, type TM1Gateway } from "@/lib/gateways";
 import { CHANGE_TYPE_LABEL, STATUS_VARIANT, statusLabel } from "@/lib/change-format";
 import { cn } from "@/lib/utils";
 import type {
@@ -198,6 +199,15 @@ function MetadataExplorer() {
   // localStorage on each render below, not cached in state) re-renders —
   // avoids a setState-in-effect just to mirror localStorage into state.
   const [, setRecentVersion] = useState(0);
+
+  // Gateway connections that exist but are another member's private
+  // ones: without this the page says "No TM1 connection yet" while the
+  // Connections page shows a gateway with "1 connection".
+  const gatewaysQuery = useQuery({
+    queryKey: ["tm1-gateways"],
+    queryFn: () => apiRequest<TM1Gateway[]>("/tm1/gateways"),
+  });
+  const hiddenConnections = hiddenConnectionCount(gatewaysQuery.data);
 
   const connectionsQuery = useQuery({
     queryKey: USABLE_CONNECTIONS_KEY,
@@ -431,6 +441,11 @@ function MetadataExplorer() {
                 Add one
               </Link>{" "}
               to explore its cubes, dimensions, processes and chores.
+              {hiddenConnections > 0 ? (
+                <span className="mt-2 block" data-testid="hidden-connections-note">
+                  {hiddenConnectionsNote(hiddenConnections)}
+                </span>
+              ) : null}
             </p>
           ) : (
             <>

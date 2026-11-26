@@ -16,7 +16,10 @@ class GatewayResponse(BaseModel):
     version: str | None
     hostname: str | None
     created_at: datetime
+    # Connections through this gateway the caller can see...
     connection_count: int
+    # ...and other members' private ones they can't (no names given).
+    hidden_connection_count: int = 0
 
 
 class GatewayKeyResponse(BaseModel):

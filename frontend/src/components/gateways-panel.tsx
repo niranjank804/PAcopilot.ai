@@ -141,6 +141,9 @@ export function GatewaysPanel() {
                     gateway.version ? `v${gateway.version}` : null,
                     lastSeen(gateway),
                     `${gateway.connection_count} connection(s)`,
+                    gateway.hidden_connection_count
+                      ? `${gateway.hidden_connection_count} private to another member`
+                      : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}

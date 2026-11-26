@@ -14,7 +14,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends, Request, Response
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies.permissions import require_permission
@@ -34,6 +34,7 @@ from src.schemas.tm1_gateway import (
     GatewayResponse,
 )
 from src.tm1.gateway.relay import get_broker
+from src.tm1.service import tm1_integration_service
 from src.tm1.gateway.service import is_online, tm1_gateway_service
 from src.services.audit_service import audit_service
 
@@ -54,19 +55,35 @@ async def _in_broker_thread(function, *args):
     return await asyncio.get_running_loop().run_in_executor(_broker_threads, function, *args)
 
 
-async def _connection_counts(db: AsyncSession, organization_id: uuid.UUID) -> dict:
+async def _connection_counts(db: AsyncSession, current_user: UserResponse) -> dict:
+    """Per gateway: (connections the caller can see, connections they can't).
+
+    A member's private connection is hidden from the rest of the organization
+    (see TM1IntegrationService.may_access), so counting it as theirs would show
+    "1 connection" on a gateway while their connection list stays empty. The
+    hidden ones are reported separately, without saying whose they are, so the
+    page can explain why nothing is listed."""
     rows = await db.execute(
-        select(TM1Connection.gateway_id, func.count())
-        .where(
-            TM1Connection.organization_id == organization_id,
+        select(TM1Connection).where(
+            TM1Connection.organization_id == current_user.organization_id,
             TM1Connection.gateway_id.is_not(None),
         )
-        .group_by(TM1Connection.gateway_id)
     )
-    return {gateway_id: count for gateway_id, count in rows.all()}
+    counts: dict = {}
+    for connection in rows.scalars().all():
+        visible, hidden = counts.get(connection.gateway_id, (0, 0))
+        if await tm1_integration_service.may_access(
+            db, connection, purpose="manage", user_id=current_user.id
+        ):
+            visible += 1
+        else:
+            hidden += 1
+        counts[connection.gateway_id] = (visible, hidden)
+    return counts
 
 
 def _describe(gateway: TM1Gateway, counts: dict) -> GatewayResponse:
+    visible, hidden = counts.get(gateway.id, (0, 0))
     return GatewayResponse(
         id=gateway.id,
         name=gateway.name,
@@ -75,7 +92,8 @@ def _describe(gateway: TM1Gateway, counts: dict) -> GatewayResponse:
         version=gateway.version,
         hostname=gateway.hostname,
         created_at=gateway.created_at,
-        connection_count=counts.get(gateway.id, 0),
+        connection_count=visible,
+        hidden_connection_count=hidden,
     )
 
 
@@ -93,7 +111,7 @@ async def list_gateways(
     current_user: UserResponse = Depends(require_permission("tm1.read")),
 ):
     gateways = await tm1_gateway_service.list(db, current_user.organization_id)
-    counts = await _connection_counts(db, current_user.organization_id)
+    counts = await _connection_counts(db, current_user)
     return ApiResponse(success=True, data=[_describe(g, counts) for g in gateways])
 
 
@@ -132,7 +150,7 @@ async def rotate_gateway_key(
     gateway, key = await tm1_gateway_service.rotate_key(
         db, gateway_id, current_user.organization_id
     )
-    counts = await _connection_counts(db, current_user.organization_id)
+    counts = await _connection_counts(db, current_user)
     app_logger.info(f"tm1_gateway_key_rotated id={gateway.id} by={current_user.id}")
     await audit_service.record(db, current_user, "gateway_key_rotated", "TM1Gateway", gateway.id,
                                {"name": gateway.name}, request)

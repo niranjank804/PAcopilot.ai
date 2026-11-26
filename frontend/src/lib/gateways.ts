@@ -10,7 +10,10 @@ export interface TM1Gateway {
   version: string | null;
   hostname: string | null;
   created_at: string;
+  /** Connections through this gateway the signed-in user can see. */
   connection_count: number;
+  /** Other members' private connections through it, hidden from this user. */
+  hidden_connection_count?: number;
 }
 
 /** Returned once, when a gateway is created or its key rotated. */
@@ -21,6 +24,19 @@ export interface GatewayKey {
 }
 
 export type ConnectionWithGateway = TM1Connection & { gateway_id?: string | null };
+
+/** How many connections, across every gateway, are another member's private
+ *  ones: they exist but are not listed for this user. */
+export function hiddenConnectionCount(gateways: TM1Gateway[] | undefined): number {
+  return (gateways ?? []).reduce((n, g) => n + (g.hidden_connection_count ?? 0), 0);
+}
+
+/** Why a member sees no connection while a gateway has one. */
+export function hiddenConnectionsNote(hidden: number): string {
+  return hidden === 1
+    ? "A gateway connection exists, but it is private to the member who added it. Ask them to share it with the organization (Edit → Who can use it → Everyone in my organization)."
+    : `${hidden} gateway connections exist, but they are private to the members who added them. Ask them to share them with the organization (Edit → Who can use it → Everyone in my organization).`;
+}
 
 /** The form's value for "reached directly, no gateway". */
 export const DIRECT = "direct";

@@ -6,7 +6,7 @@ from cryptography.fernet import Fernet
 import src.tm1.crypto as crypto_module
 from src.core.config import settings
 from src.tm1.gateway.relay import MemoryBroker, set_broker
-from tests.fixtures.factories import auth_headers, create_org_admin, create_user
+from tests.fixtures.factories import auth_headers, create_org_admin, create_user, grant_system_role
 
 
 @pytest.fixture
@@ -150,6 +150,42 @@ async def test_a_private_address_is_allowed_through_a_gateway(client, db_session
     # In use: the gateway cannot be removed from under its connection.
     blocked = await client.delete(f"/tm1/gateways/{gateway['id']}", headers=headers)
     assert blocked.status_code in (400, 422)
+
+
+@pytest.mark.asyncio
+async def test_a_member_is_told_a_gateway_connection_is_private_not_shown_it(client, db_session, tm1_credentials_key):
+    # The gateway said "1 connection(s)" while the member's connection list,
+    # and so the Metadata Explorer, stayed empty: the one connection was the
+    # admin's private one. The count now matches what the member can see,
+    # and the rest is reported as hidden.
+    org, admin = await create_org_admin(db_session)
+    analyst = await create_user(db_session, org.id)
+    await grant_system_role(db_session, analyst.id, "Analyst")
+
+    gateway = (await _create_gateway(client, auth_headers(admin)))["gateway"]
+    created = await client.post(
+        "/tm1/connections", json=_connection(gateway_id=gateway["id"]), headers=auth_headers(admin)
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["data"]["visibility"] == "private"
+
+    seen = (await client.get("/tm1/gateways", headers=auth_headers(analyst))).json()["data"][0]
+    assert (seen["connection_count"], seen["hidden_connection_count"]) == (0, 1)
+    assert (await client.get("/tm1/connections", headers=auth_headers(analyst))).json()["data"] == []
+
+    as_admin = (await client.get("/tm1/gateways", headers=auth_headers(admin))).json()["data"][0]
+    assert (as_admin["connection_count"], as_admin["hidden_connection_count"]) == (1, 0)
+
+    # Shared by its owner: the member sees it, and the gateway counts it.
+    shared = await client.patch(
+        f"/tm1/connections/{created.json()['data']['id']}",
+        json={"visibility": "organization"}, headers=auth_headers(admin),
+    )
+    assert shared.status_code == 200, shared.text
+    seen = (await client.get("/tm1/gateways", headers=auth_headers(analyst))).json()["data"][0]
+    assert (seen["connection_count"], seen["hidden_connection_count"]) == (1, 0)
+    listed = (await client.get("/tm1/connections", headers=auth_headers(analyst))).json()["data"]
+    assert [c["name"] for c in listed] == ["On-prem"]
 
 
 @pytest.mark.asyncio

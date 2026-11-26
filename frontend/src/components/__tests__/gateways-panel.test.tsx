@@ -39,6 +39,17 @@ describe("gateways", () => {
     expect(screen.getByText(/TM1SRV · v1.0.0 · seen just now · 2 connection/)).toBeInTheDocument();
   });
 
+  it("says when a gateway's connections are another member's private ones", async () => {
+    mocks.apiRequest.mockResolvedValue([
+      { ...GATEWAY, connection_count: 0, hidden_connection_count: 1 },
+    ]);
+    renderPanel();
+
+    expect(
+      await screen.findByText(/0 connection\(s\) · 1 private to another member/),
+    ).toBeInTheDocument();
+  });
+
   it("shows the key once, inside the exact commands to install it", async () => {
     const user = userEvent.setup();
     mocks.apiRequest.mockImplementation(async (path: string, options?: { method?: string }) =>

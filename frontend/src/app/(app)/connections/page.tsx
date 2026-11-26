@@ -44,7 +44,13 @@ import {
 import { EnvironmentBadge } from "@/components/environment-badge";
 import { GatewaysPanel } from "@/components/gateways-panel";
 import { ApiError, apiRequest } from "@/lib/api-client";
-import { DIRECT, type ConnectionWithGateway, type TM1Gateway } from "@/lib/gateways";
+import {
+  DIRECT,
+  hiddenConnectionCount,
+  hiddenConnectionsNote,
+  type ConnectionWithGateway,
+  type TM1Gateway,
+} from "@/lib/gateways";
 import type { TM1Connection } from "@/lib/types";
 
 const connectionSchema = z
@@ -436,6 +442,11 @@ export default function ConnectionsPage() {
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             No TM1 connections yet. Create one to start exploring your model.
+            {hiddenConnectionCount(gateways) > 0 ? (
+              <span className="mt-2 block" data-testid="hidden-connections-note">
+                {hiddenConnectionsNote(hiddenConnectionCount(gateways))}
+              </span>
+            ) : null}
           </CardContent>
         </Card>
       )}
